@@ -59,9 +59,10 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   (`tools/encounter.py`, `bash tools/build_encounter.sh`, output `out/newgen_ban_encounter_v1.mp4`): player vs kill-aura
   hacker, admin drops in, /ban, Minecraft death, BANNED stamp. Waiting on the user's feedback, real skins
   (64x64 PNGs -> `newgen-ban/src/skins/{player,hacker,admin}.png`), admin name, and whether staff review every report.
-- **Reference study:** the user downloaded 4 Minecraft animation videos into a folder `mcrefs` on their Desktop
-  (YouTube blocks cloud servers). Study them (frames, motion, camera, cuts; earshot for sound), write findings to
-  `notes/animation-study.md`, then apply them to encounter v2.
+- **Reference study:** done 2026-11-09 on the user's Windows PC (videos in `Desktop\mcrefs`, not in git). Findings and a
+  proposed encounter v2 shot list in `notes/animation-study.md`; scripts in `toolkit/refstudy/`. Next: build encounter v2
+  from section 4 of the notes (multi-shot camera, impact inserts, flash grammar, suck-out), pending the user's go-ahead.
+  earshot was not installed locally (blocked), so the audio notes use librosa/spectrograms.
 - Ranked 2vs2 v4 still awaiting feedback (MR numbers and armor trim are placeholders).
 
 ## Layout
