@@ -131,6 +131,18 @@ Read frame by frame from 30 fps strips:
   turns the head a little. In close-ups the head sways a few pixels over about 2 s, and the face changes expression by
   **swapping the eye/mouth texture** (blink, squint, glare): Minecraft faces act through texture, not through bones.
 - **Secondary motion.** Hair, capes and wings lag behind body turns by 2-4 frames and settle with a small overshoot.
+- **Weapon handling (rechecked 2026-11-09).** The handle runs *through* the closed fist, and the blade roughly
+  continues the forearm line. It is never fixed at 90° to the arm like a vanilla held item. The angle changes with the
+  action:
+  - **Relaxed:** the arm hangs and the blade points down and a little forward (DFY 221 s).
+  - **Running:** the weapon arm stays low and back with the blade trailing behind. Only the free arm pumps
+    (WY 22.9 s).
+  - **Raised or wind-up:** the blade carries on over the shoulder and behind the head (MD 13.75 s).
+  - **Guard:** the blade angles up and forward. Blocks use two hands on the hilt.
+  - **Swings and thrusts:** the blade extends the arm toward the target.
+
+  `anim-test` models this as a per-pose `wrist` angle: 90 means perpendicular to the forearm, 180 means along it, and
+  values above 180 trail the blade behind.
 - **Weight on landings.** Falls and landings compress (crouch) on contact, then settle. Bodies after a death hit stay
   down and the camera holds on them.
 

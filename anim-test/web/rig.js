@@ -103,7 +103,7 @@ export const JOINTS = ['waist', 'chest', 'head', 'rArm', 'rElbow', 'lArm', 'lElb
 export function applyPose(ch, P) {
   ch.root.position.set(...P.pos); ch.root.rotation.set(0, (P.yaw || 0) * D2R, 0);
   for (const j of JOINTS) { const r = P[j] || [0, 0, 0]; ch.J[j].rotation.set(r[0] * D2R, r[1] * D2R, r[2] * D2R, 'XYZ'); }
-  if (ch.J.weapon) ch.J.weapon.rotation.set((P.wrist ?? 90) * D2R, 0, 0);   // 90 = blade perpendicular to the forearm (fist grip); ~180 = along it (thrust)
+  if (ch.J.weapon) ch.J.weapon.rotation.set((P.wrist ?? 160) * D2R, 0, 0);   // 90 = blade perpendicular to the forearm (fist grip); ~180 = along it (thrust)
 }
 
 export function buildWeapon(json, base) {

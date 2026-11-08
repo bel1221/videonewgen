@@ -13,7 +13,7 @@ const JK = ['waist', 'chest', 'head', 'rArm', 'rElbow', 'lArm', 'lElbow', 'rLeg'
 const N = () => { const p = { pos: [0, 0, 0], yaw: 0 }; for (const j of JK) p[j] = [0, 0, 0]; return p; };
 const cp = p => JSON.parse(JSON.stringify(p));
 function mix(a, b, u) {
-  const o = { pos: a.pos.map((v, i) => v + (b.pos[i] - v) * u), yaw: a.yaw + (b.yaw - a.yaw) * u, wrist: (a.wrist ?? 90) + ((b.wrist ?? 90) - (a.wrist ?? 90)) * u };
+  const o = { pos: a.pos.map((v, i) => v + (b.pos[i] - v) * u), yaw: a.yaw + (b.yaw - a.yaw) * u, wrist: (a.wrist ?? 160) + ((b.wrist ?? 160) - (a.wrist ?? 160)) * u };
   for (const j of JK) o[j] = a[j].map((v, i) => v + (b[j][i] - v) * u); return o;
 }
 function add(p, d) { const o = cp(p); for (const k in d) { if (k === 'pos') o.pos = o.pos.map((v, i) => v + d.pos[i]); else if (k === 'yaw') o.yaw += d.yaw; else o[k] = o[k].map((v, i) => v + d[k][i]); } return o; }
@@ -34,10 +34,11 @@ function run(phi, lean = 1) {
   const p = N();
   p.rLeg = [-44 * s, 0, -2]; p.lLeg = [44 * s, 0, 2];
   p.rKnee = [12 + 92 * Math.pow(Math.max(0, c), 1.4), 0, 0]; p.lKnee = [12 + 92 * Math.pow(Math.max(0, -c), 1.4), 0, 0];
-  p.rArm = [48 * s, 0, -8]; p.lArm = [-48 * s, 0, 8];
-  p.rElbow = [-80 - 18 * Math.max(0, -s), 0, 0]; p.lElbow = [-80 - 18 * Math.max(0, s), 0, 0];
+  // sword arm stays low and back with the blade trailing (references: runners never pump the weapon arm); free arm pumps
+  p.rArm = [28 + 12 * s, 0, -10]; p.lArm = [-50 * s, 0, 8];
+  p.rElbow = [-32 - 6 * s, 0, 0]; p.lElbow = [-80 - 18 * Math.max(0, s), 0, 0];
   p.waist = [13 * lean, -6 * s, 0]; p.chest = [5 * lean, 12 * s, 0]; p.head = [-15 * lean, -6 * s, 0];
-  p.pos = [0, 0.11 * (1 - Math.abs(s)) - 0.04, 0];
+  p.pos = [0, 0.11 * (1 - Math.abs(s)) - 0.04, 0]; p.wrist = 214 + 6 * s;
   return p;
 }
 const runContacts = (phi0, phi1) => { const out = []; for (let k = Math.ceil((phi0 - 0.25) * 2); 0.25 + k / 2 <= phi1; k++) out.push(0.25 + k / 2); return out; };
@@ -48,9 +49,9 @@ function stance(sideTwist = 0) {
   p.rLeg = [-20, 0, -6]; p.rKnee = [30, 0, 0]; p.lLeg = [18, 0, 6]; p.lKnee = [24, 0, 0];
   p.waist = [10, -12 + sideTwist, 0]; p.chest = [4, -10, 0]; p.head = [-10, 20, 0];
   p.rArm = [-58, 0, -12]; p.rElbow = [-58, 0, 0]; p.lArm = [-34, 0, 22]; p.lElbow = [-62, 0, 0];
-  p.pos = [0, -0.12, 0]; return p;
+  p.pos = [0, -0.12, 0]; p.wrist = 138; return p;
 }
-function idle() { const p = N(); p.rArm = [-10, 0, -6]; p.rElbow = [-14, 0, 0]; p.lArm = [4, 0, 5]; p.lElbow = [-8, 0, 0]; p.rKnee = [3, 0, 0]; p.lKnee = [3, 0, 0]; return p; }
+function idle() { const p = N(); p.rArm = [-10, 0, -6]; p.rElbow = [-14, 0, 0]; p.lArm = [4, 0, 5]; p.lElbow = [-8, 0, 0]; p.rKnee = [3, 0, 0]; p.lKnee = [3, 0, 0]; p.wrist = 160; return p; }
 
 // ------------------------------------------------------------------ character A (slim skin 1, Aegisblade): runs in, leaps, ducks, thrusts, crosses
 const AX = 0.5;
@@ -60,23 +61,23 @@ let A_K = null;
 function buildA() {
   const at = (p, x, y, z) => set(p, { pos: [x, y, z] });
   const S = stance();
-  const crouch = set(S, { rLeg: [-32, 0, -6], rKnee: [74, 0, 0], lLeg: [22, 0, 6], lKnee: [64, 0, 0], waist: [32, 0, 0], chest: [12, 0, 0], head: [-26, 0, 0],
+  const crouch = set(S, { wrist: 168, rLeg: [-32, 0, -6], rKnee: [74, 0, 0], lLeg: [22, 0, 6], lKnee: [64, 0, 0], waist: [32, 0, 0], chest: [12, 0, 0], head: [-26, 0, 0],
     rArm: [-150, 0, -14], rElbow: [-62, 0, 0], lArm: [24, 0, 20], lElbow: [-30, 0, 0] });
-  const take = set(crouch, { rLeg: [12, 0, -4], rKnee: [8, 0, 0], lLeg: [34, 0, 4], lKnee: [22, 0, 0], waist: [-10, 0, 0], chest: [-14, 0, 0], head: [-6, 0, 0],
+  const take = set(crouch, { wrist: 165, rLeg: [12, 0, -4], rKnee: [8, 0, 0], lLeg: [34, 0, 4], lKnee: [22, 0, 0], waist: [-10, 0, 0], chest: [-14, 0, 0], head: [-6, 0, 0],
     rArm: [-188, 0, -10], rElbow: [-84, 0, 0], lArm: [-64, 0, 34], lElbow: [-20, 0, 0] });
-  const apex = set(take, { rLeg: [-62, 0, -4], rKnee: [92, 0, 0], lLeg: [-18, 0, 4], lKnee: [104, 0, 0], waist: [-4, 0, 0], chest: [-18, 0, 0] });
-  const strike = set(apex, { rArm: [-38, 0, -8], rElbow: [-6, 0, 0], lArm: [10, 0, 30], waist: [30, 0, 0], chest: [26, 0, 0], head: [8, 0, 0], rLeg: [-40, 0, -4], rKnee: [60, 0, 0], lLeg: [10, 0, 4], lKnee: [70, 0, 0] });
-  const land = set(S, { rLeg: [-38, 0, -6], rKnee: [80, 0, 0], lLeg: [26, 0, 6], lKnee: [74, 0, 0], waist: [28, 0, 0], chest: [10, 0, 0], head: [-18, 0, 0], rArm: [-62, 0, -10], rElbow: [-32, 0, 0] });
-  const duck = set(S, { waist: [44, 0, 0], chest: [16, 0, 0], head: [-30, 0, 0], rLeg: [-58, 0, -8], rKnee: [100, 0, 0], lLeg: [12, 0, 8], lKnee: [100, 0, 0], rArm: [-30, 0, -20], rElbow: [-70, 0, 0], lArm: [-20, 0, 30] });
-  const draw1 = set(S, { wrist: 130, rArm: [-18, 0, -12], rElbow: [-112, 0, 0], chest: [2, -32, 0], waist: [6, -18, 0], head: [-8, 14, 0] });
-  const draw2 = set(draw1, { wrist: 150, rArm: [2, 0, -18], rElbow: [-126, 0, 0], chest: [0, -44, 0], waist: [8, -24, 0], rKnee: [40, 0, 0], lKnee: [34, 0, 0] });
+  const apex = set(take, { wrist: 165, rLeg: [-62, 0, -4], rKnee: [92, 0, 0], lLeg: [-18, 0, 4], lKnee: [104, 0, 0], waist: [-4, 0, 0], chest: [-18, 0, 0] });
+  const strike = set(apex, { wrist: 150, rArm: [-38, 0, -8], rElbow: [-6, 0, 0], lArm: [10, 0, 30], waist: [30, 0, 0], chest: [26, 0, 0], head: [8, 0, 0], rLeg: [-40, 0, -4], rKnee: [60, 0, 0], lLeg: [10, 0, 4], lKnee: [70, 0, 0] });
+  const land = set(S, { wrist: 140, rLeg: [-38, 0, -6], rKnee: [80, 0, 0], lLeg: [26, 0, 6], lKnee: [74, 0, 0], waist: [28, 0, 0], chest: [10, 0, 0], head: [-18, 0, 0], rArm: [-62, 0, -10], rElbow: [-32, 0, 0] });
+  const duck = set(S, { wrist: 160, waist: [44, 0, 0], chest: [16, 0, 0], head: [-30, 0, 0], rLeg: [-58, 0, -8], rKnee: [100, 0, 0], lLeg: [12, 0, 8], lKnee: [100, 0, 0], rArm: [-30, 0, -20], rElbow: [-70, 0, 0], lArm: [-20, 0, 30] });
+  const draw1 = set(S, { wrist: 150, rArm: [-18, 0, -12], rElbow: [-112, 0, 0], chest: [2, -32, 0], waist: [6, -18, 0], head: [-8, 14, 0] });
+  const draw2 = set(draw1, { wrist: 165, rArm: [2, 0, -18], rElbow: [-126, 0, 0], chest: [0, -44, 0], waist: [8, -24, 0], rKnee: [40, 0, 0], lKnee: [34, 0, 0] });
   const thrust = set(S, { wrist: 178, rArm: [-112, 0, 0], rElbow: [-2, 0, 0], chest: [12, 12, 0], waist: [16, 6, 0], head: [-10, -22, 0], rLeg: [-58, 0, -6], rKnee: [46, 0, 0], lLeg: [32, 0, 6], lKnee: [10, 0, 0], lArm: [20, 0, 40] });
-  const follow = set(thrust, { wrist: 165, chest: [8, 6, 0], rArm: [-100, 0, -4], rElbow: [-12, 0, 0] });
-  const prep = set(S, { rArm: [-12, 0, -14], rElbow: [-108, 0, 0], waist: [26, 0, 0], chest: [10, -40, 0], rKnee: [52, 0, 0], lKnee: [48, 0, 0] });
-  const slashA = set(S, { chest: [10, 54, 0], waist: [14, 30, 0], rArm: [-92, 0, -4], rElbow: [-24, 0, 0] });
-  const slashB = set(S, { chest: [10, -72, 0], waist: [14, -38, 0], rArm: [-92, 0, 0], rElbow: [-4, 0, 0], lArm: [-40, 0, 60] });
-  const slide = set(S, { wrist: 120, waist: [24, -40, 0], chest: [8, -50, 0], head: [-14, 40, 0], rArm: [-74, 0, -62], rElbow: [-4, 0, 0], lArm: [-20, 0, 50], rLeg: [-60, 0, -10], rKnee: [80, 0, 0], lLeg: [30, 0, 10], lKnee: [70, 0, 0] });
-  const hero = set(idle(), { rArm: [-16, 0, -14], rElbow: [-22, 0, 0], head: [6, -28, 0], chest: [-2, -10, 0], lArm: [6, 0, 8] });
+  const follow = set(thrust, { wrist: 168, chest: [8, 6, 0], rArm: [-100, 0, -4], rElbow: [-12, 0, 0] });
+  const prep = set(S, { wrist: 150, rArm: [-12, 0, -14], rElbow: [-108, 0, 0], waist: [26, 0, 0], chest: [10, -40, 0], rKnee: [52, 0, 0], lKnee: [48, 0, 0] });
+  const slashA = set(S, { wrist: 172, chest: [10, 54, 0], waist: [14, 30, 0], rArm: [-92, 0, -4], rElbow: [-24, 0, 0] });
+  const slashB = set(S, { wrist: 172, chest: [10, -72, 0], waist: [14, -38, 0], rArm: [-92, 0, 0], rElbow: [-4, 0, 0], lArm: [-40, 0, 60] });
+  const slide = set(S, { wrist: 150, waist: [24, -40, 0], chest: [8, -50, 0], head: [-14, 40, 0], rArm: [-74, 0, -62], rElbow: [-4, 0, 0], lArm: [-20, 0, 50], rLeg: [-60, 0, -10], rKnee: [80, 0, 0], lLeg: [30, 0, 10], lKnee: [70, 0, 0] });
+  const hero = set(idle(), { wrist: 172, rArm: [-4, 0, -16], rElbow: [-10, 0, 0], head: [6, -28, 0], chest: [-2, -10, 0], lArm: [6, 0, 8] });
   const r3 = run((runZ(3.0) + 26) / STRIDE); r3.pos = [AX, 0, runZ(3.0)];
   A_K = [
     [3.00, r3],
@@ -122,22 +123,22 @@ let B_K = null;
 function buildB() {
   const at = (p, x, y, z) => set(p, { pos: [x, y, z] });
   const I = idle(), S = stance();
-  const look = set(I, { head: [0, 38, 0] });
-  const block = set(S, { rArm: [-162, 0, 24], rElbow: [-52, 0, 0], lArm: [-150, 0, -22], lElbow: [-64, 0, 0], waist: [-4, 0, 0], chest: [-6, 0, 0], head: [-14, 0, 0] });
-  const absorb = set(block, { rKnee: [62, 0, 0], lKnee: [56, 0, 0], rLeg: [-30, 0, -6], waist: [6, 0, 0] });
-  const windH = set(S, { chest: [6, 72, 0], waist: [6, 40, 0], rArm: [-96, 0, -6], rElbow: [-22, 0, 0], head: [-8, -30, 0], rKnee: [44, 0, 0], lKnee: [38, 0, 0] });
-  const swingH = set(S, { chest: [8, -76, 0], waist: [8, -36, 0], rArm: [-94, 0, 0], rElbow: [-4, 0, 0], head: [-8, 26, 0], lArm: [-30, 0, 56] });
-  const over = set(swingH, { chest: [8, -92, 0], waist: [8, -44, 0] });
-  const hit = set(S, { waist: [-32, 0, 0], chest: [-22, 0, 0], head: [-28, 0, 0], rArm: [-44, 0, -74], rElbow: [-20, 0, 0], lArm: [-34, 0, 76], lElbow: [-24, 0, 0], rLeg: [-36, 0, -6], rKnee: [20, 0, 0], lLeg: [16, 0, 6], lKnee: [10, 0, 0] });
-  const stagger = set(hit, { waist: [14, 0, 0], chest: [10, 0, 0], head: [10, 0, 0], rLeg: [-10, 0, -6], rKnee: [40, 0, 0], lLeg: [30, 0, 6], lKnee: [30, 0, 0] });
-  const kneel = set(N(), { rLeg: [-88, 0, -6], rKnee: [92, 0, 0], lLeg: [6, 0, 4], lKnee: [96, 0, 0], waist: [26, 0, 0], chest: [8, 0, 0], head: [22, 0, 0],
+  const look = set(I, { wrist: 160, head: [0, 38, 0] });
+  const block = set(S, { wrist: 176, rArm: [-128, 0, 22], rElbow: [-46, 0, 0], lArm: [-126, 0, -26], lElbow: [-48, 0, 0], waist: [-4, 0, 0], chest: [-6, 0, 0], head: [-14, 0, 0] });
+  const absorb = set(block, { wrist: 176, rKnee: [62, 0, 0], lKnee: [56, 0, 0], rLeg: [-30, 0, -6], waist: [6, 0, 0] });
+  const windH = set(S, { wrist: 172, chest: [6, 72, 0], waist: [6, 40, 0], rArm: [-96, 0, -6], rElbow: [-22, 0, 0], head: [-8, -30, 0], rKnee: [44, 0, 0], lKnee: [38, 0, 0] });
+  const swingH = set(S, { wrist: 172, chest: [8, -76, 0], waist: [8, -36, 0], rArm: [-94, 0, 0], rElbow: [-4, 0, 0], head: [-8, 26, 0], lArm: [-30, 0, 56] });
+  const over = set(swingH, { wrist: 172, chest: [8, -92, 0], waist: [8, -44, 0] });
+  const hit = set(S, { wrist: 130, waist: [-32, 0, 0], chest: [-22, 0, 0], head: [-28, 0, 0], rArm: [-44, 0, -74], rElbow: [-20, 0, 0], lArm: [-34, 0, 76], lElbow: [-24, 0, 0], rLeg: [-36, 0, -6], rKnee: [20, 0, 0], lLeg: [16, 0, 6], lKnee: [10, 0, 0] });
+  const stagger = set(hit, { wrist: 140, waist: [14, 0, 0], chest: [10, 0, 0], head: [10, 0, 0], rLeg: [-10, 0, -6], rKnee: [40, 0, 0], lLeg: [30, 0, 6], lKnee: [30, 0, 0] });
+  const kneel = set(N(), { wrist: 104, rLeg: [-88, 0, -6], rKnee: [92, 0, 0], lLeg: [6, 0, 4], lKnee: [96, 0, 0], waist: [26, 0, 0], chest: [8, 0, 0], head: [22, 0, 0],
     rArm: [-48, 0, -8], rElbow: [-30, 0, 0], lArm: [-58, 0, 10], lElbow: [-42, 0, 0] });
-  const prep = set(S, { rArm: [-160, 0, -16], rElbow: [-70, 0, 0], waist: [24, 0, 0], chest: [8, 0, 0], rKnee: [54, 0, 0], lKnee: [48, 0, 0] });
-  const diag = set(S, { rArm: [-30, 0, 30], rElbow: [-6, 0, 0], chest: [20, -40, 0], waist: [20, -20, 0] });
-  const done = set(diag, { chest: [24, -50, 0], head: [16, 10, 0] });
-  const knees = set(N(), { rLeg: [0, 0, -4], rKnee: [90, 0, 0], lLeg: [0, 0, 4], lKnee: [90, 0, 0], waist: [34, 0, 0], chest: [18, 0, 0], head: [30, 0, 0],
+  const prep = set(S, { wrist: 165, rArm: [-160, 0, -16], rElbow: [-70, 0, 0], waist: [24, 0, 0], chest: [8, 0, 0], rKnee: [54, 0, 0], lKnee: [48, 0, 0] });
+  const diag = set(S, { wrist: 150, rArm: [-30, 0, 30], rElbow: [-6, 0, 0], chest: [20, -40, 0], waist: [20, -20, 0] });
+  const done = set(diag, { wrist: 150, chest: [24, -50, 0], head: [16, 10, 0] });
+  const knees = set(N(), { wrist: 166, rLeg: [0, 0, -4], rKnee: [90, 0, 0], lLeg: [0, 0, 4], lKnee: [90, 0, 0], waist: [34, 0, 0], chest: [18, 0, 0], head: [30, 0, 0],
     rArm: [-6, 0, -10], rElbow: [-10, 0, 0], lArm: [4, 0, 10], lElbow: [-8, 0, 0] });
-  const slump = set(knees, { waist: [52, 0, 0], chest: [26, 0, 0], head: [38, 0, 0] });
+  const slump = set(knees, { wrist: 166, waist: [52, 0, 0], chest: [26, 0, 0], head: [38, 0, 0] });
   const Y = 180, Z = 2.2;
   const k = (t, p, x, y, z, e) => [t, set(at(p, x, y, z), { yaw: Y }), e];
   B_K = [
