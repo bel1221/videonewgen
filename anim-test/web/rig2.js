@@ -51,16 +51,27 @@ export function loadSkin(url) {
 }
 
 // bone indices
-const B = { root: 0, hips: 1, spine: 2, chest: 3, head: 4, rSh: 5, rEl: 6, lSh: 7, lEl: 8, rTh: 9, rSn: 10, lTh: 11, lSn: 12, rHand: 13 };
+// skeleton modelled on a human: pelvis -> lumbar (spine) -> lower thoracic (spine2) -> thoracic (chest) -> upper thoracic
+// (chest2) -> neck -> head; clavicles on the upper chest carry the shoulders; hips carry the legs.
+const B = { root: 0, hips: 1, spine: 2, spine2: 3, chest: 4, chest2: 5, neck: 6, head: 7, rClav: 8, lClav: 9, rSh: 10, rEl: 11, lSh: 12, lEl: 13,
+  rTh: 14, rSn: 15, lTh: 16, lSn: 17, rHand: 18 };
+// torso skin: each vertex blends the two vertebrae it sits between (centres 13, 16, 19, 22 px) -> a continuous curved back
+function spineW(y) {
+  const cs = [[13, B.spine], [16, B.spine2], [19, B.chest], [22, B.chest2]];
+  if (y <= cs[0][0]) return [[cs[0][1], 0, 0, 0], [1, 0, 0, 0]];
+  if (y >= cs[3][0]) return [[cs[3][1], 0, 0, 0], [1, 0, 0, 0]];
+  for (let i = 0; i < 3; i++) if (y <= cs[i + 1][0]) { const u = (y - cs[i][0]) / 3, s = u * u * (3 - 2 * u); return [[cs[i][1], cs[i + 1][1], 0, 0], [1 - s, s, 0, 0]]; }
+}
 export function buildCharacter(skin, weaponGroup, weaponScale = 1) {
   const aw = skin.userData.slim ? 3 : 4;
   // bind-pose bone positions (absolute px, character at origin, feet at y=0)
   const abs = {
-    root: [0, 0, 0], hips: [0, 12, 0], spine: [0, 12, 0], chest: [0, 18, 0], head: [0, 24, 0],
+    root: [0, 0, 0], hips: [0, 12, 0], spine: [0, 12, 0], spine2: [0, 15, 0], chest: [0, 18, 0], chest2: [0, 21, 0], neck: [0, 23.5, 0], head: [0, 24, 0],
+    rClav: [-1.5, 22, 0], lClav: [1.5, 22, 0],
     rSh: [-(4 + aw / 2), 22, 0], rEl: [-(4 + aw / 2), 18, 0], lSh: [4 + aw / 2, 22, 0], lEl: [4 + aw / 2, 18, 0],
     rTh: [-2, 12, 0], rSn: [-2, 6, 0], lTh: [2, 12, 0], lSn: [2, 6, 0], rHand: [-(4 + aw / 2), 12.5, 0],
   };
-  const parent = { hips: 'root', spine: 'hips', chest: 'spine', head: 'chest', rSh: 'chest', rEl: 'rSh', lSh: 'chest', lEl: 'lSh', rTh: 'hips', rSn: 'rTh', lTh: 'hips', lSn: 'lTh', rHand: 'rEl' };
+  const parent = { hips: 'root', spine: 'hips', spine2: 'spine', chest: 'spine2', chest2: 'chest', neck: 'chest2', head: 'neck', rClav: 'chest2', lClav: 'chest2', rSh: 'rClav', rEl: 'rSh', lSh: 'lClav', lEl: 'lSh', rTh: 'hips', rSn: 'rTh', lTh: 'hips', lSn: 'lTh', rHand: 'rEl' };
   const names = Object.keys(B), bones = {};
   for (const n of names) { const b = new THREE.Bone(); b.name = n; bones[n] = b; }
   for (const n of names) {
@@ -71,7 +82,7 @@ export function buildCharacter(skin, weaponGroup, weaponScale = 1) {
   const G = { p: [], n: [], uv: [], si: [], sw: [], idx: [] }, GO = { p: [], n: [], uv: [], si: [], sw: [], idx: [] };
   const part = (uB, vB, uO, vO, w, h, d, x0, y0, z0, inf, wf) => { skinnedBox(G, uB, vB, w, h, d, x0, y0, z0, 0, wf); skinnedBox(GO, uO, vO, w, h, d, x0, y0, z0, inf, wf); };
   part(0, 0, 32, 0, 8, 8, 8, -4, 24, -4, 0.5, one(B.head));
-  part(16, 16, 16, 32, 8, 12, 4, -4, 12, -2, 0.25, two(B.chest, B.spine, 18, 2.2));
+  part(16, 16, 16, 32, 8, 12, 4, -4, 12, -2, 0.25, spineW);
   part(40, 16, 40, 32, aw, 12, 4, -(4 + aw), 12, -2, 0.25, two(B.rSh, B.rEl, 18));
   part(32, 48, 48, 48, aw, 12, 4, 4, 12, -2, 0.25, two(B.lSh, B.lEl, 18));
   part(0, 16, 0, 32, 4, 12, 4, -4, 0, -2, 0.25, two(B.rTh, B.rSn, 6));
@@ -119,8 +130,15 @@ export function applyPose(ch, P) {
   ch.root.position.set(...P.pos); ch.root.rotation.set(tl[0] * D2R, (P.yaw || 0) * D2R, tl[1] * D2R, 'YXZ');
   const b = ch.bones, w = P.waist || [0, 0, 0];
   const pel = P.pelvis || [w[0] * 0.35, w[1] * 0.45, w[2] * 0.35];
-  setRot(b.hips, pel); setRot(b.spine, [w[0] - pel[0], w[1] - pel[1], w[2] - pel[2]]);
-  setRot(b.chest, P.chest || [0, 0, 0]); setRot(b.head, P.head || [0, 0, 0]);
+  const cst = P.chest || [0, 0, 0], hd = P.head || [0, 0, 0], sc = (v, k) => [v[0] * k, v[1] * k, v[2] * k];
+  const rest = [w[0] - pel[0], w[1] - pel[1], w[2] - pel[2]];
+  setRot(b.hips, pel); setRot(b.spine, sc(rest, 0.55)); setRot(b.spine2, sc(rest, 0.45));     // lumbar bends most
+  setRot(b.chest, sc(cst, 0.55)); setRot(b.chest2, sc(cst, 0.45));                           // thoracic curve
+  setRot(b.neck, sc(hd, 0.4)); setRot(b.head, sc(hd, 0.6));                                   // neck carries part of the head turn
+  // clavicles: shoulders shrug up/forward as the arm rises past horizontal (scapula elevation)
+  for (const [cl, arm, s] of [[b.rClav, P.rArm || [0, 0, 0], -1], [b.lClav, P.lArm || [0, 0, 0], 1]]) {
+    const e = Math.min(1, Math.max(0, (-arm[0] - 70) / 110)) + Math.min(0.6, Math.abs(arm[2]) / 120);
+    cl.rotation.set(-6 * e * D2R, 0, s * 14 * e * D2R, 'XYZ'); }
   setRot(b.rSh, P.rArm || [0, 0, 0]); setRot(b.rEl, P.rElbow || [0, 0, 0]); setRot(b.lSh, P.lArm || [0, 0, 0]); setRot(b.lEl, P.lElbow || [0, 0, 0]);
   b.rHand.rotation.set(0, (P.roll || 0) * D2R, 0);
   if (ch.weapon) ch.weapon.rotation.set((P.wrist ?? 160) * D2R, 0, 0);

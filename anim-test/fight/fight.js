@@ -254,6 +254,8 @@ function drawState(t) {
   const DBG = params.get('dbg');
   if (DBG) { const p = C.pose(DBG, t), yaw = p.yaw * Math.PI / 180, side = +(params.get('side') || 90) * Math.PI / 180;
     const c0 = new THREE.Vector3(p.pos[0], FLOOR + 0.9, p.pos[2]);
+    if (params.get('fixed')) { const fx = +params.get('fixed'), q = C.pose(DBG, fx), y2 = q.yaw * Math.PI / 180; c0.set(q.pos[0] + Math.sin(y2) * 1.5, FLOOR + 0.9, q.pos[2] + Math.cos(y2) * 1.5);
+      cam = { pos: c0.clone().add(new THREE.Vector3(Math.sin(y2 + side) * 7.5, 0.2, Math.cos(y2 + side) * 7.5)), look: c0, fov: 30, roll: 0, label: 'dbg' }; } else
     cam = { pos: c0.clone().add(new THREE.Vector3(Math.sin(yaw + side) * 5.2, 0.2, Math.cos(yaw + side) * 5.2)), look: c0, fov: 30, roll: 0, label: 'dbg' }; }
   camera.position.copy(cam.pos); camera.fov = cam.fov; camera.updateProjectionMatrix(); camera.up.set(0, 1, 0); camera.lookAt(cam.look); if (cam.roll) camera.rotateZ(cam.roll);
   const focus = new THREE.Vector3(0, FLOOR, 0);
