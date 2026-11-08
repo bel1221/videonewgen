@@ -130,6 +130,23 @@ class Scene:
         s.W, s.H, s.sc = W, H, scale
         s.V = Rx(cam_pitch) @ Ry(cam_yaw); s.c = s.V @ np.array(center, float)
         s.scr = screen or (W / 2, H / 2); s.quads = []
+        # optional coloured lighting (v2). None keeps the original single-direction shade exactly.
+        # dict(amb=(r,g,b), key=((r,g,b), dir), rim=((r,g,b), dir), points=[((r,g,b), pos, radius), ...]); colours as 0..1+ multipliers
+        s.light = None
+    def _light(s, Q, n):
+        L = s.light; col = np.array(L['amb'], np.float32)
+        kc, kd = L['key']; kd = np.asarray(kd, float); kd = kd / np.linalg.norm(kd)
+        col = col + np.array(kc, np.float32) * max(0.0, float(n @ kd))
+        if L.get('rim'):
+            rc, rd = L['rim']; rd = np.asarray(rd, float); rd = rd / np.linalg.norm(rd)
+            side = 1.0 - abs(float((s.V @ n)[2]))          # strongest on faces seen edge-on (silhouette edges)
+            col = col + np.array(rc, np.float32) * max(0.0, float(n @ rd)) * (0.35 + 0.65 * side)
+        if L.get('points'):
+            p = Q.A + 0.5 * (Q.B - Q.A) + 0.5 * (Q.C - Q.A)
+            for pc, pp, r in L['points']:
+                dv = np.asarray(pp, float) - p; d = float(np.linalg.norm(dv)) + 1e-6
+                col = col + np.array(pc, np.float32) * max(0.0, float(n @ dv) / d) / (1.0 + (d / r) ** 2)
+        return col
     def proj(s, p):
         q = s.V @ p
         return np.array([s.scr[0] + (q[0] - s.c[0]) * s.sc, s.scr[1] - (q[1] - s.c[1]) * s.sc, q[2]])
@@ -160,8 +177,11 @@ class Scene:
             m &= c[..., 3] >= 128
             if not m.any(): continue
             n = np.cross(Q.C - Q.A, Q.B - Q.A); nl = np.linalg.norm(n)
-            sh = Q.shade if Q.shade is not None else (0.62 + 0.38 * max(0.0, float(n @ LIGHT) / nl) if nl > 0 else 0.8)
-            c[..., :3] *= sh
+            if s.light is not None and Q.shade is None and nl > 0:
+                c[..., :3] *= s._light(Q, n / nl)
+            else:
+                sh = Q.shade if Q.shade is not None else (0.62 + 0.38 * max(0.0, float(n @ LIGHT) / nl) if nl > 0 else 0.8)
+                c[..., :3] *= sh
             if Q.tint is not None:
                 tc, ta = Q.tint; c[..., :3] = c[..., :3] * (1 - ta) + np.array(tc, np.float32) * ta
             c[..., 3] = 255

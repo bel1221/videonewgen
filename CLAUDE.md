@@ -60,9 +60,12 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   hacker, admin drops in, /ban, Minecraft death, BANNED stamp. Waiting on the user's feedback, real skins
   (64x64 PNGs -> `newgen-ban/src/skins/{player,hacker,admin}.png`), admin name, and whether staff review every report.
 - **Reference study:** done 2026-11-09 on the user's Windows PC (videos in `Desktop\mcrefs`, not in git). Findings and a
-  proposed encounter v2 shot list in `notes/animation-study.md`; scripts in `toolkit/refstudy/`. Next: build encounter v2
-  from section 4 of the notes (multi-shot camera, impact inserts, flash grammar, suck-out), pending the user's go-ahead.
-  earshot was not installed locally (blocked), so the audio notes use librosa/spectrograms.
+  proposed encounter v2 shot list in `notes/animation-study.md`; scripts in `toolkit/refstudy/`. earshot was not
+  installed locally (blocked), so the audio notes use librosa/spectrograms.
+- **Encounter v2** built from the study: `tools/encounter_v2.py` (14 shots + 2 impact inserts + flash, anticipation/
+  knockback/trails/idle/face swaps, coloured key/fill/rim/point lighting via `MC.Scene.light`, haze, embers, bloom,
+  grade), `enc_sfx_v2.py`, `enc_music_v2.py` (low-pass suck-out into the landing), `bash tools/build_encounter_v2.sh`
+  (Windows: `PY=python`) -> `out/newgen_ban_encounter_v2.mp4` (10.5 s). Waiting on the user's feedback; skins/admin name still open.
 - Ranked 2vs2 v4 still awaiting feedback (MR numbers and armor trim are placeholders).
 
 ## Layout
