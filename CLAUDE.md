@@ -68,7 +68,7 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   (Windows: `PY=python`) -> `out/newgen_ban_encounter_v2.mp4` (10.5 s). Waiting on the user's feedback; skins/admin name still open.
 - **3D animation test** (`anim-test/`, see its README): three.js voxel world + jointed skin rig (elbows/knees/waist/wrist)
   with the user's 3 skins, run + sword fight, golden-hour lighting, rendered in headless Chrome ->
-  `anim-test/out/newgen_anim_test_v2.mp4` (9.5 s; v2 = weapon grips reworked from the references, per-pose wrist). Waiting on feedback.
+  `anim-test/out/newgen_anim_test_v2.mp4` (9.5 s; v2 = weapon grips reworked from the references, per-pose wrist). EXPERIMENTAL: user says "not quite there but getting better"; keep iterating on weapon handling/animation feel next session.
 - Ranked 2vs2 v4 still awaiting feedback (MR numbers and armor trim are placeholders).
 
 ## Layout
