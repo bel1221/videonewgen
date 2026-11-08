@@ -270,7 +270,7 @@ function buildAll() {
   for (const c of ['A', 'B']) { T[c].sort((a, b) => a[0] - b[0]); P[c].sort((a, b) => a[0] - b[0]); }
 }
 export const export_cross = {};
-export function events() { return { steps: STEPS.map(s => [+s.t.toFixed(3), s.kind, +(s.sp || 0).toFixed(2), s.c, s.foot]), ghits: GHITS.map(g => +g.t.toFixed(3)), clashes: CONT.map(c => [c.t, c.big, c.kind]), swings: SWINGS() }; }
+export function events() { return { steps: STEPS.map(s => [+s.t.toFixed(3), s.kind, +(s.sp || 0).toFixed(2), s.c, s.foot, s.run ? 1 : 0]), slides: SLIDES, ghits: GHITS.map(g => +g.t.toFixed(3)), clashes: CONT.map(c => [c.t, c.big, c.kind]), swings: SWINGS() }; }
 
 // clash corrections (IK-lite): solved in fight.js so the two blades physically cross at each clash time
 export const CORR = { A: [], B: [] };
@@ -322,8 +322,8 @@ function runGait(c, root, rawXZ, N) {
       const p0 = phiAt(i - 1), p1 = phiAt(i);
       for (const [f, off] of [['r', 0.25], ['l', 0.75]]) if (Math.floor(p0 - off) < Math.floor(p1 - off)) {
         const vx = root[i][0] - root[Math.max(i0, i - 6)][0], vz = root[i][1] - root[Math.max(i0, i - 6)][1], vn = Math.hypot(vx, vz) || 1;
-        const fx = vx / vn, fz = vz / vn, side = f === 'r' ? 1 : -1;            // right foot sits on the right of travel
-        con.push({ i, f, p: [root[i][0] + fx * 0.2 + fz * 0.12 * side, root[i][1] + fz * 0.2 - fx * 0.12 * side] });
+        const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1;            // right foot on the right of travel: right = (-fz, fx)
+        con.push({ i, f, p: [root[i][0] + fx * 0.2 + fz * 0.13 * side, root[i][1] + fz * 0.2 - fx * 0.13 * side] });
       }
     }
     for (const f of ['r', 'l']) {
@@ -364,7 +364,7 @@ function simulate() {
   for (const c of ['A', 'B']) {
     const sm = push[c].map((_, i) => { let x = 0, z = 0, w = 0; for (let j = -R; j <= R; j++) { const q = push[c][Math.min(N - 1, Math.max(0, i + j))], g = Math.exp(-(j * j) / (2 * (R / 2) ** 2)); x += q[0] * g; z += q[1] * g; w += g; } return [x / w * 1.15, z / w * 1.15]; });
     const root = raw[c].map((p, i) => [p.pos[0] + sm[i][0], p.pos[2] + sm[i][1]]);
-    const feet = { r: null, l: null }, step = { r: null, l: null }, outs = { r: [], l: [] };
+    const feet = { r: null, l: null }, step = { r: null, l: null }, outs = { r: [], l: [] }, Dsm = { r: null, l: null }, lastStep = { r: -9, l: -9 };
     const rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, root, rawXZ, N), entry = {};
     for (const e of G.ev) STEPS.push({ c, t: e.t, foot: e.f, p: [e.p[0], 0, e.p[1]], kind: 'step', sp: 5, run: true });
     for (let i = 0; i < N; i++) {
@@ -381,16 +381,17 @@ function simulate() {
         }
         const fk = air || (f === 'r' && p.fkR) || (f === 'l' && p.fkL);
         const off = legFK(leg, knee, hx), lx = off[0] / 16, lz = off[1] / 16;
-        const D = [root[i][0] + lx * cy + lz * sy, root[i][1] - lx * sy + lz * cy];
+        const Dr = [root[i][0] + lx * cy + lz * sy, root[i][1] - lx * sy + lz * cy];
+        Dsm[f] = Dsm[f] ? [lerp(Dsm[f][0], Dr[0], 1), lerp(Dsm[f][1], Dr[1], 1)] : Dr.slice(); const D = Dsm[f];   // ~0.1 s low-pass
         if (fk) { if (feet[f]) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'lift' }); feet[f] = null; step[f] = null; out.push(null); continue; }
         if (!feet[f]) { feet[f] = D.slice(); STEPS.push({ c, t, foot: f, p: [D[0], 0, D[1]], kind: 'land', sp }); }
-        if (skid) { feet[f] = [lerp(feet[f][0], D[0], 0.25), lerp(feet[f][1], D[1], 0.25)]; step[f] = null; if (i % 12 === 0) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'skid' }); out.push([feet[f][0], 0, feet[f][1]]); continue; }
+        if (skid) { feet[f] = [lerp(feet[f][0], D[0], 0.25), lerp(feet[f][1], D[1], 0.25)]; step[f] = null; if (i % 60 === 0) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'skid' }); out.push([feet[f][0], 0, feet[f][1]]); continue; }
         const o = f === 'r' ? 'l' : 'r';
         if (step[f]) {
           const s_ = step[f], u = Math.min(1, (t - s_.t0) / s_.dur), w = u * u * (3 - 2 * u);
           s_.to = [lerp(s_.to[0], D[0] + vx * (s_.dur * (1 - u)) * 0.6, 0.15), lerp(s_.to[1], D[1] + vz * (s_.dur * (1 - u)) * 0.6, 0.15)];
           const x = lerp(s_.from[0], s_.to[0], w), z = lerp(s_.from[1], s_.to[1], w), y = s_.h * Math.sin(Math.PI * u);
-          if (u >= 1) { feet[f] = s_.to.slice(); step[f] = null; STEPS.push({ c, t, foot: f, p: [x, 0, z], kind: 'step', sp }); out.push([x, 0, z]); }
+          if (u >= 1) { feet[f] = s_.to.slice(); step[f] = null; lastStep[f] = t; STEPS.push({ c, t, foot: f, p: [x, 0, z], kind: 'step', sp }); out.push([x, 0, z]); }
           else out.push([x, y, z]);
           continue;
         }
@@ -398,8 +399,9 @@ function simulate() {
         const reach = Math.hypot(feet[f][0] - root[i][0], feet[f][1] - root[i][1]);
         const otherBusy = step[o] && reach < 0.5 && (sp < 2.5 || (t - step[o].t0) / step[o].dur < 0.4);
         const errO = feet[o] ? Math.hypot(feet[o][0] - D[0], feet[o][1] - D[1]) : 0;
-        if ((err > 0.13 && !otherBusy && !(step[o] == null && feet[o] && errO > err * 1.4 && reach < 0.5)) || (reach > 0.58 && !step[f])) {
-          const run = sp > 2.5, dur = run ? Math.max(0.1, Math.min(0.16, 0.75 / sp)) : Math.min(0.22, Math.max(0.09, 0.07 + 0.12 * err));
+        const rested = t - lastStep[f] > 0.18 && t - lastStep[o] > 0.08;
+        if ((err > 0.17 && rested && !otherBusy && !(step[o] == null && feet[o] && errO > err * 1.4 && reach < 0.5)) || (reach > 0.5 && !step[f] && t - lastStep[f] > 0.06)) {
+          const run = sp > 2.5, dur = run ? Math.max(0.12, Math.min(0.18, 0.75 / sp)) : Math.min(0.26, Math.max(0.15, 0.1 + 0.12 * err));
           step[f] = { from: feet[f].slice(), to: [D[0] + vx * dur * 0.6, D[1] + vz * dur * 0.6], t0: t, dur, h: run ? 0.2 : Math.min(0.2, 0.05 + 0.2 * err) };
         }
         out.push([feet[f][0], 0, feet[f][1]]);

@@ -298,6 +298,14 @@ window.dbgPose = function (k, t) { const p = C.pose(k, t); applyPose(cast[k], p)
   const sole = n => b[n].localToWorld(new THREE.Vector3(0, -6, 0)).toArray().map(v => +v.toFixed(3));
   return { pos: p.pos.map(v => +v.toFixed(3)), y: +p.y.toFixed(3), floor: +floorAt(p.pos[0], p.pos[2]).toFixed(3), ik: p.ik, hips: w('hips'), rTh: w('rTh'), rSn: w('rSn'), rSole: sole('rSn'), lSole: sole('lSn'), rLegFK: p.rLeg, rKnee: p.rKnee }; };
 window.events = () => C.events();
+window.shake = function (k, a, b) { const P = []; for (let t = a; t <= b + 1e-6; t += 1 / 30) { applyPose(cast[k], C.pose(k, t)); cast[k].root.updateMatrixWorld(true); P.push([t, cast[k].bones.head.getWorldPosition(new THREE.Vector3())]); }
+  const rev = {}; for (let i = 2; i < P.length; i++) { const v1 = P[i - 1][1].clone().sub(P[i - 2][1]), v2 = P[i][1].clone().sub(P[i - 1][1]);
+    if (v1.length() > 0.012 && v2.length() > 0.012 && v1.dot(v2) / (v1.length() * v2.length()) < -0.5) { const s = Math.floor(P[i][0] * 2) / 2; rev[s] = (rev[s] || 0) + 1; } }
+  return rev; };
+window.jitter = function (k, a, b) { const P = []; for (let t = a; t <= b + 1e-6; t += 1 / 30) { const p = C.pose(k, t); applyPose(cast[k], p); cast[k].root.updateMatrixWorld(true);
+    const h = cast[k].bones.head.getWorldPosition(new THREE.Vector3()), c = cast[k].bones.chest.getWorldPosition(new THREE.Vector3()); P.push([t, h, c]); }
+  const out = []; for (let i = 2; i < P.length; i++) { const jh = P[i][1].clone().sub(P[i - 1][1].clone().multiplyScalar(2)).add(P[i - 2][1]).length(), jc = P[i][2].clone().sub(P[i - 1][2].clone().multiplyScalar(2)).add(P[i - 2][2]).length();
+    out.push([+P[i][0].toFixed(2), +jh.toFixed(3), +jc.toFixed(3)]); } return out; };
 window.dbgBlade = function (k, t) { const p = C.pose(k, t); applyPose(cast[k], p); cast[k].root.updateMatrixWorld(true);
   const o = k === 'A' ? 'B' : 'A', q = C.pose(o, t); let fp = 0, bp = 0; const v = new THREE.Vector3();
   for (let a = 4; a <= 28; a += 2) { cast[k].weapon.localToWorld(v.set(0, a, 0)); fp = Math.max(fp, floorAt(v.x, v.z) - v.y);

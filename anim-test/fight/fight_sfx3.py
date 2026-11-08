@@ -47,9 +47,23 @@ def noise(bus, t, g, dur, lo, hi):
     n = int(dur * SR); tt = np.arange(n) / SR; x = rng.standard_normal(n) * np.exp(-tt * 4 / dur) * np.minimum(1, tt / 0.004)
     x = sosfilt(butter(2, [lo, hi], 'band', fs=SR, output='sos'), x); x /= np.abs(x).max() + 1e-9
     place(bus, np.stack([x, x], 1).astype(np.float32), t, g, align='start')
+_last_sand = [-1]
 def mc_step(t, g, foot, rate=None):
-    f = MC_SAND[rng.integers(len(MC_SAND))]; r = rate or rng.uniform(0.92, 1.12)
-    place(2, load(f, r), t, g, pan=(0.12 if foot == 'r' else -0.12), align='onset')
+    k = rng.integers(len(MC_SAND))
+    while k == _last_sand[0]: k = rng.integers(len(MC_SAND))        # never the same file twice in a row
+    _last_sand[0] = k; r = rate or rng.uniform(0.9, 1.15)
+    x = load(MC_SAND[k], r); off = int(rng.uniform(0, 0.03) * SR); x = x[off:]   # random start -> fewer identical transients
+    place(2, x, t, g, pan=(0.12 if foot == 'r' else -0.12), align='onset')
+def slide(t0, t1, g):
+    # sliding on sand: a random grain of a sand step, time-stretched to the slide length, low-passed, swelled in and out
+    src = MC_SAND[rng.integers(len(MC_SAND))]; x = load(src)[:, 0]; a = int(rng.uniform(0.02, 0.12) * SR); grain = x[a:a + int(0.14 * SR)]
+    dur = max(0.25, t1 - t0 + 0.15); factor = 0.14 / dur; chain = []
+    while factor < 0.5: chain.append('atempo=0.5'); factor /= 0.5
+    chain.append(f'atempo={factor:.4f}')
+    y = np.frombuffer(subprocess.run(['ffmpeg', '-v', 'error', '-f', 'f32le', '-ar', str(SR), '-ac', '1', '-i', '-', '-af', ','.join(chain + ['lowpass=f=4500']), '-f', 'f32le', '-'],
+                                     input=grain.astype(np.float32).tobytes(), capture_output=True, check=True).stdout, np.float32).copy()
+    n = len(y); env = np.minimum(1, np.arange(n) / (0.06 * SR)) * np.minimum(1, (n - np.arange(n)) / (0.18 * SR)); y = y * env / (np.abs(y).max() + 1e-9)
+    place(2, np.stack([y, y], 1).astype(np.float32), t0, g, align='start')
 
 muted = lambda t: any(abs(t - m) < 0.03 for m in MUTE_CLASH)
 # ---------------- BUS 1: action / fighting
@@ -66,12 +80,17 @@ for t, big, kind in EV['clashes']:
     ring(t + 0.004, -15 if big else -20, big)                       # tail = random bus
     if big: place(3, load(pick('click')), t + 0.012, -14)
 # ---------------- BUS 2: surroundings (one Minecraft sand step per planted foot)
-for t, kind, sp, c, foot in EV['steps']:
-    if kind == 'step': mc_step(t, -11 + min(4, sp * 0.8) + rng.uniform(-1.5, 0.5), foot)
-    elif kind == 'land': mc_step(t, -6, 'r', 0.85); place(2, load(MC_FALL), t, -12, align='onset')
-    elif kind == 'skid': mc_step(t, -16, 'l', 0.75)
+last = {'A': -9, 'B': -9}
+for t, kind, sp, c, foot, run in sorted(EV['steps']):
+    if kind not in ('step', 'land') or t - last[c] < (0.2 if run or kind == 'land' else 0.32): continue
+    last[c] = t
+    if kind == 'land': mc_step(t, -12, foot or 'r', 0.85)
+    elif run: mc_step(t, -14 + rng.uniform(-1.5, 0.5), foot)               # running: clearly audible
+    else: mc_step(t, -30 + rng.uniform(-2, 0), foot)                        # fighting footwork: barely there
+for c, wins in EV['slides'].items():
+    for t0, t1 in wins: slide(t0, t1, -13)
 for t in EV['ghits']: noise(2, t, -12, 0.22, 400, 5200)
-mc_step(19.38, -4, 'r', 0.8); place(2, load(MC_FALL), 19.38, -6, align='onset'); thump(2, 19.38, -10, 60)
+mc_step(19.38, -9, 'r', 0.8); thump(2, 19.38, -12, 60)
 # ---------------- BUS 3: random
 for i, tb in enumerate(np.arange(11.7, 12.5, 0.055)):
     noise(3, tb, -22, 0.04, 2000, 9000)
