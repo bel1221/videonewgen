@@ -1,0 +1,5 @@
+# Finished renders live on Higgsfield (media ids in HANDOFF.md); re-download when needed
+renders/
+# Regenerable caches (see HANDOFF.md §9.4)
+*.npy
+__pycache__/
