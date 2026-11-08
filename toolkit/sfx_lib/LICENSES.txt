@@ -1,0 +1,115 @@
+TD-CUT SOUND LIBRARY - SOURCES AND LICENCES
+
+Every sound in this folder comes from an open sound library and is published under CC0 1.0
+(Creative Commons Zero, public domain dedication: https://creativecommons.org/publicdomain/zero/1.0/).
+CC0 allows use in commercial and non-commercial finished media without attribution. Credits are listed
+here as a courtesy.
+
+Interface Sounds
+  author: Kenney (kenney.nl)
+  source: https://kenney.nl/assets/interface-sounds
+  licence: CC0 1.0
+  files (69): flash/kint__glass_004.ogg, flash/kint__select_007.ogg, riser/kint__maximize_005.ogg, glitch/kint__glitch_001.ogg, glitch/kint__glitch_002.ogg, glitch/kint__glitch_003.ogg, glitch/kint__glitch_004.ogg, glitch/kint__scratch_001.ogg, glitch/kint__scratch_002.ogg, glitch/kint__scratch_004.ogg, glitch/kint__scratch_005.ogg, dataswish/kint__close_002.ogg, dataswish/kint__close_003.ogg, dataswish/kint__open_002.ogg, dataswish/kint__open_003.ogg, ui_error/kint__error_001.ogg, ui_error/kint__error_002.ogg, ui_error/kint__error_003.ogg, ui_error/kint__error_004.ogg, ui_error/kint__error_005.ogg, ui_error/kint__error_006.ogg, ui_error/kint__error_007.ogg, ui_error/kint__error_008.ogg, ui_error/kint__question_001.ogg, ui_error/kint__question_002.ogg, ui_error/kint__question_003.ogg, ui_error/kint__question_004.ogg, ui_error/kint__bong_001.ogg, ui_error/kint__confirmation_001.ogg, ui_error/kint__confirmation_003.ogg, ui_blip/kint__click_001.ogg, ui_blip/kint__click_002.ogg, ui_blip/kint__click_003.ogg, ui_blip/kint__click_004.ogg, ui_blip/kint__click_005.ogg, ui_blip/kint__select_001.ogg, ui_blip/kint__select_002.ogg, ui_blip/kint__select_008.ogg, ui_blip/kint__tick_001.ogg, ui_blip/kint__tick_002.ogg, ui_blip/kint__tick_004.ogg, ui_blip/kint__toggle_001.ogg, ui_blip/kint__toggle_002.ogg, ui_blip/kint__toggle_003.ogg, ui_blip/kint__toggle_004.ogg, ui_blip/kint__back_001.ogg, ui_blip/kint__back_002.ogg, ui_blip/kint__back_003.ogg, ui_blip/kint__back_004.ogg, ui_blip/kint__pluck_001.ogg, ui_blip/kint__pluck_002.ogg, scan/kint__scroll_001.ogg, scan/kint__scroll_004.ogg, scan/kint__scroll_005.ogg, scan/kint__maximize_003.ogg, scan/kint__minimize_003.ogg, scan/kint__maximize_004.ogg, scan/kint__minimize_004.ogg, crack/kint__glass_001.ogg, crack/kint__glass_003.ogg, crack/kint__glass_005.ogg, poweron/kint__switch_003.ogg, poweron/kint__switch_004.ogg, poweron/kint__switch_005.ogg, poweron/kint__maximize_001.ogg, poweron/kint__maximize_002.ogg, powerdown/kint__minimize_001.ogg, powerdown/kint__minimize_002.ogg, powerdown/kint__minimize_005.ogg
+
+UI Audio
+  author: Kenney (kenney.nl)
+  source: https://kenney.nl/assets/ui-audio
+  licence: CC0 1.0
+  files (19): ui_blip/kui__click1.ogg, ui_blip/kui__click2.ogg, ui_blip/kui__click3.ogg, ui_blip/kui__click4.ogg, ui_blip/kui__click5.ogg, ui_blip/kui__rollover1.ogg, ui_blip/kui__rollover2.ogg, ui_blip/kui__rollover3.ogg, ui_blip/kui__rollover4.ogg, ui_blip/kui__rollover5.ogg, ui_blip/kui__rollover6.ogg, ui_blip/kui__switch1.ogg, ui_blip/kui__switch5.ogg, ui_blip/kui__switch10.ogg, ui_blip/kui__switch15.ogg, ui_blip/kui__switch20.ogg, ui_blip/kui__switch25.ogg, ui_blip/kui__switch30.ogg, ui_blip/kui__switch33.ogg
+
+Digital Audio
+  author: Kenney (kenney.nl)
+  source: https://kenney.nl/assets/digital-audio
+  licence: CC0 1.0
+  files (38): boom/kdig__lowDown.ogg, boom/kdig__lowRandom.ogg, riser/kdig__powerUp3.ogg, dataswish/kdig__phaserDown1.ogg, dataswish/kdig__phaserDown2.ogg, dataswish/kdig__phaserDown3.ogg, dataswish/kdig__phaserUp2.ogg, dataswish/kdig__phaserUp4.ogg, dataswish/kdig__phaserUp6.ogg, dataswish/kdig__phaserUp7.ogg, dataswish/kdig__phaseJump2.ogg, dataswish/kdig__phaseJump4.ogg, dataswish/kdig__phaseJump5.ogg, dataswish/kdig__highDown.ogg, dataswish/kdig__highUp.ogg, ui_error/kdig__twoTone1.ogg, ui_error/kdig__twoTone2.ogg, ui_error/kdig__threeTone1.ogg, ui_error/kdig__threeTone2.ogg, scan/kdig__pepSound1.ogg, scan/kdig__pepSound3.ogg, scan/kdig__tone1.ogg, corrupt/kdig__spaceTrash1.ogg, corrupt/kdig__spaceTrash2.ogg, corrupt/kdig__spaceTrash3.ogg, corrupt/kdig__spaceTrash4.ogg, corrupt/kdig__spaceTrash5.ogg, buzz/kdig__zap1.ogg, buzz/kdig__zap2.ogg, buzz/kdig__zapTwoTone.ogg, buzz/kdig__zapTwoTone2.ogg, buzz/kdig__zapThreeToneUp.ogg, poweron/kdig__powerUp1.ogg, poweron/kdig__powerUp4.ogg, poweron/kdig__powerUp6.ogg, poweron/kdig__powerUp10.ogg, poweron/kdig__powerUp12.ogg, powerdown/kdig__zapThreeToneDown.ogg
+
+Sci-fi Sounds
+  author: Kenney (kenney.nl)
+  source: https://kenney.nl/assets/sci-fi-sounds
+  licence: CC0 1.0
+  files (24): boom/ksci__lowFrequency_explosion_000.ogg, boom/ksci__lowFrequency_explosion_001.ogg, boom/ksci__impactMetal_001.ogg, boom/ksci__impactMetal_002.ogg, boom/ksci__explosionCrunch_004.ogg, boom/ksci__explosionCrunch_000.ogg, hit/ksci__impactMetal_000.ogg, hit/ksci__impactMetal_003.ogg, hit/ksci__impactMetal_004.ogg, glitch/ksci__laserRetro_002.ogg, glitch/ksci__laserSmall_001.ogg, corrupt/ksci__computerNoise_000.ogg, corrupt/ksci__computerNoise_001.ogg, corrupt/ksci__computerNoise_002.ogg, corrupt/ksci__computerNoise_003.ogg, buzz/ksci__forceField_000.ogg, buzz/ksci__forceField_001.ogg, buzz/ksci__forceField_002.ogg, buzz/ksci__forceField_003.ogg, buzz/ksci__forceField_004.ogg, poweron/ksci__doorClose_000.ogg, poweron/ksci__doorClose_001.ogg, powerdown/ksci__doorOpen_000.ogg, powerdown/ksci__doorOpen_001.ogg
+
+Impact Sounds
+  author: Kenney (kenney.nl)
+  source: https://kenney.nl/assets/impact-sounds
+  licence: CC0 1.0
+  files (31): boom/kimp__impactSoft_heavy_000.ogg, boom/kimp__impactSoft_heavy_003.ogg, boom/kimp__impactMining_000.ogg, boom/kimp__impactMining_004.ogg, boom/kimp__impactPunch_heavy_000.ogg, boom/kimp__impactPunch_heavy_002.ogg, hit/kimp__impactMetal_heavy_000.ogg, hit/kimp__impactMetal_heavy_001.ogg, hit/kimp__impactMetal_heavy_002.ogg, hit/kimp__impactMetal_heavy_003.ogg, hit/kimp__impactMetal_heavy_004.ogg, hit/kimp__impactMetal_light_000.ogg, hit/kimp__impactMetal_light_003.ogg, hit/kimp__impactPlate_heavy_001.ogg, hit/kimp__impactPlate_heavy_003.ogg, hit/kimp__impactBell_heavy_004.ogg, flash/kimp__impactMetal_light_001.ogg, flash/kimp__impactMetal_light_002.ogg, flash/kimp__impactMetal_light_004.ogg, flash/kimp__impactGlass_light_000.ogg, flash/kimp__impactGlass_light_002.ogg, crack/kimp__impactGlass_heavy_000.ogg, crack/kimp__impactGlass_heavy_001.ogg, crack/kimp__impactGlass_heavy_002.ogg, crack/kimp__impactGlass_heavy_003.ogg, crack/kimp__impactGlass_heavy_004.ogg, crack/kimp__impactGlass_medium_000.ogg, crack/kimp__impactGlass_medium_001.ogg, crack/kimp__impactGlass_medium_002.ogg, crack/kimp__impactGlass_medium_003.ogg, crack/kimp__impactGlass_medium_004.ogg
+
+Air whoosh
+  author: pyranostudios
+  source: https://opengameart.org/content/air-whoosh
+  licence: CC0 1.0
+  files (1): longwhoosh/air__whoosh2_0.ogg
+
+Swish - bamboo stick weapon swhoshes
+  author: qubodup (Iwan Gabovitch)
+  source: https://opengameart.org/content/swish-bamboo-stick-weapon-swhoshes
+  licence: CC0 1.0
+  files (24): whoosh/swish__swosh-01.ogg, whoosh/swish__swosh-03.ogg, whoosh/swish__swosh-05.ogg, whoosh/swish__swosh-06.ogg, whoosh/swish__swosh-07.ogg, whoosh/swish__swosh-08.ogg, whoosh/swish__swosh-12.ogg, whoosh/swish__swosh-13.ogg, whoosh/swish__swosh-14.ogg, whoosh/swish__swosh-15.ogg, whoosh/swish__swosh-16.ogg, whoosh/swish__swosh-20.ogg, whoosh/swish__swosh-22.ogg, whoosh/swish__swosh-36.ogg, whoosh/swish__swosh-40.ogg, whoosh/swish__swosh-42.ogg, whoosh/swish__swosh-43.ogg, longwhoosh/swish__swosh-23.ogg, longwhoosh/swish__swosh-28.ogg, longwhoosh/swish__swosh-31.ogg, longwhoosh/swish__swosh-32.ogg, longwhoosh/swish__swosh-35.ogg, longwhoosh/swish__swosh-38.ogg, longwhoosh/swish__swosh-41.ogg
+
+Wind, hit, time morph
+  author: qubodup (Iwan Gabovitch)
+  source: https://opengameart.org/content/wind-hit-time-morph
+  licence: CC0 1.0
+  files (4): whoosh/qbd__60009__qubodup__swosh_22.ogg, whoosh/qbd__qubodup-megaswosh1.ogg, whoosh/qbd__qubodup-megaswosh2.ogg, riser/qbd__qubodup-slomo1.ogg
+
+Frequency Static Sound Effects
+  author: bretbernhoft
+  source: https://opengameart.org/content/frequency-static-sound-effects
+  licence: CC0 1.0
+  files (4): static/fstat__static1_excerpt_10s.ogg, static/fstat__static1_excerpt_60s.ogg, static/fstat__static2_excerpt_10s.ogg, static/fstat__static2_excerpt_60s.ogg
+
+Static
+  author: xhunterko
+  source: https://opengameart.org/content/static
+  licence: CC0 1.0
+  files (1): static/scat__ScatterNoise1.ogg
+
+Misc/menu sci-fi sounds
+  author: haeldb
+  source: https://opengameart.org/content/miscmenu-sci-fi-sounds
+  licence: CC0 1.0 (dual-licensed CC0 / OGA-BY 3.0; used under CC0)
+  files (6): boom/hio__bouncehit.ogg, boom/hio__menu4.ogg, boom/hio__menu2.ogg, static/hio__walkie_static.ogg, corrupt/hio__crunch-trash.ogg, powerdown/hio__disconnect.ogg
+
+Machine shutting down
+  author: cough-e
+  source: https://opengameart.org/content/machine-shutting-down
+  licence: CC0 1.0
+  files (1): powerdown/mpo__MachinePowerOff.ogg
+
+Energy Drain
+  author: qubodup (Iwan Gabovitch)
+  source: https://opengameart.org/content/energy-drain
+  licence: CC0 1.0
+  files (1): powerdown/drain__qubodup-PowerDrain.ogg
+
+Keyboard Soundpack #1 [Typing and Single Keystrokes]
+  author: unicaegames
+  source: https://opengameart.org/content/keyboard-soundpack-1-typing-and-single-keystrokes
+  licence: CC0 1.0
+  files (32): type/key__keypress-001.ogg, type/key__keypress-002.ogg, type/key__keypress-003.ogg, type/key__keypress-004.ogg, type/key__keypress-005.ogg, type/key__keypress-006.ogg, type/key__keypress-007.ogg, type/key__keypress-008.ogg, type/key__keypress-009.ogg, type/key__keypress-010.ogg, type/key__keypress-011.ogg, type/key__keypress-012.ogg, type/key__keypress-013.ogg, type/key__keypress-014.ogg, type/key__keypress-015.ogg, type/key__keypress-016.ogg, type/key__keypress-017.ogg, type/key__keypress-018.ogg, type/key__keypress-019.ogg, type/key__keypress-020.ogg, type/key__keypress-021.ogg, type/key__keypress-022.ogg, type/key__keypress-023.ogg, type/key__keypress-024.ogg, type/key__keypress-025.ogg, type/key__keypress-026.ogg, type/key__keypress-027.ogg, type/key__keypress-028.ogg, type/key__keypress-029.ogg, type/key__keypress-030.ogg, type/key__keypress-031.ogg, type/key__keypress-032.ogg
+
+Camera
+  author: themightyglider
+  source: https://opengameart.org/content/camera
+  licence: CC0 1.0
+  files (1): flash/cam__photo.ogg
+
+50 CC0 Sci-Fi SFX
+  author: rubberduck
+  source: https://opengameart.org/content/50-cc0-sci-fi-sfx
+  licence: CC0 1.0
+  files (29): boom/sf50__explosion_01.ogg, riser/sf50__teleport_02.ogg, riser/sf50__misc_03.ogg, riser/sf50__teleport_01.ogg, glitch/sf50__misc_05.ogg, glitch/sf50__misc_07.ogg, glitch/sf50__misc_10.ogg, glitch/sf50__misc_11.ogg, glitch/sf50__terminal_02.ogg, glitch/sf50__weird_05.ogg, ui_error/sf50__beep_01.ogg, ui_error/sf50__beep_02.ogg, ui_error/sf50__beep_03.ogg, ui_error/sf50__retro_beep_01.ogg, ui_error/sf50__retro_beep_02.ogg, ui_error/sf50__retro_beep_05.ogg, ui_error/sf50__retro_beep_06.ogg, scan/sf50__terminal_01.ogg, scan/sf50__terminal_03.ogg, scan/sf50__terminal_04.ogg, scan/sf50__terminal_05.ogg, scan/sf50__terminal_06.ogg, scan/sf50__terminal_07.ogg, scan/sf50__terminal_08.ogg, scan/sf50__terminal_09.ogg, corrupt/sf50__loop_machine_03.ogg, corrupt/sf50__loop_ambient_weird.ogg, buzz/sf50__loop_machine_01.ogg, buzz/sf50__loop_machine_02.ogg
+
+60 CC0 Sci-Fi SFX
+  author: rubberduck
+  source: https://opengameart.org/content/60-cc0-sci-fi-sfx
+  licence: CC0 1.0
+  files (34): riser/sf60__sfx_04a.ogg, riser/sf60__sfx_21a.ogg, glitch/sf60__sfx_02a.ogg, glitch/sf60__sfx_02b.ogg, glitch/sf60__sfx_02c.ogg, glitch/sf60__sfx_02d.ogg, glitch/sf60__sfx_07a.ogg, glitch/sf60__sfx_07b.ogg, glitch/sf60__sfx_07c.ogg, glitch/sf60__sfx_07d.ogg, glitch/sf60__sfx_09a.ogg, glitch/sf60__sfx_09b.ogg, glitch/sf60__sfx_13a.ogg, glitch/sf60__sfx_14a.ogg, glitch/sf60__sfx_20a.ogg, glitch/sf60__sfx_20b.ogg, glitch/sf60__sfx_22a.ogg, dataswish/sf60__sfx_10a.ogg, dataswish/sf60__sfx_10b.ogg, dataswish/sf60__sfx_12a.ogg, dataswish/sf60__sfx_12b.ogg, dataswish/sf60__sfx_01a.ogg, dataswish/sf60__sfx_01c.ogg, scan/sf60__sfx_08a.ogg, scan/sf60__sfx_08b.ogg, scan/sf60__sfx_12c.ogg, scan/sf60__sfx_05a.ogg, scan/sf60__sfx_05b.ogg, corrupt/sf60__sfx_11a.ogg, corrupt/sf60__sfx_11c.ogg, corrupt/sf60__sfx_16a.ogg, corrupt/sf60__sfx_16b.ogg, corrupt/sf60__sfx_18a.ogg, buzz/sf60__sfx_06b.ogg
+
+50 CC0 retro / synth SFX
+  author: rubberduck
+  source: https://opengameart.org/content/50-cc0-retro-synth-sfx
+  licence: CC0 1.0
+  files (19): riser/rs50__synth_misc_16.ogg, riser/rs50__synth_misc_04.ogg, riser/rs50__synth_misc_12.ogg, riser/rs50__power_up_03.ogg, glitch/rs50__synth_misc_10.ogg, glitch/rs50__synth_misc_13.ogg, glitch/rs50__synth_laser_03.ogg, glitch/rs50__retro_die_02.ogg, ui_error/rs50__synth_beep_01.ogg, ui_error/rs50__synth_beep_02.ogg, ui_error/rs50__synth_beep_03.ogg, corrupt/rs50__synth_misc_06.ogg, poweron/rs50__power_up_01.ogg, poweron/rs50__power_up_02.ogg, poweron/rs50__power_up_04.ogg, poweron/rs50__power_up_05.ogg, poweron/rs50__power_up_06.ogg, powerdown/rs50__retro_die_01.ogg, powerdown/rs50__retro_die_03.ogg
+

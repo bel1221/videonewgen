@@ -1,4 +1,4 @@
-set -e; cd /home/user/rr/newgen-ranked; TOT=51.77
+set -e; cd "$(dirname "$0")/.."; TOT=51.77
 ffmpeg -v error -y -ss 101.39 -t $TOT -i audio/sa.mp3 -af "loudnorm=I=-26:TP=-6:LRA=11,afade=t=in:d=0.8,afade=t=out:st=49.27:d=2.7" -ar 48000 -ac 2 comp/music_cut.wav
 python3 - <<'PY'
 import subprocess, numpy as np

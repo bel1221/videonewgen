@@ -1,4 +1,4 @@
-set -e; cd /home/user/rr/katana-newgen-p2
+set -e; cd "$(dirname "$0")/.."
 N=1845; Q=$((N/6))
 for i in 0 1 2 3 4 5; do a=$((i*Q)); b=$(( i==5 ? N : (i+1)*Q )); python3 tools/ngp2.py $a $b comp/part$i.mp4 > logs/part$i.log 2>&1 & done
 wait

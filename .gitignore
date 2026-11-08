@@ -3,3 +3,8 @@ renders/
 # Regenerable caches (see HANDOFF.md §9.4)
 *.npy
 __pycache__/
+# Per-project working dirs (rebuildable)
+*/comp/
+*/logs/
+*/qa/
+node_modules/

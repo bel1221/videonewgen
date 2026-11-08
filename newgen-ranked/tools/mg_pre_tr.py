@@ -1,5 +1,5 @@
 # NewGen showcase - clean motion graphics. python3 tools/mg.py F0 F1 out.mp4 | still t1,..
-import sys, json, math, random, subprocess
+import os, sys, json, math, random, subprocess
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 W, H, FPS = 1920, 1080, 30
@@ -12,9 +12,9 @@ def eo(x): x = clamp(x); return 1 - (1 - x) ** 3
 def eio(x): x = clamp(x); return 3 * x * x - 2 * x ** 3
 def bo(x): x = clamp(x); c1 = 1.5; c3 = c1 + 1; return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2
 def lerp(a, b, x): return a + (b - a) * x
-FM = '/usr/share/fonts/truetype/higgsfield/Montserrat-ExtraBold.ttf'
+FM = os.environ.get('NEWGEN_TOOLKIT', os.path.abspath('../toolkit')) + '/fonts/Montserrat-ExtraBold.ttf'
 import os
-FI = os.environ['HF_WORKFLOWS'] + '/katana/scripts/fonts/Inter[opsz,wght].ttf'
+FI = os.environ.get('NEWGEN_TOOLKIT', os.path.abspath('../toolkit')) + '/fonts/Inter-Variable.ttf'
 _fc = {}
 def font(p, s, var=None):
     k = (p, s, var)

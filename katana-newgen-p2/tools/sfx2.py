@@ -1,6 +1,6 @@
-import json, subprocess, importlib.util, os, sys
+import os, json, subprocess, importlib.util, os, sys
 import numpy as np
-SR = 48000; RR = os.environ['HF_WORKFLOWS'] + '/katana/scripts'
+SR = 48000; RR = os.environ.get('NEWGEN_TOOLKIT', os.path.abspath('../toolkit'))
 spec = importlib.util.spec_from_file_location('ng', 'tools/ngp2.py'); n = importlib.util.module_from_spec(spec); spec.loader.exec_module(n)
 TOT = n.TOTAL
 def load(path, ss=None, to=None, tempo=None):

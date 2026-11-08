@@ -1,4 +1,4 @@
-set -e; cd /home/user/rr/newgen-show-en; TOT=85.74; OUT=newgen_showcase_v1.mp4
+set -e; cd "$(dirname "$0")/.."; TOT=85.74; OUT=newgen_showcase_v1.mp4
 ffmpeg -v error -y -ss 126.65 -t $TOT -i audio/sa.mp3 -af "loudnorm=I=-26:TP=-6:LRA=11,afade=t=in:d=0.6,afade=t=out:st=83.24:d=2.5" -ar 48000 -ac 2 comp/music_cut.wav
 python3 - <<'PY'
 import subprocess, numpy as np

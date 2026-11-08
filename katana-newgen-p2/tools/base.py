@@ -1,12 +1,12 @@
 # NewGen neon-laser motion graphics renderer: python3 ng_render.py F0 F1 out.mp4
-import sys, json, math, subprocess, random
+import os, sys, json, math, subprocess, random
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 W, H, FPS = 1920, 1080, 30
 TOTAL = 53.0
 BG = (13, 13, 12); LIME = (212, 250, 40); OFF = (234, 232, 225); WHITE = (244, 244, 240); GREY = (120, 120, 116)
-FH = '/usr/share/fonts/truetype/higgsfield/Montserrat-ExtraBold.ttf'
-FI = '/usr/share/fonts/truetype/liberation2/LiberationSerif-Italic.ttf'
+FH = os.environ.get('NEWGEN_TOOLKIT', os.path.abspath('../toolkit')) + '/fonts/Montserrat-ExtraBold.ttf'
+FI = next(p for p in ('/usr/share/fonts/truetype/liberation2/LiberationSerif-Italic.ttf', '/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf') if os.path.exists(p))
 FM = '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf'
 FMB = '/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf'
 _fc = {}

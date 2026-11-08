@@ -1,0 +1,87 @@
+# NewGenMC promo videos
+
+Marketing videos for **NewGenMC** (newgenmc.net), a Vietnamese Minecraft server (Battle Royale + Competitive Duels,
+legendary weapons, ranked MR leaderboard with a top-10 "Champion" tier). Audience: Vietnamese Minecraft players.
+Full history, scripts, prompts and every past decision: `HANDOFF.md`. Read the relevant section before changing a video.
+
+## House rules (the user's feedback; these override any skill's defaults)
+
+**Visual**
+- Clean motion graphics / semi-typography. Pixel-cartoon only for the "money" video.
+- Don't overuse any single effect (neon lines, laser sweeps). Light/ray effects never cover text.
+- **No still frames**: every scene drifts (camera push + horizontal drift), backgrounds move, transitions overlap.
+- **No grey text.** White text, key words in GREEN (112,222,132) or ORANGE (255,164,104), soft drop shadow.
+- Fast pacing comes from faster animations, tighter gaps, VO at 1.2x (`atempo=1.2`), never from speeding up the file.
+- Use the user's own Minecraft assets (sprites, `.bbmodel` renders, screenshots). Never hand-draw imitations.
+- Weapon spins: 144 angles per turn with neighbour blending.
+- HUD on every frame: "NEWGENMC" top-left, "newgenmc.net" top-right, chapter "NN — NAME" bottom-left, progress bar bottom-right.
+- Blur competitor server names/logos; crop out any "kingmc.vn" scoreboard.
+- Fonts: Montserrat ExtraBold (headlines), Inter variable (body/kickers) - both in `toolkit/fonts/`.
+
+**Audio**
+- Never `riser/rs50__synth_misc_16.ogg`, never explosions or anything in `boom/`.
+- No SFX file more than twice per video.
+- Music (`sa.mp3`) at loudnorm I=-26, sidechain-ducked under VO; master loudnorm I=-14.
+
+**Voice (ElevenLabs)**
+- Vietnamese: "Thắm - Giọng Nữ Miền Bắc", voice_id `0ggMuQ1r9f9jqBu50nJn`, model `eleven_v4`.
+- English terms must sound English: write SMP as "ét em pi", MR as "em a", 2vs2 as "2 versus 2". "Pay To Win" stays as-is.
+- Script voice: first person "mình", viewers "các bạn"/"bạn", rhetorical-question hook, English game terms kept in English, casual CTA ("...nhá!").
+- Generating voice costs the user's ElevenLabs credits (~100-215 per line for 2 takes). Say so before generating.
+
+**Content facts**
+- Duels/Ranked have existed for a long time: never present them as new ("đã chính thức có mặt").
+- Ranked 2vs2: "mỗi team sẽ nhận được một vũ khí huyền thoại ngẫu nhiên". Champion = top 10 on the ranked leaderboard;
+  reward = an exclusive armor trim obtainable no other way.
+- Placeholders still in Ranked v4: the MR numbers (1,350→1,450, +25) and the chestplate trim design. Ask before reusing.
+- Part 3 "Hoàn thiện" is on hold until the user brings it up.
+
+**Before every delivery check**: no SFX >2 uses, no banned sounds, no grey text, no still frames, no overused effect,
+competitors blurred, no "kingmc.vn". Render QA stills and look at them.
+
+## Layout
+
+| Path | What |
+|---|---|
+| `newgen-ranked/` | Ranked 2vs2 video (active). `tools/rk_scenes.py` = scenes, `tools/mg.py` = engine, `tools/timing.py` = VO timing |
+| `newgen-show/`, `newgen-show-en/` | Showcase video, Vietnamese v6 / English v2 (same engine) |
+| `katana-newgen-p2/tools/` | Part 2 "Phát triển" renderer (neon-laser style) |
+| `assets/models/*.bbmodel` | The 49-group legendary weapon model (44 unique weapons; dupes listed in `bbtool/render.py`) |
+| `assets/` | Original-quality background, green screens, weapon spin sheets, `lib_all.png` |
+| `bbtool/` | Software renderer for the `.bbmodel`: stills (`render.py`), 144-angle spin sheets (`spin_hd.py`), all-weapon sheet (`lib.py`) |
+| `toolkit/` | Fonts, CC0 SFX library (`sfx_lib/`, Kenney etc.), `deliver.sh` final encode, `install_runtimes.sh` |
+| `renders/` (gitignored) | Finished MP4s; re-download from Higgsfield: `https://d2ol7oe51mr4n9.cloudfront.net/user_3LhMjPy4UCr199g26ggXbTuJE9o/<media_id>.mp4` (ids in HANDOFF.md) |
+
+## Rendering the house-style videos (Python engine)
+
+Run from the project folder (e.g. `cd newgen-ranked`). Caches are gitignored; rebuild once per session:
+```bash
+mkdir -p comp logs qa && python3 tools/prep_gs.py   # + spin144.npy snippet in HANDOFF.md §9.4
+python3 tools/rk_sfx.py && bash tools/mix.sh          # SFX bed + audio mix
+python3 tools/rk_scenes.py still 10.5,22,33.5         # QA stills -> qa/
+bash tools/build.sh                                   # full render (8 workers; ~2 min for 52 s here)
+```
+Verified in this environment: rebuilt SFX bed and frames match the delivered v4 exactly.
+Weapon renders: `cd bbtool && ONLY=17,34 python3 -I render.py ../assets/models/newgenmc_vu_khi_huyen_thoai.bbmodel OUTDIR`
+(indices are outliner positions). Word timings for new VO: faster-whisper `small`, `language='vi'`, `word_timestamps=True`.
+
+## Skills and helpers (`.claude/`)
+
+Installed from the user's chosen repos, pinned to reviewed commits (see `.claude/SOURCES.md`). Use them as craft and QA
+helpers; the house rules above still win, and the house style is built with the Python engine above.
+- `video-director`: plan/QA discipline for code-made videos (`scripts/check_timeline.py`, `scripts/qa_video.py`).
+- `earshot` / `real-sound`: listen to audio before judging it; SFX choice, sync and mix checks.
+- `rossark-motion-skill`: keeping things alive (idle motion, no teleporting) for characters/mascots/scenes.
+- `huashu-motion`, `take-one`, `explainroo`: whole-film pipelines (HTML/Chrome based) for new formats, e.g. explainers or
+  a different look. explainroo's built-in TTS has no Vietnamese voice; use ElevenLabs for Vietnamese.
+- `reanimate`: rebuild a motion from a reference video or website frame by frame.
+- Subagents in `.claude/agents/`: short-video editing coach, video optimization, TikTok, social media, content creator,
+  paid-media creative, visual storyteller, game audio engineer.
+- Prompt/case library (reference only): `~/.opus-video-prompts`.
+
+## Environment
+
+Cloud environment `videonewgen` installs everything at session start (`toolkit/install_runtimes.sh`) and allows
+Higgsfield's CDN and Hugging Face (earshot/explainroo models). Higgsfield and ElevenLabs are connected as MCP tools.
+Node's built-in fetch ignores the proxy: run Node tools that download (explainroo, huashu-motion, take-one) with
+`NODE_USE_ENV_PROXY=1`. Commit work and push to `origin main`; the container is temporary.
