@@ -1,0 +1,249 @@
+// 20 s sword-fight test in the user's colosseum. Deterministic: window.renderAt(t) draws the frame at t (seconds),
+// averaging SUB sub-frames across a 180-degree shutter for real motion blur.
+import * as THREE from 'three';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { loadSkin, buildCharacter, buildWeapon, applyPose } from '../web/rig.js';
+import * as C from './choreo.js';
+
+const W = 1920, H = 1080, params = new URLSearchParams(location.search);
+const SUB = +(params.get('sub') || 5);
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const FOGC = new THREE.Color(0.55, 0.62, 0.74);
+scene.fog = new THREE.FogExp2(FOGC, 0.011);
+scene.background = FOGC.clone();
+
+// ------------------------------------------------------------------ cold overcast light (Marlow): cool sky, pale low sun behind, warm only from sparks
+const hemi = new THREE.HemisphereLight(0xb8cdf0, 0x5d5a66, 1.25); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xe6eeff, 2.1); sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.04; sun.shadow.radius = 4;
+Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 260 }); scene.add(sun, sun.target);
+const rim = new THREE.DirectionalLight(0x9db8ff, 0.9); scene.add(rim, rim.target);
+const fillL = new THREE.DirectionalLight(0xdfe6ff, 0.45); scene.add(fillL, fillL.target);
+const sparkL = new THREE.PointLight(0xffa860, 0, 4.5, 2.0); scene.add(sparkL);
+
+// ------------------------------------------------------------------ arena
+const base = '/anim-test/fight/assets/';
+const mtl = await new MTLLoader().setPath(base + 'colosseum/').loadAsync('B.mtl'); mtl.preload();
+for (const k in mtl.materials) {
+  const m = mtl.materials[k];
+  if (m.map) { m.map.magFilter = THREE.NearestFilter; m.map.minFilter = THREE.NearestMipmapLinearFilter; m.map.colorSpace = THREE.SRGBColorSpace; m.map.anisotropy = 8; }
+  if (!/grass|leaves|vine|fern|lily|redstone/.test(k)) m.color.setRGB(1, 1, 1);
+  m.alphaTest = 0.5; m.transparent = false; m.side = THREE.FrontSide;
+}
+const arenaObj = await new OBJLoader().setMaterials(mtl).setPath(base + 'colosseum/').loadAsync('B.obj');
+const stdMats = new Map();
+arenaObj.traverse(o => {
+  if (!o.isMesh) return;
+  const conv = m => { if (stdMats.has(m)) return stdMats.get(m);
+    const s = new THREE.MeshStandardMaterial({ map: m.map, color: m.color, roughness: 0.92, metalness: 0, alphaTest: 0.5, side: THREE.FrontSide }); stdMats.set(m, s); return s; };
+  o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
+  o.castShadow = true; o.receiveShadow = true;
+});
+scene.add(arenaObj);
+// arena floor heightmap (raycast once on a grid)
+const ray = new THREE.Raycaster(); const HM = new Map(); const meshes = []; arenaObj.traverse(o => o.isMesh && meshes.push(o));
+arenaObj.updateMatrixWorld(true);
+function floorAt(x, z) {
+  const k = Math.round(x * 2) + ',' + Math.round(z * 2); if (HM.has(k)) return HM.get(k);
+  ray.set(new THREE.Vector3(Math.round(x * 2) / 2, 60, Math.round(z * 2) / 2), new THREE.Vector3(0, -1, 0)); ray.far = 80;
+  const h = ray.intersectObjects(meshes, false).find(i => i.face && i.face.normal.y > 0.5);
+  const y = h ? h.point.y : 30; HM.set(k, y); return y;
+}
+const FLOOR = floorAt(0, 0);
+console.log('FLOOR', FLOOR);
+
+// ------------------------------------------------------------------ cast
+const [s1, s2, s3, aeg, veil] = await Promise.all([
+  loadSkin('/anim-test/src/skins/1.png'), loadSkin('/anim-test/src/skins/2.png'), loadSkin('/anim-test/src/skins/3.png'),
+  fetch(base + 'w/aegisblade.json').then(r => r.json()), fetch(base + 'w/veilblade.json').then(r => r.json())]);
+const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/')), B: buildCharacter(s2, buildWeapon(veil, base + 'w/')), C: buildCharacter(s3, null) };
+for (const k in cast) scene.add(cast[k].root);
+await new Promise(r => setTimeout(r, 400));
+const world = { floorAt, FLOOR };
+C.init(world);
+
+// blade points (px along the blade, grip at 0) in world space
+const _v = new THREE.Vector3();
+function blade(k, t, along) { applyPose(cast[k], C.pose(k, t)); cast[k].root.updateMatrixWorld(true); return along.map(a => cast[k].J.weapon.localToWorld(_v.set(0, a, 0).clone())); }
+// closest points between the two blades at each clash time -> spark positions
+function segClosest(p1, q1, p2, q2) {
+  const d1 = q1.clone().sub(p1), d2 = q2.clone().sub(p2), r = p1.clone().sub(p2), a = d1.dot(d1), e = d2.dot(d2), f = d2.dot(r);
+  const c = d1.dot(r), b = d1.dot(d2), den = a * e - b * b; let s = den > 1e-6 ? THREE.MathUtils.clamp((b * f - c * e) / den, 0, 1) : 0;
+  let tt = (b * s + f) / e; if (tt < 0) { tt = 0; s = THREE.MathUtils.clamp(-c / a, 0, 1); } else if (tt > 1) { tt = 1; s = THREE.MathUtils.clamp((b - c) / a, 0, 1); }
+  const c1 = p1.clone().addScaledVector(d1, s), c2 = p2.clone().addScaledVector(d2, tt); return { mid: c1.clone().lerp(c2, 0.5), dist: c1.distanceTo(c2) };
+}
+// solve clash corrections: coordinate descent on both sword arms so the blades cross (distance -> 0)
+function bladeDist(t) { const [a0, a1] = blade('A', t, [8, 26]), [b0, b1] = blade('B', t, [8, 26]); return segClosest(a0, a1, b0, b1).dist; }
+const VARS = ['ax', 'az', 'el', 'wr', 'ch', 'fw'], LIM = { ax: 60, az: 60, el: 50, wr: 45, ch: 45, fw: 1.2 };
+for (const cl of C.CLASHES) {
+  if (cl.at || !(cl.kind === 'blade' || cl.kind === 'cross')) continue;
+  const eA = { t: cl.t, ax: 0, az: 0, el: 0, wr: 0, ch: 0, fw: 0 }, eB = { ...eA }; C.CORR.A.push(eA); C.CORR.B.push(eB);
+  const f = () => bladeDist(cl.t) + 0.0003 * VARS.reduce((s, v) => s + (v === 'fw' ? 400 : 1) * (eA[v] * eA[v] + eB[v] * eB[v]), 0);
+  let best = f();
+  for (const step of [16, 8, 4, 2, 1]) for (let pass = 0; pass < 6; pass++) { let imp = false;
+    for (const e of [eA, eB]) for (const v of VARS) for (const sgn of [1, -1]) {
+      const old = e[v], nv = THREE.MathUtils.clamp(old + sgn * (v === 'fw' ? step / 20 : step), v === 'fw' ? 0 : -LIM[v], LIM[v]); if (nv === old) continue; e[v] = nv; const fv = f();
+      if (fv < best - 1e-4) { best = fv; imp = true; } else e[v] = old; }
+    if (!imp) break; }
+}
+const contacts = C.CLASHES.map(cl => {
+  if (cl.at) return { ...cl, p: cl.at(cast, blade) };
+  const [a0, a1] = blade('A', cl.t, [4, 24]), [b0, b1] = blade('B', cl.t, [4, 24]); const r = segClosest(a0, a1, b0, b1);
+  return { ...cl, p: r.mid.toArray(), dist: r.dist };
+});
+console.log('CLASHES', JSON.stringify(contacts.map(c => [c.t, c.p.map(v => +v.toFixed(2)), +(c.dist || 0).toFixed(2)])));
+C.setContacts(contacts);
+
+// ------------------------------------------------------------------ fx objects
+function softTex(kind) {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  if (kind === 'star') {
+    let gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.15, 'rgba(255,230,190,0.9)'); gr.addColorStop(1, 'rgba(255,160,80,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128); g.globalCompositeOperation = 'lighter';
+    for (const [w, h] of [[128, 5], [5, 70], [90, 3]]) { const lg = g.createLinearGradient(64 - w / 2, 0, 64 + w / 2, 0); g.fillStyle = 'rgba(255,240,215,0.9)'; g.fillRect(64 - w / 2, 64 - h / 2, w, h); }
+  } else if (kind === 'ring') {
+    g.strokeStyle = 'rgba(255,255,255,1)'; g.lineWidth = 7; g.filter = 'blur(3px)'; g.beginPath(); g.arc(64, 64, 52, 0, Math.PI * 2); g.stroke();
+  } else { const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const TEX = { star: softTex('star'), ring: softTex('ring'), soft: softTex('soft') };
+function spritePool(n, tex, blending) {
+  const arr = []; for (let i = 0; i < n; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, blending, transparent: true, depthWrite: false, fog: false })); s.visible = false; scene.add(s); arr.push(s); } return arr;
+}
+const FLARES = spritePool(6, TEX.star, THREE.AdditiveBlending), RINGS = spritePool(6, TEX.ring, THREE.AdditiveBlending);
+function particleLayer(n, additive) {
+  const g = new THREE.BufferGeometry();
+  for (const [k, d] of [['position', 3], ['color', 3], ['size', 1], ['alpha', 1]]) g.setAttribute(k, new THREE.Float32BufferAttribute(new Float32Array(n * d), d));
+  const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+    vertexShader: `attribute float size; attribute float alpha; attribute vec3 color; varying float vA; varying vec3 vC;
+      void main(){ vA = alpha; vC = color; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = min(size * (900.0 / -mv.z), 64.0); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying float vA; varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); gl_FragColor = vec4(vC, smoothstep(0.5, 0.0, d) * vA); }` });
+  const p = new THREE.Points(g, m); p.frustumCulled = false; scene.add(p); return { g, n };
+}
+const PADD = particleLayer(1500, true), PSOFT = particleLayer(5000, false);
+function writeP(L, list) {
+  const a = L.g.attributes; for (let i = 0; i < L.n; i++) { const q = list[i];
+    if (!q) { a.alpha.array[i] = 0; a.size.array[i] = 0; continue; } a.position.array.set(q.p, i * 3); a.color.array.set(q.c, i * 3); a.size.array[i] = q.s; a.alpha.array[i] = q.a; }
+  for (const k in a) a[k].needsUpdate = true;
+}
+// debris: block chunks (instanced cubes with the arena sand texture)
+const sandTex = new THREE.TextureLoader().load(base + 'colosseum/tex/minecraft/block/sand.png'); sandTex.magFilter = THREE.NearestFilter; sandTex.colorSpace = THREE.SRGBColorSpace;
+const DEB = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ map: sandTex, roughness: 1 }), 80); DEB.castShadow = true; scene.add(DEB);
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+// trails: ribbons from blade 30%..tip over the last ~0.1 s, opacity from blade-tip speed
+function trailMesh(col) {
+  const N = 18, g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(N * 2 * 3), 3)); g.setAttribute('alpha', new THREE.Float32BufferAttribute(new Float32Array(N * 2), 1));
+  const idx = []; for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } g.setIndex(idx);
+  const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, uniforms: { col: { value: new THREE.Color(...col) } },
+    vertexShader: 'attribute float alpha; varying float vA; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: 'uniform vec3 col; varying float vA; void main(){ gl_FragColor = vec4(col * vA, vA); }' });
+  const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; scene.add(mesh); return { g, N, mesh };
+}
+const TRAIL = { A: trailMesh([1.0, 0.92, 0.75]), B: trailMesh([0.85, 0.7, 1.0]) };
+
+// ------------------------------------------------------------------ post: bloom + grade (cold, vignette, CA, flash, impact frame)
+const camera = new THREE.PerspectiveCamera(40, W / H, 0.05, 600);
+const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, samples: 4 });
+const composer = new EffectComposer(renderer, rt); composer.renderToScreen = false;
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.45, 0.5, 0.88); composer.addPass(bloom);
+const grade = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, flash: { value: 0 }, black: { value: 0 }, ca: { value: 0 }, impact: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float flash, black, ca, impact; varying vec2 vUv;
+    void main(){ vec2 d = vUv - 0.5; float r2 = dot(d, d);
+      vec3 c; c.r = texture2D(tDiffuse, vUv + d * ca * 0.025).r; c.g = texture2D(tDiffuse, vUv).g; c.b = texture2D(tDiffuse, vUv - d * ca * 0.025).b;
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c = mix(vec3(l), c, 0.82);                                                         // desaturate toward the cold Marlow palette
+      c += vec3(-0.012, 0.0, 0.03) * (1.0 - clamp(l, 0.0, 1.0)) + vec3(0.015, 0.008, -0.01) * clamp(l, 0.0, 1.0);
+      c *= 1.0 - 0.6 * r2;
+      if (impact > 0.5) {   // anime impact frame: hot core stays white, everything else inverted to black ink, rim from local contrast
+        float m = smoothstep(1.15, 1.3, l);
+        vec2 px = vec2(1.0 / 1920.0, 1.0 / 1080.0) * 2.0; float e = 0.0;
+        for (int i = 0; i < 4; i++) { vec2 o = vec2(i == 0 ? 1.0 : i == 1 ? -1.0 : 0.0, i == 2 ? 1.0 : i == 3 ? -1.0 : 0.0) * px;
+          e += abs(dot(texture2D(tDiffuse, vUv + o).rgb, vec3(0.333)) - dot(texture2D(tDiffuse, vUv).rgb, vec3(0.333))); }
+        float ink = smoothstep(0.06, 0.16, e);
+        c = mix(vec3(0.94, 0.9, 0.84), vec3(0.02, 0.015, 0.03), max(ink, 1.0 - smoothstep(0.08, 0.5, l)));
+        c = mix(c, vec3(1.0, 0.97, 0.9), m); }  // anime impact frame
+      c = mix(c, vec3(3.5, 3.2, 2.9), flash); c = mix(c, vec3(0.0), black);
+      gl_FragColor = vec4(c, 1.0); }` });
+composer.addPass(grade); composer.addPass(new OutputPass());
+// accumulation for motion blur
+const acc = new THREE.WebGLRenderTarget(W, H, { type: THREE.FloatType });
+const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const accMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, transparent: true,       // explicit weighted add, alpha ignored
+  blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+  uniforms: { map: { value: null }, w: { value: 1 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: 'uniform sampler2D map; uniform float w; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(map, vUv).rgb * w, w); }' });
+const accScene = new THREE.Scene(); accScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), accMat));
+const outMat = new THREE.ShaderMaterial({ depthTest: false, uniforms: { map: { value: null } },   // raw pass-through (OutputPass already did sRGB)
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: 'uniform sampler2D map; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(map, vUv).rgb, 1.0); }' }); const outScene = new THREE.Scene(); outScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), outMat));
+
+// ------------------------------------------------------------------ one sub-frame
+function drawState(t) {
+  for (const k in cast) applyPose(cast[k], C.pose(k, t));
+  // trails sampled from past poses
+  for (const k of ['A', 'B']) {
+    const tr = TRAIL[k], P = tr.g.attributes.position.array, Al = tr.g.attributes.alpha.array; let any = false;
+    const tips = []; for (let i = 0; i < tr.N; i++) tips.push(blade(k, t - i / 160, [9, 26]));
+    for (let i = 0; i < tr.N; i++) {
+      const [b0, b1] = tips[i]; P.set([b0.x, b0.y, b0.z, b1.x, b1.y, b1.z], i * 6);
+      const nxt = tips[Math.min(i + 1, tr.N - 1)][1]; const sp = b1.distanceTo(nxt) * 160;      // tip speed, blocks/s
+      const a = THREE.MathUtils.clamp((sp - 9) / 18, 0, 1) * Math.pow(1 - i / tr.N, 1.4) * 0.85 * C.trailGate(k, t);
+      Al[i * 2] = a * 0.05; Al[i * 2 + 1] = a; any = any || a > 0.01;
+    }
+    tr.mesh.visible = any; tr.g.attributes.position.needsUpdate = tr.g.attributes.alpha.needsUpdate = true;
+  }
+  for (const k in cast) applyPose(cast[k], C.pose(k, t));
+  const cam = C.camera(t, cast);
+  camera.position.copy(cam.pos); camera.fov = cam.fov; camera.updateProjectionMatrix(); camera.up.set(0, 1, 0); camera.lookAt(cam.look); if (cam.roll) camera.rotateZ(cam.roll);
+  const focus = new THREE.Vector3(0, FLOOR, 0);
+  sun.position.copy(focus).add(new THREE.Vector3(-60, 55, -90)); sun.target.position.copy(focus);
+  rim.position.copy(focus).add(new THREE.Vector3(70, 30, 60)); rim.target.position.copy(focus);
+  fillL.position.copy(cam.pos).add(new THREE.Vector3(0, 3, 0)); fillL.target.position.copy(cam.look);
+  const fx = C.effects(t, camera);
+  writeP(PADD, fx.add); writeP(PSOFT, fx.soft);
+  FLARES.forEach((s, i) => { const f = fx.flares[i]; s.visible = !!f; if (f) { s.position.set(...f.p); s.scale.setScalar(f.s); s.material.opacity = f.a; s.material.color.setRGB(...(f.c || [3, 2.4, 1.6])); s.material.rotation = f.rot || 0; } });
+  RINGS.forEach((s, i) => { const f = fx.rings[i]; s.visible = !!f; if (f) { s.position.set(...f.p); s.scale.setScalar(f.s); s.material.opacity = f.a; s.material.color.setRGB(1.6, 1.6, 1.8); } });
+  for (let i = 0; i < 80; i++) { const d = fx.debris[i];
+    if (!d) { _m.makeScale(0, 0, 0); } else { _q.setFromEuler(_e.set(...d.r)); _m.compose(new THREE.Vector3(...d.p), _q, new THREE.Vector3(d.s, d.s, d.s)); }
+    DEB.setMatrixAt(i, _m); }
+  DEB.instanceMatrix.needsUpdate = true;
+  sparkL.intensity = fx.sparkLight.i; sparkL.position.set(...fx.sparkLight.p);
+  grade.uniforms.flash.value = fx.flash; grade.uniforms.black.value = fx.black; grade.uniforms.ca.value = fx.ca; grade.uniforms.impact.value = fx.impact;
+  bloom.strength = 0.42 + fx.bloomBoost;
+  return cam;
+}
+
+const fill = document.getElementById('fill');
+window.renderAt = function (t) {
+  const shutter = 0.5 / 30, n = C.blurOK(t) ? SUB : 1;
+  renderer.setRenderTarget(acc); renderer.setClearColor(0x000000, 0); renderer.clear();
+  let label = '';
+  for (let i = 0; i < n; i++) {
+    const ts = t + (n > 1 ? (i / (n - 1) - 0.5) * shutter : 0);
+    label = drawState(ts).label;
+    composer.render();
+    accMat.uniforms.map.value = composer.readBuffer.texture; accMat.uniforms.w.value = 1 / n;
+    renderer.setRenderTarget(acc); renderer.autoClear = false; renderer.render(accScene, quadCam); renderer.autoClear = true;
+  }
+  outMat.uniforms.map.value = acc.texture; renderer.setRenderTarget(null); renderer.render(outScene, quadCam);
+  fill.style.width = (300 * Math.min(1, t / C.TOTAL)) + 'px';
+  return label;
+};
+window.TOTAL = C.TOTAL; window.ready = true;

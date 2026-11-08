@@ -18,20 +18,21 @@ const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application
 const browser = await chromium.launch({ executablePath: CHROME, headless: true,
   args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning' || m.text().startsWith('contacts')) console.error('[page]', m.text()); });
+page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning' || /^(contacts|FLOOR|CLASHES)/.test(m.text())) console.error('[page]', m.text()); });
 page.on('pageerror', e => console.error('[pageerror]', e.message));
-await page.goto(`http://127.0.0.1:${port}/anim-test/web/index.html`);
-await page.waitForFunction('window.ready === true', null, { timeout: 120000 });
+const PAGE = '/' + (process.env.PAGE || 'anim-test/web/index.html').replace(/^\/+/, '');
+await page.goto(`http://127.0.0.1:${port}${PAGE}${process.env.QS || ''}`);
+await page.waitForFunction('window.ready === true', null, { timeout: 300000 });
 await page.evaluate(() => document.fonts.ready);
 const info = await page.evaluate(() => { const gl = document.querySelector('canvas').getContext('webgl2'); const d = gl.getExtension('WEBGL_debug_renderer_info'); return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : 'unknown'; });
 console.error('renderer:', info);
 
 const [mode, a, b, out] = process.argv.slice(2);
 if (mode === 'still') {
-  fs.mkdirSync(path.join(ROOT, 'anim-test/qa'), { recursive: true });
+  fs.mkdirSync(path.join(ROOT, 'anim-test/' + (process.env.QADIR || 'qa')), { recursive: true });
   for (const s of a.split(',')) {
     const t = parseFloat(s); const t0 = Date.now(); const label = await page.evaluate(t => window.renderAt(t), t);
-    await page.screenshot({ path: path.join(ROOT, `anim-test/qa/still_${t.toFixed(2).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 90 });
+    await page.screenshot({ path: path.join(ROOT, `anim-test/${process.env.QADIR || 'qa'}/still_${t.toFixed(2).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 90 });
     console.error(`t=${t} ${label} ${Date.now() - t0} ms`);
   }
 } else {

@@ -264,3 +264,45 @@ uses or fewer. Hits with no insert can share one cue.
 Open questions for the user before building v2 are unchanged from CLAUDE.md (skins, admin name, staff review wording).
 New ones: is about 11 s still fine for this scene, and should the flash and speed-line grammar stay subtle (house
 "clean motion graphics" style) or go full anime as in DFY?
+
+## 5. Fight test v1 vs the references (2026-11-09)
+
+`anim-test/out/newgen_fight_test_v1.mp4` is 20 s, set in the user's colosseum and rendered with three.js in headless
+Chrome:
+- Rig: elbows, knees, waist, wrist pitch and wrist roll.
+- Clash timing: an IK-lite solve makes the blades actually touch at 15 of the 18 clashes.
+- Motion blur: 5 samples across a 180° shutter.
+- Impact frames: an inked black-and-white frame, then 2 colour frames with a flare.
+- Effects: weapon trails, sparks, debris and snow.
+- Sound: a whoosh on every swing, plus a metal hit and a synthesized blade ring on every clash.
+
+I ran the same measurements as in §1, plus a 30 fps strip compared with Marlow 11.6-12.4 s
+(`anim-test/fight/qa/compare_strip.jpg`):
+
+| | Marlow | Fight v1 | Verdict |
+|---|---|---|---|
+| median shot / action shot | 0.79 / 0.52 s | 0.57 / 0.45 s | on target |
+| locked camera | 26 % | 0 % | fine; could use 1-2 deliberate holds |
+| pan / zoom speed when moving | 5.3 %W/s / 7.1 %/s | 7.3 / 8.9 | slightly faster than the reference |
+| loudness vs cut rate | +0.75 | +1.00 (only 4 windows) | ok |
+| cuts within 17 ms of an onset | 3 of 17 | 13 of 27 | tighter than the reference |
+| saturation / highlight chroma | 104 / 14.6 | 54 / 6.5 | **too grey**: the desaturation went too far |
+
+What still has to be worked on, most important first:
+1. **Atmosphere depth.** Marlow fills the frame with ground mist, big out-of-focus snow near the lens, shallow
+   depth of field and backlit haze. Ours has small, sparse snow and uniform fog, with no depth of field, so it reads
+   flat. Add a bokeh/DOF pass, foreground snow cards and ground mist planes.
+2. **Characters too small in the fight.** Marlow keeps the camera inside the action, with bodies filling 50-100 % of
+   the frame and passing the lens. Too many of our exchange shots are wide, for example 6.57-6.77 s. Use closer,
+   handheld-style framing.
+3. **Whole-body momentum.** In Marlow the whole body commits to every swing: hips and shoulders lead and the weight
+   transfers. Ours still swings mostly from the arm. The feet also slide, because there is no foot planting. Next:
+   foot IK and a hip-led swing chain (hips, then chest, then shoulder, then elbow, offset by 1-2 frames each).
+4. **Impact style.** Marlow's impact is warm and photographic: 2 frames of orange glow with a horizontal anamorphic
+   streak, then the wide. Our inked black-and-white frame is anime grammar, a stylistic choice to confirm with the
+   user. The circular shock rings look cheap and should go or be replaced with air distortion.
+5. **Colour.** Desaturate less (keep chroma around 12-15 in the highlights). Keep warm only on sparks, but stronger.
+6. **Flurry clash misses.** The clashes at 11.08, 11.35 and 13.96 s still miss by 0.6-1.9 blocks. Those swing arcs
+   need re-keying, not just correcting.
+7. **Weapons.** The legendary-weapon render and grips read well and are a strength over the reference's plain iron
+   swords. Wrist roll now allows sideways blocks.
