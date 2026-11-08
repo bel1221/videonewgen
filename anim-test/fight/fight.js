@@ -8,10 +8,11 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { loadSkin, buildCharacter, buildWeapon, applyPose } from '../web/rig.js';
+import { loadSkin, buildCharacter, buildWeapon, applyPose, setTwist } from '../web/rig2.js';
 import * as C from './choreo.js';
 
 const W = 1920, H = 1080, params = new URLSearchParams(location.search);
+if (params.get('twist') !== null) setTwist(+params.get('twist'));
 const SUB = +(params.get('sub') || 5);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
 renderer.setSize(W, H); renderer.setPixelRatio(1);
@@ -20,17 +21,17 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const FOGC = new THREE.Color(0.55, 0.62, 0.74);
-scene.fog = new THREE.FogExp2(FOGC, 0.011);
+const FOGC = new THREE.Color(0.93, 0.84, 0.7);
+scene.fog = new THREE.FogExp2(FOGC, 0.006);
 scene.background = FOGC.clone();
 
 // ------------------------------------------------------------------ cold overcast light (Marlow): cool sky, pale low sun behind, warm only from sparks
-const hemi = new THREE.HemisphereLight(0xb8cdf0, 0x5d5a66, 1.25); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xe6eeff, 2.1); sun.castShadow = true;
-sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.04; sun.shadow.radius = 4;
-Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 260 }); scene.add(sun, sun.target);
-const rim = new THREE.DirectionalLight(0x9db8ff, 0.9); scene.add(rim, rim.target);
-const fillL = new THREE.DirectionalLight(0xdfe6ff, 0.45); scene.add(fillL, fillL.target);
+const hemi = new THREE.HemisphereLight(0x9fc2ff, 0xd8b98a, 1.05); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe0b0, 3.3); sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.03; sun.shadow.radius = 1.5;
+Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 260 }); scene.add(sun, sun.target);
+const rim = new THREE.DirectionalLight(0xffd6a0, 0.8); scene.add(rim, rim.target);
+const fillL = new THREE.DirectionalLight(0xfff0dc, 0.35); scene.add(fillL, fillL.target);
 const sparkL = new THREE.PointLight(0xffa860, 0, 4.5, 2.0); scene.add(sparkL);
 
 // ------------------------------------------------------------------ arena
@@ -68,15 +69,16 @@ console.log('FLOOR', FLOOR);
 const [s1, s2, s3, aeg, veil] = await Promise.all([
   loadSkin('/anim-test/src/skins/1.png'), loadSkin('/anim-test/src/skins/2.png'), loadSkin('/anim-test/src/skins/3.png'),
   fetch(base + 'w/aegisblade.json').then(r => r.json()), fetch(base + 'w/veilblade.json').then(r => r.json())]);
-const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/')), B: buildCharacter(s2, buildWeapon(veil, base + 'w/')), C: buildCharacter(s3, null) };
+const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), 0.69), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), 0.69), C: buildCharacter(s3, null) };
 for (const k in cast) scene.add(cast[k].root);
+for (const k in cast) cast[k].floorAt = floorAt;   // blade/ground physics in rig2
 await new Promise(r => setTimeout(r, 400));
 const world = { floorAt, FLOOR };
 C.init(world);
 
 // blade points (px along the blade, grip at 0) in world space
 const _v = new THREE.Vector3();
-function blade(k, t, along) { applyPose(cast[k], C.pose(k, t)); cast[k].root.updateMatrixWorld(true); return along.map(a => cast[k].J.weapon.localToWorld(_v.set(0, a, 0).clone())); }
+function blade(k, t, along) { applyPose(cast[k], C.pose(k, t)); cast[k].root.updateMatrixWorld(true); return along.map(a => cast[k].weapon.localToWorld(_v.set(0, a, 0).clone())); }
 // closest points between the two blades at each clash time -> spark positions
 function segClosest(p1, q1, p2, q2) {
   const d1 = q1.clone().sub(p1), d2 = q2.clone().sub(p2), r = p1.clone().sub(p2), a = d1.dot(d1), e = d2.dot(d2), f = d2.dot(r);
@@ -86,10 +88,10 @@ function segClosest(p1, q1, p2, q2) {
 }
 // solve clash corrections: coordinate descent on both sword arms so the blades cross (distance -> 0)
 function bladeDist(t) { const [a0, a1] = blade('A', t, [8, 26]), [b0, b1] = blade('B', t, [8, 26]); return segClosest(a0, a1, b0, b1).dist; }
-const VARS = ['ax', 'az', 'el', 'wr', 'ch', 'fw'], LIM = { ax: 60, az: 60, el: 50, wr: 45, ch: 45, fw: 1.2 };
+const VARS = ['ax', 'az', 'el', 'wr', 'ba', 'ch', 'fw'], LIM = { ax: 60, az: 60, el: 50, wr: 50, ba: 70, ch: 45, fw: 1.2 };
 for (const cl of C.CLASHES) {
   if (cl.at || !(cl.kind === 'blade' || cl.kind === 'cross')) continue;
-  const eA = { t: cl.t, ax: 0, az: 0, el: 0, wr: 0, ch: 0, fw: 0 }, eB = { ...eA }; C.CORR.A.push(eA); C.CORR.B.push(eB);
+  const eA = { t: cl.t, ax: 0, az: 0, el: 0, wr: 0, ba: 0, ch: 0, fw: 0 }, eB = { ...eA }; C.CORR.A.push(eA); C.CORR.B.push(eB);
   const f = () => bladeDist(cl.t) + 0.0003 * VARS.reduce((s, v) => s + (v === 'fw' ? 400 : 1) * (eA[v] * eA[v] + eB[v] * eB[v]), 0);
   let best = f();
   for (const step of [16, 8, 4, 2, 1]) for (let pass = 0; pass < 6; pass++) { let imp = false;
@@ -98,6 +100,13 @@ for (const cl of C.CLASHES) {
       if (fv < best - 1e-4) { best = fv; imp = true; } else e[v] = old; }
     if (!imp) break; }
 }
+C.resim();
+// blade-vs-ground contacts: tip scraping the sand during a fast swing -> sand spray + sparks
+{ const GH = []; let last = -9;
+  for (let t = 0.1; t < C.TOTAL; t += 1 / 60) for (const k of ['A', 'B']) {
+    const [tip] = blade(k, t, [27]), [tp] = blade(k, t - 1 / 60, [27]), sp = tip.distanceTo(tp) * 60, fl = floorAt(tip.x, tip.z);
+    if (tip.y < fl + 0.1 && sp > 5 && t - last > 0.12) { GH.push({ t, p: [tip.x, fl, tip.z], k }); last = t; } }
+  C.setGroundHits(GH); console.log('GROUNDHITS', GH.length); }
 const contacts = C.CLASHES.map(cl => {
   if (cl.at) return { ...cl, p: cl.at(cast, blade) };
   const [a0, a1] = blade('A', cl.t, [4, 24]), [b0, b1] = blade('B', cl.t, [4, 24]); const r = segClosest(a0, a1, b0, b1);
@@ -152,7 +161,36 @@ function trailMesh(col) {
     fragmentShader: 'uniform vec3 col; varying float vA; void main(){ gl_FragColor = vec4(col * vA, vA); }' });
   const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; scene.add(mesh); return { g, N, mesh };
 }
+const FP = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.2, 0.26).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x6b5236, alphaMap: TEX.soft, transparent: true, opacity: 0.22, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), 600);
+FP.frustumCulled = false; scene.add(FP);
+function updatePrints(t) {
+  let n = 0;
+  for (const s of C.STEPS) { if (s.t > t || n >= 600 || (s.kind !== 'step' && s.kind !== 'land' && s.kind !== 'skid')) continue;
+    const y = floorAt(s.p[0], s.p[2]) + 0.012; _q.setFromEuler(_e.set(0, Math.atan2(s.p[0], s.p[2]) * 0 + (s.c === 'A' ? 0.3 : -0.3), 0));
+    _m.compose(new THREE.Vector3(s.p[0], y, s.p[2]), _q, new THREE.Vector3(s.kind === 'skid' ? 1.5 : 1, 1, s.kind === 'skid' ? 1.8 : 1)); FP.setMatrixAt(n++, _m); }
+  FP.count = n; FP.instanceMatrix.needsUpdate = true;
+}
 const TRAIL = { A: trailMesh([1.0, 0.92, 0.75]), B: trailMesh([0.85, 0.7, 1.0]) };
+const GHOSTS = {};
+for (const k of ['A', 'B']) {
+  GHOSTS[k] = [];
+  for (let i = 0; i < 3; i++) {
+    const g = cast[k].weapon.clone(true); g.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.depthWrite = false; o.castShadow = false; } });
+    g.matrixAutoUpdate = false; scene.add(g); GHOSTS[k].push(g);
+  }
+}
+function updateGhosts(t) {
+  for (const k of ['A', 'B']) {
+    const now = blade(k, t, [22])[0], prev = blade(k, t - 1 / 60, [22])[0], sp = now.distanceTo(prev) * 60;
+    const on = THREE.MathUtils.clamp((sp - 10) / 14, 0, 1) * C.trailGate(k, t);
+    GHOSTS[k].forEach((g, i) => {
+      g.visible = on > 0.02; if (!g.visible) return;
+      applyPose(cast[k], C.pose(k, t - (i + 1) * 0.011)); cast[k].root.updateMatrixWorld(true);
+      g.matrix.copy(cast[k].weapon.matrixWorld); g.matrixWorldNeedsUpdate = true;
+      g.traverse(o => { if (o.isMesh) o.material.opacity = on * (0.42 - i * 0.12); });
+    });
+  }
+}
 
 // ------------------------------------------------------------------ post: bloom + grade (cold, vignette, CA, flash, impact frame)
 const camera = new THREE.PerspectiveCamera(40, W / H, 0.05, 600);
@@ -167,8 +205,8 @@ const grade = new ShaderPass({
     void main(){ vec2 d = vUv - 0.5; float r2 = dot(d, d);
       vec3 c; c.r = texture2D(tDiffuse, vUv + d * ca * 0.025).r; c.g = texture2D(tDiffuse, vUv).g; c.b = texture2D(tDiffuse, vUv - d * ca * 0.025).b;
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      c = mix(vec3(l), c, 0.82);                                                         // desaturate toward the cold Marlow palette
-      c += vec3(-0.012, 0.0, 0.03) * (1.0 - clamp(l, 0.0, 1.0)) + vec3(0.015, 0.008, -0.01) * clamp(l, 0.0, 1.0);
+      c = mix(vec3(l), c, 1.08);                                                         // warm desert grade (Desert Arena), slight saturation lift
+      c += vec3(-0.008, 0.0, 0.018) * (1.0 - clamp(l, 0.0, 1.0)) + vec3(0.02, 0.01, -0.012) * clamp(l, 0.0, 1.0);
       c *= 1.0 - 0.6 * r2;
       if (impact > 0.5) {   // anime impact frame: hot core stays white, everything else inverted to black ink, rim from local contrast
         float m = smoothstep(1.15, 1.3, l);
@@ -209,11 +247,18 @@ function drawState(t) {
     }
     tr.mesh.visible = any; tr.g.attributes.position.needsUpdate = tr.g.attributes.alpha.needsUpdate = true;
   }
+  updatePrints(t);
+  updateGhosts(t);
   for (const k in cast) applyPose(cast[k], C.pose(k, t));
-  const cam = C.camera(t, cast);
+  let cam = C.camera(t, cast);
+  const DBG = params.get('dbg');
+  if (DBG) { const p = C.pose(DBG, t), yaw = p.yaw * Math.PI / 180, side = +(params.get('side') || 90) * Math.PI / 180;
+    const c0 = new THREE.Vector3(p.pos[0], FLOOR + 0.9, p.pos[2]);
+    cam = { pos: c0.clone().add(new THREE.Vector3(Math.sin(yaw + side) * 5.2, 0.2, Math.cos(yaw + side) * 5.2)), look: c0, fov: 30, roll: 0, label: 'dbg' }; }
   camera.position.copy(cam.pos); camera.fov = cam.fov; camera.updateProjectionMatrix(); camera.up.set(0, 1, 0); camera.lookAt(cam.look); if (cam.roll) camera.rotateZ(cam.roll);
   const focus = new THREE.Vector3(0, FLOOR, 0);
-  sun.position.copy(focus).add(new THREE.Vector3(-60, 55, -90)); sun.target.position.copy(focus);
+  const fc = new THREE.Vector3(cam.look.x, FLOOR, cam.look.z);   // shadow frustum follows the action (sharp shadows)
+  sun.position.copy(fc).add(new THREE.Vector3(-55, 62, -70)); sun.target.position.copy(fc);
   rim.position.copy(focus).add(new THREE.Vector3(70, 30, 60)); rim.target.position.copy(focus);
   fillL.position.copy(cam.pos).add(new THREE.Vector3(0, 3, 0)); fillL.target.position.copy(cam.look);
   const fx = C.effects(t, camera);
@@ -246,4 +291,14 @@ window.renderAt = function (t) {
   fill.style.width = (300 * Math.min(1, t / C.TOTAL)) + 'px';
   return label;
 };
+window.dbgPose = function (k, t) { const p = C.pose(k, t); applyPose(cast[k], p); cast[k].root.updateMatrixWorld(true);
+  const b = cast[k].bones, w = n => b[n].getWorldPosition(new THREE.Vector3()).toArray().map(v => +v.toFixed(3));
+  const sole = n => b[n].localToWorld(new THREE.Vector3(0, -6, 0)).toArray().map(v => +v.toFixed(3));
+  return { pos: p.pos.map(v => +v.toFixed(3)), y: +p.y.toFixed(3), floor: +floorAt(p.pos[0], p.pos[2]).toFixed(3), ik: p.ik, hips: w('hips'), rTh: w('rTh'), rSn: w('rSn'), rSole: sole('rSn'), lSole: sole('lSn'), rLegFK: p.rLeg, rKnee: p.rKnee }; };
+window.events = () => C.events();
+window.dbgBlade = function (k, t) { const p = C.pose(k, t); applyPose(cast[k], p); cast[k].root.updateMatrixWorld(true);
+  const o = k === 'A' ? 'B' : 'A', q = C.pose(o, t); let fp = 0, bp = 0; const v = new THREE.Vector3();
+  for (let a = 4; a <= 28; a += 2) { cast[k].weapon.localToWorld(v.set(0, a, 0)); fp = Math.max(fp, floorAt(v.x, v.z) - v.y);
+    const r = Math.hypot(v.x - q.pos[0], v.z - q.pos[2]); if (v.y > q.pos[1] && v.y < q.pos[1] + 1.85 && r < 0.2) bp = Math.max(bp, 0.2 - r); }
+  return { floorPen: fp, bodyPen: bp }; };
 window.TOTAL = C.TOTAL; window.ready = true;

@@ -12,12 +12,13 @@ const E = { lin: u => u, io: u => u * u * (3 - 2 * u), o: u => 1 - Math.pow(1 - 
 const JK = ['waist', 'chest', 'head', 'rArm', 'rElbow', 'lArm', 'lElbow', 'rLeg', 'rKnee', 'lLeg', 'lKnee'];
 
 let W = null, F = 30;
-export function init(world) { W = world; F = world.FLOOR; buildAll(); }
+export function init(world) { W = world; F = world.FLOOR; buildAll(); simulate(); }
+export function resim() { STEPS.length = 0; simulate(); }
 
 // ------------------------------------------------------------------ pose library (signs: see rig.js applyPose notes)
-function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, tilt: [0, 0], yawAbs: null }; for (const j of JK) p[j] = [0, 0, 0]; return p; }
-const cp = p => JSON.parse(JSON.stringify(p));
-function S(base, d) { const o = cp(base); for (const k in d) o[k] = Array.isArray(d[k]) ? d[k].slice() : d[k]; return o; }
+function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] }; for (const j of JK) p[j] = [0, 0, 0]; return p; }
+const cp = p => { const o = JSON.parse(JSON.stringify(p)); delete o._flat; return o; };
+function S(base, d) { const o = cp(base); delete o._flat; for (const k in d) o[k] = Array.isArray(d[k]) ? d[k].slice() : d[k]; return o; }
 const L = {};
 L.relaxed = S(N(), { rArm: [-4, 0, -14], rElbow: [-10, 0, 0], wrist: 172, lArm: [4, 0, 8], lElbow: [-8, 0, 0], rKnee: [3, 0, 0], lKnee: [3, 0, 0], head: [4, 0, 0] });
 L.guard = S(N(), { rLeg: [-22, 0, -6], rKnee: [34, 0, 0], lLeg: [18, 0, 6], lKnee: [26, 0, 0], waist: [10, -14, 0], chest: [4, -8, 0], head: [-10, 18, 0],
@@ -37,7 +38,7 @@ L.thrust = S(G, { wrist: 178, rArm: [-112, 0, 0], rElbow: [-2, 0, 0], chest: [12
 L.parryH = S(G, { rArm: [-150, 0, -30], rElbow: [-50, 0, 0], roll: 90, wrist: 92, lArm: [-150, 0, 30], lElbow: [-60, 0, 0], chest: [-6, 0, 0], head: [-14, 0, 0], rKnee: [40, 0, 0], lKnee: [34, 0, 0], y: -0.24 });
 L.parryR = S(G, { rArm: [-58, 0, -28], rElbow: [-62, 0, 0], wrist: 112, chest: [2, -20, 0], lArm: [-44, 0, 26] });
 L.parryL = S(G, { rArm: [-84, 0, 44], rElbow: [-78, 0, 0], wrist: 118, chest: [2, 24, 0], lArm: [-30, 0, 20] });
-L.kickW = S(G, { rLeg: [-60, 0, -4], rKnee: [104, 0, 0], lKnee: [24, 0, 0], waist: [-6, 0, 0], rArm: [-50, 0, -30], rElbow: [-40, 0, 0], lArm: [-40, 0, 40], wrist: 140 });
+L.kickW = S(G, { fkR: true, rLeg: [-60, 0, -4], rKnee: [104, 0, 0], lKnee: [24, 0, 0], waist: [-6, 0, 0], rArm: [-50, 0, -30], rElbow: [-40, 0, 0], lArm: [-40, 0, 40], wrist: 140 });
 L.kick = S(L.kickW, { rLeg: [-98, 0, -4], rKnee: [8, 0, 0], lLeg: [6, 0, 4], lKnee: [18, 0, 0], waist: [-20, 0, 0], chest: [-8, 0, 0] });
 L.hitBack = S(G, { waist: [-30, 0, 0], chest: [-22, 0, 0], head: [-28, 0, 0], rArm: [-50, 0, -70], rElbow: [-24, 0, 0], lArm: [-40, 0, 70], lElbow: [-28, 0, 0],
   rLeg: [-40, 0, -6], rKnee: [24, 0, 0], lLeg: [16, 0, 6], lKnee: [12, 0, 0], wrist: 140, y: -0.05 });
@@ -64,15 +65,53 @@ L.flick = S(L.relaxed, { rArm: [-40, 0, -52], rElbow: [-20, 0, 0], wrist: 176, h
 L.knees = S(N(), { rLeg: [0, 0, -4], rKnee: [90, 0, 0], lLeg: [0, 0, 4], lKnee: [90, 0, 0], waist: [34, 0, 0], chest: [18, 0, 0], head: [30, 0, 0], rArm: [-6, 0, -10], rElbow: [-10, 0, 0], lArm: [4, 0, 10], wrist: 166, y: -0.38 });
 L.fallen = S(L.knees, { tilt: [82, 0], waist: [10, 0, 0], chest: [6, 0, 0], head: [10, 0, 0], rArm: [-150, 0, -20], lArm: [-150, 0, 20], y: -0.1 });
 
+
+// ------------------------------------------------------------------ blade intent (Desert Arena study): where the blade points, per action,
+// relative to the torso. The rig solves wrist bend + roll each frame so the hand aims the blade there.
+const bdv = (el, az) => { const e = el * Math.PI / 180, a = az * Math.PI / 180; return [Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a)]; };
+const BD = {
+  relaxed: [-40, -32], guard: [68, -12], windR: [38, -150], slashR: [-8, 75], windL: [40, 150], slashL: [-6, -75],
+  windO: [55, 180], slashO: [-38, 0], windT: [4, -8], thrust: [0, 0], parryH: [6, 90], parryR: [74, -28], parryL: [74, 28],
+  kickW: [62, -20], kick: [55, -30], hitBack: [40, -70], slide: [-18, -150], kneelG: [70, -10], kneelBlock: [6, 90],
+  crouch: [-28, -155], takeoff: [62, 180], tuck: [72, 180], slam: [-62, 0], dodge: [64, -15], duck: [48, -35], bind: [56, 14],
+  spin: [2, -92], sweepW: [-18, -150], sweep: [-24, 65], upperW: [-42, -20], upper: [82, 0], land: [50, -15], flick: [-45, -45],
+  knees: [-50, -25], fallen: [-10, -90],
+};
+for (const k in BD) if (L[k]) L[k].bd = bdv(...BD[k]);
 function mix(a, b, u) {
   const o = { wrist: lerp(a.wrist, b.wrist, u), roll: lerp(a.roll, b.roll, u), y: lerp(a.y, b.y, u), yawOff: lerp(a.yawOff, b.yawOff, u), tilt: [lerp(a.tilt[0], b.tilt[0], u), lerp(a.tilt[1], b.tilt[1], u)],
     yawAbs: (a.yawAbs != null && b.yawAbs != null) ? lerp(a.yawAbs, b.yawAbs, u) : (u < 0.5 ? a.yawAbs : b.yawAbs) };
+  o.fkR = u < 0.5 ? a.fkR : b.fkR; o.fkL = u < 0.5 ? a.fkL : b.fkL;
+  { const ba = a.bd || [0, 1, 0], bb = b.bd || [0, 1, 0], v = ba.map((x, i) => lerp(x, bb[i], u)), n = Math.hypot(...v) || 1; o.bd = v.map(x => x / n); }
   for (const j of JK) o[j] = a[j].map((v, i) => lerp(v, b[j][i], u)); return o;
 }
+// pose <-> flat numeric vector (for spline interpolation)
+const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff'];
+function flat(p) { if (p._flat) return p._flat; const a = FLAT_KEYS.map(k => p[k]); a.push(p.tilt[0], p.tilt[1]); a.push(...(p.bd || [0, 1, 0])); for (const j of JK) a.push(...p[j]); p._flat = a; return a; }
+function unflat(a, tmpl) {
+  const o = { yawAbs: tmpl.yawAbs, fkR: tmpl.fkR, fkL: tmpl.fkL }; let i = 0; for (const k of FLAT_KEYS) o[k] = a[i++]; o.tilt = [a[i++], a[i++]];
+  { const v = [a[i++], a[i++], a[i++]], n = Math.hypot(...v) || 1; o.bd = v.map(x => x / n); }
+  for (const j of JK) o[j] = [a[i++], a[i++], a[i++]]; return o;
+}
+// Cardinal spline through keyframes with non-uniform times; per-segment ease only warps time ('i' accelerates into an
+// impact, 'o' decelerates out of one, 'back' overshoots); 'io' segments flow through keys instead of stopping.
+const WARP = { io: u => u, lin: u => u, o: u => 1 - (1 - u) * (1 - u), o2: u => 1 - (1 - u) * (1 - u), i: u => u * u * u };
 function evalKeys(K, t) {
   if (t <= K[0][0]) return cp(K[0][1]);
-  for (let i = 1; i < K.length; i++) if (t <= K[i][0]) { const [t0, p0] = K[i - 1], [t1, p1, e] = K[i]; return mix(p0, p1, E[e || 'io']((t - t0) / Math.max(1e-6, t1 - t0))); }
-  return cp(K[K.length - 1][1]);
+  const n = K.length; if (t >= K[n - 1][0]) return cp(K[n - 1][1]);
+  let i = 1; while (K[i][0] < t) i++;
+  const [t1, p1] = K[i - 1], [t2, p2, e] = K[i]; const u = (t - t1) / Math.max(1e-6, t2 - t1);
+  const ey = (p1.yawAbs != null && p2.yawAbs != null) ? lerp(p1.yawAbs, p2.yawAbs, u) : (u < 0.5 ? p1.yawAbs : p2.yawAbs);
+  if (e === 'back') { const o = mix(p1, p2, E.back(u)); o.yawAbs = ey; o.fkR = (u < 0.5 ? p1 : p2).fkR; return o; }
+  const w = (WARP[e || 'io'] || WARP.io)(u);
+  const a1 = flat(p1), a2 = flat(p2), a0 = i >= 2 ? flat(K[i - 2][1]) : a1, a3 = i + 1 < n ? flat(K[i + 1][1]) : a2;
+  const t0 = i >= 2 ? K[i - 2][0] : t1 - (t2 - t1), t3 = i + 1 < n ? K[i + 1][0] : t2 + (t2 - t1), dt = t2 - t1;
+  // tangents are zeroed at hard keys (impact 'i' arriving, 'o'/'lin' leaving) so strikes stay crisp
+  const k1 = (e === 'o' || e === 'lin') ? 0 : 0.85, k2 = (e === 'i' || e === 'lin' || (K[i + 1] && K[i + 1][2] === 'o')) ? 0 : 0.85;
+  const h00 = 2 * w ** 3 - 3 * w * w + 1, h10 = w ** 3 - 2 * w * w + w, h01 = -2 * w ** 3 + 3 * w * w, h11 = w ** 3 - w * w;
+  const out = a1.map((v, j) => { const m1 = k1 * (a2[j] - a0[j]) / Math.max(1e-6, t2 - t0) * dt, m2 = k2 * (a3[j] - a1[j]) / Math.max(1e-6, t3 - t1) * dt;
+    return h00 * v + h10 * m1 + h01 * a2[j] + h11 * m2; });
+  const o = unflat(out, u < 0.5 ? p1 : p2); o.yawAbs = ey; return o;
 }
 function evalPos(K, t) {
   if (t <= K[0][0]) return [K[0][1], K[0][2]];
@@ -82,7 +121,11 @@ function evalPos(K, t) {
 
 // ------------------------------------------------------------------ run cycle (sword arm low, blade trailing; free arm pumps)
 const STRIDE = 3.6;
-function runLegs(phi, p) {
+function runBody(phi, p) {
+  const s = Math.sin(2 * Math.PI * phi);
+  p.waist = [16, -7 * s, 0]; p.chest = [6, p.chest[1], 0]; p.y = -0.06 + 0.07 * Math.abs(Math.sin(2 * Math.PI * phi * 2)); return p;
+}
+function runLegsOld(phi, p) {
   const s = Math.sin(2 * Math.PI * phi), c = Math.cos(2 * Math.PI * phi);
   p.rLeg = [-48 * s, 0, -2]; p.lLeg = [48 * s, 0, 2];
   p.rKnee = [12 + 96 * Math.pow(Math.max(0, c), 1.4), 0, 0]; p.lKnee = [12 + 96 * Math.pow(Math.max(0, -c), 1.4), 0, 0];
@@ -92,7 +135,7 @@ function runLegs(phi, p) {
 function runArms(phi, p, swordToo) {
   const s = Math.sin(2 * Math.PI * phi);
   p.lArm = [-52 * s, 0, 8]; p.lElbow = [-84 - 16 * Math.max(0, s), 0, 0];
-  if (swordToo) { p.rArm = [28 + 12 * s, 0, -10]; p.rElbow = [-32 - 6 * s, 0, 0]; p.wrist = 214 + 6 * s; p.chest = [6, 10 * s, 0]; p.head = [-16, -6 * s, 0]; }
+  if (swordToo) { p.rArm = [28 + 12 * s, 0, -10]; p.rElbow = [-32 - 6 * s, 0, 0]; p.wrist = 214 + 6 * s; p.bd = bdv(-22 + 6 * s, -160); p.chest = [6, 10 * s, 0]; p.head = [-16, -6 * s, 0]; }
   return p;
 }
 
@@ -100,20 +143,21 @@ function runArms(phi, p, swordToo) {
 const T = { A: [], B: [] }, P = { A: [], B: [] }, RUN = { A: [], B: [] }, BR = { A: [], B: [] };
 const k = (c, t, pose, e, d) => T[c].push([t, d ? S(pose, d) : pose, e]);
 const at = (c, t, x, z, e) => P[c].push([t, x, z, e]);
-export const CLASHES = [];   // {t, big, kind}
+export const CLASHES = [];
+function SWINGS() { const out = []; for (const c of ['A', 'B']) for (const [t, p, e] of T[c]) if (e === 'i' && t > 2.5) out.push([+t.toFixed(3), c]); return out.sort((a, b) => a[0] - b[0]); }   // {t, big, kind}
 const clash = (t, big = false, kind = 'blade', extra = {}) => CLASHES.push({ t, big, kind, ...extra });
 
 function buildAll() {
   // ---------- opening: both relaxed across the arena, B draws, A draws
-  at('A', 0, -13, 0.4); at('B', 0, 13, -0.4);
+  at('A', 0, -7.5, 0.4); at('B', 0, 7.5, -0.4);
   k('A', 0, L.relaxed); k('B', 0, L.relaxed);
   k('B', 1.62, L.relaxed); k('B', 1.78, L.crouch, 'o', { rArm: [-30, 0, -20], rElbow: [-90, 0, 0], wrist: 140, y: -0.2 }); k('B', 2.1, G, 'back');
   k('A', 2.2, L.relaxed); k('A', 2.38, G, 'back', { y: -0.2 }); k('A', 2.62, G);
   // ---------- charge (A 2.85-4.1, B 2.9-4.12)
   k('A', 2.72, L.crouch, 'o', { rArm: [20, 0, -12], rElbow: [-30, 0, 0], wrist: 210 }); k('A', 2.86, L.crouch, 'lin', { rArm: [20, 0, -12], rElbow: [-30, 0, 0], wrist: 210 });
   RUN.A.push([2.86, 3.86]); RUN.B.push([2.92, 3.88]);
-  at('A', 2.86, -13, 0.4); at('A', 4.08, -2.0, 0.1, 'lin'); at('A', 4.2, -1.4, 0.05, 'o');
-  at('B', 2.92, 13, -0.4); at('B', 4.1, 2.0, -0.1, 'lin'); at('B', 4.2, 1.45, -0.05, 'o');
+  at('A', 2.86, -7.5, 0.4); at('A', 4.08, -2.0, 0.1, 'lin'); at('A', 4.2, -1.4, 0.05, 'o');
+  at('B', 2.92, 7.5, -0.4); at('B', 4.1, 2.0, -0.1, 'lin'); at('B', 4.2, 1.45, -0.05, 'o');
   k('A', 3.86, L.guard, 'lin', { rArm: [20, 0, -12], rElbow: [-30, 0, 0], wrist: 210 }); k('A', 4.08, L.windR, 'o'); k('A', 4.2, L.slashR, 'i');
   k('B', 3.86, L.guard, 'lin'); k('B', 4.08, L.windO, 'o'); k('B', 4.2, L.slashO, 'i');
   clash(4.2, true);
@@ -226,20 +270,21 @@ function buildAll() {
   for (const c of ['A', 'B']) { T[c].sort((a, b) => a[0] - b[0]); P[c].sort((a, b) => a[0] - b[0]); }
 }
 export const export_cross = {};
+export function events() { return { steps: STEPS.map(s => [+s.t.toFixed(3), s.kind, +(s.sp || 0).toFixed(2), s.c]), ghits: GHITS.map(g => +g.t.toFixed(3)), clashes: CONT.map(c => [c.t, c.big, c.kind]), swings: SWINGS() }; }
 
 // clash corrections (IK-lite): solved in fight.js so the two blades physically cross at each clash time
 export const CORR = { A: [], B: [] };
 function corrW(d) { if (d < -0.16 || d > 0.22) return 0; return d < 0 ? E.io((d + 0.16) / 0.16) : 1 - E.io(d / 0.22); }
 function rootXZ(c, t) { return evalPos(P[c], t); }
-export function pose(c, t) {
-  if (c === 'C') { const p = N(); p.pos = [0, -200, 0]; return p; }
+function basePose(c, t) {
   const p = evalKeys(T[c], t); const [x, z] = rootXZ(c, t);
   for (const e of CORR[c]) { const w = corrW(t - e.t); if (!w) continue;
-    p.rArm[0] += e.ax * w; p.rArm[2] += e.az * w; p.rElbow[0] += e.el * w; p.wrist += e.wr * w; p.chest[1] += e.ch * w; p._fw = (p._fw || 0) + (e.fw || 0) * w; }
+    p.rArm[0] += e.ax * w; p.rArm[2] += e.az * w; p.rElbow[0] += e.el * w; p.chest[1] += e.ch * w;
+    if (e.wr || e.ba) { const b = p.bd, el = Math.asin(Math.max(-1, Math.min(1, b[1]))) * 180 / Math.PI + e.wr * w, az = Math.atan2(b[0], b[2]) * 180 / Math.PI + (e.ba || 0) * w; p.bd = bdv(el, az); } p._fw = (p._fw || 0) + (e.fw || 0) * w; }
   for (const [t0, t1] of RUN[c]) if (t >= t0 && t <= t1) {
     const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]); const phi = d / STRIDE;
     const blend = clamp(Math.min((t - t0) / 0.08, (t1 - t) / 0.1));
-    const r = runArms(phi, runLegs(phi, cp(p)), t < t1 - 0.25);
+    const r = runArms(phi, runBody(phi, cp(p)), t < t1 - 0.25);
     Object.assign(p, mix(p, r, blend));
   }
   // breathing (bigger after exertion)
@@ -250,14 +295,104 @@ export function pose(c, t) {
   const yaw = p.yawAbs != null ? p.yawAbs : Math.atan2(ox - x, oz - z) * 180 / Math.PI;
   let X = x, Z = z;
   if (p._fw) { const dd = Math.hypot(ox - x, oz - z) || 1; X += (ox - x) / dd * p._fw; Z += (oz - z) / dd * p._fw; }   // clash step-in
-  const g = W.floorAt(X, Z);
-  p.pos = [X, g + p.y, Z]; p.yaw = yaw + p.yawOff;
+  p.pos = [X, p.y, Z]; p.yaw = yaw + p.yawOff;
+  return p;
+}
+
+// ------------------------------------------------------------------ simulation: collision + footstep planner (240 Hz, precomputed)
+const HZ = 240; const SIM = { A: null, B: null }; export const STEPS = [];   // {c, t, foot, p:[x,0,z], kind:'step'|'land'|'skid'|'lift', sp}
+export const SLIDES = { A: [[6.92, 7.6], [17.32, 17.75]], B: [[4.88, 5.3], [8.76, 9.1], [15.22, 15.7], [17.32, 17.72]] };
+const inWin = (L, t) => L.some(([a, b]) => t >= a && t <= b);
+const _eu = new THREE.Euler(), _v1 = new THREE.Vector3();
+function legFK(leg, knee, hipX) {   // desired sole offset in the body frame (px) from the authored FK leg angles
+  _eu.set(leg[0] * Math.PI / 180, leg[1] * Math.PI / 180, leg[2] * Math.PI / 180, 'XYZ'); const R1 = new THREE.Quaternion().setFromEuler(_eu);
+  _eu.set(knee[0] * Math.PI / 180, 0, 0, 'XYZ'); const R2 = new THREE.Quaternion().setFromEuler(_eu);
+  _v1.set(0, -6, 0).applyQuaternion(R2).add(new THREE.Vector3(0, -6, 0)).applyQuaternion(R1);
+  const sx = hipX + _v1.x * 1.25; return [Math.sign(hipX) * Math.max(1.6, Math.abs(sx)), _v1.z * 1.2];
+}
+function isAir(p) { return p.y > 0.22 || Math.abs(p.tilt[0]) > 30; }
+function simulate() {
+  const N = Math.ceil(TOTAL * HZ) + 2, raw = { A: [], B: [] }, push = { A: [], B: [] };
+  for (let i = 0; i < N; i++) { const t = i / HZ; for (const c of ['A', 'B']) raw[c].push(basePose(c, t)); }
+  // collision: bodies are 0.32-block capsules; posts and walls come from the arena heightmap
+  for (let i = 0; i < N; i++) {
+    const a = raw.A[i].pos, b = raw.B[i].pos, dx = a[0] - b[0], dz = a[2] - b[2], d = Math.hypot(dx, dz) || 1e-3, pen = 0.64 - d;
+    const pa = [0, 0], pb = [0, 0];
+    if (pen > 0) { pa[0] += dx / d * pen / 2; pa[1] += dz / d * pen / 2; pb[0] -= dx / d * pen / 2; pb[1] -= dz / d * pen / 2; }
+    for (const [P_, pp] of [[a, pa], [b, pb]]) for (let k = 0; k < 12; k++) {
+      const th = k / 12 * Math.PI * 2, x = P_[0] + Math.cos(th) * 0.34, z = P_[2] + Math.sin(th) * 0.34;
+      if (W.floorAt(x, z) > F + 0.6) { pp[0] -= Math.cos(th) * 0.05; pp[1] -= Math.sin(th) * 0.05; }
+    }
+    push.A.push(pa); push.B.push(pb);
+  }
+  const R = Math.round(0.06 * HZ);
+  for (const c of ['A', 'B']) {
+    const sm = push[c].map((_, i) => { let x = 0, z = 0, w = 0; for (let j = -R; j <= R; j++) { const q = push[c][Math.min(N - 1, Math.max(0, i + j))], g = Math.exp(-(j * j) / (2 * (R / 2) ** 2)); x += q[0] * g; z += q[1] * g; w += g; } return [x / w * 1.15, z / w * 1.15]; });
+    const root = raw[c].map((p, i) => [p.pos[0] + sm[i][0], p.pos[2] + sm[i][1]]);
+    const feet = { r: null, l: null }, step = { r: null, l: null }, outs = { r: [], l: [] };
+    for (let i = 0; i < N; i++) {
+      const t = i / HZ, p = raw[c][i], air = isAir(p), yaw = p.yaw * Math.PI / 180, cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const vx = i > 0 ? (root[i][0] - root[i - 1][0]) * HZ : 0, vz = i > 0 ? (root[i][1] - root[i - 1][1]) * HZ : 0, sp = Math.hypot(vx, vz);
+      const skid = inWin(SLIDES[c], t);
+      for (const [f, leg, knee, hx] of [['r', p.rLeg, p.rKnee, -2], ['l', p.lLeg, p.lKnee, 2]]) {
+        const out = outs[f], fk = air || (f === 'r' && p.fkR) || (f === 'l' && p.fkL);
+        const off = legFK(leg, knee, hx), lx = off[0] / 16, lz = off[1] / 16;
+        const D = [root[i][0] + lx * cy + lz * sy, root[i][1] - lx * sy + lz * cy];
+        if (fk) { if (feet[f]) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'lift' }); feet[f] = null; step[f] = null; out.push(null); continue; }
+        if (!feet[f]) { feet[f] = D.slice(); STEPS.push({ c, t, foot: f, p: [D[0], 0, D[1]], kind: 'land', sp }); }
+        if (skid) { feet[f] = [lerp(feet[f][0], D[0], 0.25), lerp(feet[f][1], D[1], 0.25)]; step[f] = null; if (i % 12 === 0) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'skid' }); out.push([feet[f][0], 0, feet[f][1]]); continue; }
+        const o = f === 'r' ? 'l' : 'r';
+        if (step[f]) {
+          const s_ = step[f], u = Math.min(1, (t - s_.t0) / s_.dur), w = u * u * (3 - 2 * u);
+          s_.to = [lerp(s_.to[0], D[0] + vx * (s_.dur * (1 - u)) * 0.6, 0.15), lerp(s_.to[1], D[1] + vz * (s_.dur * (1 - u)) * 0.6, 0.15)];
+          const x = lerp(s_.from[0], s_.to[0], w), z = lerp(s_.from[1], s_.to[1], w), y = s_.h * Math.sin(Math.PI * u);
+          if (u >= 1) { feet[f] = s_.to.slice(); step[f] = null; STEPS.push({ c, t, foot: f, p: [x, 0, z], kind: 'step', sp }); out.push([x, 0, z]); }
+          else out.push([x, y, z]);
+          continue;
+        }
+        const pred = [D[0] + vx * 0.07, D[1] + vz * 0.07], err = Math.hypot(feet[f][0] - pred[0], feet[f][1] - pred[1]);
+        const reach = Math.hypot(feet[f][0] - root[i][0], feet[f][1] - root[i][1]);
+        const otherBusy = step[o] && reach < 0.5 && (sp < 2.5 || (t - step[o].t0) / step[o].dur < 0.4);
+        const errO = feet[o] ? Math.hypot(feet[o][0] - D[0], feet[o][1] - D[1]) : 0;
+        if ((err > 0.13 && !otherBusy && !(step[o] == null && feet[o] && errO > err * 1.4 && reach < 0.5)) || (reach > 0.58 && !step[f])) {
+          const run = sp > 2.5, dur = run ? Math.max(0.1, Math.min(0.16, 0.75 / sp)) : Math.min(0.22, Math.max(0.09, 0.07 + 0.12 * err));
+          step[f] = { from: feet[f].slice(), to: [D[0] + vx * dur * 0.6, D[1] + vz * dur * 0.6], t0: t, dur, h: run ? 0.2 : Math.min(0.2, 0.05 + 0.2 * err) };
+        }
+        out.push([feet[f][0], 0, feet[f][1]]);
+      }
+    }
+    SIM[c] = { root, raw: raw[c].map(p => [p.pos[0], p.pos[2]]), r: outs.r, l: outs.l };
+  }
+}
+function samp(arr, t) {
+  const x = t * HZ, i = Math.max(0, Math.min(arr.length - 2, Math.floor(x))), u = x - i, a = arr[i], b = arr[i + 1];
+  if (!a || !b) return a || b; return a.map((v, k) => v + (b[k] - v) * u);
+}
+// successive breaking: hips lead, the arm chain trails by 1-2 frames, the head drags
+const LAG = { waist: 0.03, chest: 0.015, lArm: -0.012, rElbow: -0.02, lElbow: -0.03, head: -0.035 };
+export function pose(c, t) {
+  if (c === 'C') { const p = N(); p.pos = [0, -200, 0]; return p; }
+  const p = basePose(c, t), k0 = evalKeys(T[c], t);
+  for (const j in LAG) { const q = evalKeys(T[c], t + LAG[j]); p[j] = p[j].map((v, i) => v + (q[j][i] - k0[j][i])); }
+  { const q = evalKeys(T[c], t - 0.03), v = p.bd.map((x, i) => x + (q.bd[i] - k0.bd[i])), n = Math.hypot(...v) || 1; p.bd = v.map(x => x / n); }
+  const S_ = SIM[c], rt = samp(S_.root, t), rw = samp(S_.raw, t), X = rt[0] + p.pos[0] - rw[0], Z = rt[1] + p.pos[2] - rw[1], g = W.floorAt(X, Z);
+  p.pos = [X, g + (isAir(p) ? p.y : p.y * 0.8), Z];
+  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]]; }
+  const fr = samp(S_.r, t), fl = samp(S_.l, t);
+  if (fr || fl) { p.ik = {}; for (const [k, f] of [['r', fr], ['l', fl]]) if (f) p.ik[k] = [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.035, f[2]];
+    // pelvis drop: lower the hips until every planted foot is within leg reach (wide stances sit low, nothing floats)
+    const yaw = p.yaw * Math.PI / 180, hipY = p.pos[1] + 0.75; let drop = 0;
+    for (const [k, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const tg = p.ik[k]; if (!tg) continue;
+      const hxw = p.pos[0] + hx * Math.cos(yaw), hzw = p.pos[2] - hx * Math.sin(yaw), dh = Math.hypot(tg[0] - hxw, tg[2] - hzw), reach = 0.735;
+      if (dh < reach) { const need = hipY - tg[1] - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } else drop = Math.max(drop, hipY - tg[1]); }
+    p.pos[1] -= Math.min(0.42, drop); }
   return p;
 }
 
 // ------------------------------------------------------------------ contacts (set by fight.js from the real blade geometry)
 let CONT = [];
 export function setContacts(c) { CONT = c; }
+let GHITS = []; export function setGroundHits(g) { GHITS = g; }
 const BIG = () => CONT.filter(c => c.big && c.kind === 'blade');
 
 // ------------------------------------------------------------------ shots
@@ -295,26 +430,26 @@ export function camera(t, cast) {
     case 'otsA_far': pos = A.clone().add(fA.clone().multiplyScalar(-2.0)).add(side.clone().multiplyScalar(0.9)).add(up(1.95)); look = B.clone().add(up(1.2)); fov = 26 - 3 * u; break;
     case 'runA': pos = A.clone().add(side.clone().multiplyScalar(4.2)).add(fA.clone().multiplyScalar(0.9)).add(up(0.95)); look = A.clone().add(up(1.1)).add(fA.clone().multiplyScalar(0.8)); fov = 44; roll = -0.04; break;
     case 'runB': pos = B.clone().add(fB.clone().multiplyScalar(4.6 - 0.8 * u)).add(side.clone().multiplyScalar(-0.6)).add(up(0.7)); look = B.clone().add(up(1.25)); fov = 38; break;
-    case 'converge': pos = mid.clone().add(side.clone().multiplyScalar(-7.5)).add(up(1.1)); look = mid.clone().add(up(1.5)); fov = 40 - 6 * u; break;
-    case 'orbit1': { const a = (0.35 + 0.9 * u) * Math.PI / 2; pos = mid.clone().add(side.clone().multiplyScalar(Math.cos(a) * 5.4)).add(ab.clone().multiplyScalar(Math.sin(a) * 5.4)).add(up(2.0 - 0.5 * u)); look = mid.clone().add(up(1.45)); fov = 40; break; }
+    case 'converge': pos = mid.clone().add(side.clone().multiplyScalar(-6.0)).add(up(1.0)); look = mid.clone().add(up(1.5)); fov = 40 - 6 * u; break;
+    case 'orbit1': { const a = (0.35 + 0.9 * u) * Math.PI / 2; pos = mid.clone().add(side.clone().multiplyScalar(Math.cos(a) * 3.7)).add(ab.clone().multiplyScalar(Math.sin(a) * 3.7)).add(up(1.6 - 0.4 * u)); look = mid.clone().add(up(1.45)); fov = 40; break; }
     case 'otsA': pos = A.clone().add(fA.clone().multiplyScalar(-1.9)).add(side.clone().multiplyScalar(0.95)).add(up(2.05)); look = B.clone().add(up(1.3)); fov = 42; break;
     case 'lowSpin': pos = A.clone().add(fA.clone().multiplyScalar(2.4)).add(side.clone().multiplyScalar(2.4)).add(up(0.45)); look = A.clone().add(up(1.4)); fov = 48; roll = 0.06; break;
-    case 'wideKick': pos = mid.clone().add(side.clone().multiplyScalar(7.6)).add(up(1.7)); look = mid.clone().lerp(A, 0.45).add(up(1.1)); fov = 42; break;
+    case 'wideKick': pos = mid.clone().add(side.clone().multiplyScalar(5.0)).add(up(1.3)); look = mid.clone().lerp(A, 0.45).add(up(1.1)); fov = 42; break;
     case 'kneelLow': pos = A.clone().add(fA.clone().multiplyScalar(-1.7)).add(side.clone().multiplyScalar(0.7)).add(up(0.85)); look = B.clone().add(up(1.7)); fov = 42; break;
     case 'shove': pos = mid.clone().add(side.clone().multiplyScalar(3.4)).add(up(1.5)); look = mid.clone().add(up(1.25)); fov = 46; break;
     case 'leapLow': { const a0 = v3(...pose('A', 9.2).pos); pos = a0.clone().add(side.clone().multiplyScalar(3.4)).add(ab.clone().multiplyScalar(2.6)).add(up(0.35)); look = A.clone().add(up(1.4)); fov = 52; roll = -0.05; break; }
     case 'slamHigh': pos = A.clone().add(up(7.6)).add(side.clone().multiplyScalar(3.2)).add(ab.clone().multiplyScalar(-2.4)); look = A.clone().add(up(0.4)).add(ab.clone().multiplyScalar(1.2)); fov = 46; break;
-    case 'flurry': { const a = Math.PI * (0.15 + 1.0 * u); const c = mid; pos = c.clone().add(side.clone().multiplyScalar(Math.cos(a) * 4.6)).add(ab.clone().multiplyScalar(Math.sin(a) * 4.6)).add(up(1.75)); look = c.clone().add(up(1.4)); fov = 42; break; }
+    case 'flurry': { const a = Math.PI * (0.15 + 1.0 * u); const c = mid; pos = c.clone().add(side.clone().multiplyScalar(Math.cos(a) * 3.5)).add(ab.clone().multiplyScalar(Math.sin(a) * 3.5)).add(up(1.45)); look = c.clone().add(up(1.4)); fov = 42; break; }
     case 'bindECU': { const c = v3(...(CONT.find(x => Math.abs(x.t - 11.62) < 0.01) || { p: mid.toArray() }).p); const cc = c.clone().add(up(-0.45)); pos = cc.clone().add(side.clone().multiplyScalar(1.7 - 0.2 * u)).add(up(0.2)); look = cc; fov = 34; roll = 0.04; break; }
     case 'bindFaces': pos = mid.clone().add(side.clone().multiplyScalar(3.2)).add(up(1.8)); look = mid.clone().add(up(1.55)); fov = 36 - 4 * u; break;
-    case 'pushWide': pos = mid.clone().add(side.clone().multiplyScalar(8.2)).add(up(2.6)); look = mid.clone().add(up(1.2)); fov = 40; break;
+    case 'pushWide': pos = mid.clone().add(side.clone().multiplyScalar(5.4)).add(up(1.6)); look = mid.clone().add(up(1.2)); fov = 40; break;
     case 'whirlFront': pos = A.clone().add(fA.clone().multiplyScalar(-2.6)).add(side.clone().multiplyScalar(1.3)).add(up(1.05)); look = B.clone().add(up(1.3)); fov = 46; break;
-    case 'whirlSide': pos = mid.clone().add(side.clone().multiplyScalar(5.2)).add(up(1.4)); look = mid.clone().add(up(1.3)); fov = 42; break;
+    case 'whirlSide': pos = mid.clone().add(side.clone().multiplyScalar(3.9)).add(up(1.2)); look = mid.clone().add(up(1.3)); fov = 42; break;
     case 'jumpLow': pos = mid.clone().add(side.clone().multiplyScalar(3.3)).add(up(0.22)); look = mid.clone().add(up(1.7)); fov = 54; break;
-    case 'knockWide': pos = mid.clone().add(side.clone().multiplyScalar(7.2)).add(up(2.0)); look = mid.clone().lerp(B, 0.55).add(up(1.2)); fov = 42; break;
+    case 'knockWide': pos = mid.clone().add(side.clone().multiplyScalar(5.0)).add(up(1.4)); look = mid.clone().lerp(B, 0.55).add(up(1.2)); fov = 42; break;
     case 'breathA': pos = A.clone().add(fA.clone().multiplyScalar(2.8)).add(side.clone().multiplyScalar(1.3)).add(up(1.7)); look = A.clone().add(up(1.45)); fov = 34 - 3 * u; break;
     case 'breathB': pos = B.clone().add(fB.clone().multiplyScalar(2.8)).add(side.clone().multiplyScalar(-1.3)).add(up(1.7)); look = B.clone().add(up(1.45)); fov = 34 - 3 * u; break;
-    case 'chargeSide': pos = mid.clone().add(side.clone().multiplyScalar(6.4)).add(up(0.9)); look = mid.clone().add(up(1.3)); fov = 40; break;
+    case 'chargeSide': pos = mid.clone().add(side.clone().multiplyScalar(4.8)).add(up(0.8)); look = mid.clone().add(up(1.3)); fov = 40; break;
     case 'flash': pos = mid.clone().add(side.clone().multiplyScalar(6.4)).add(up(0.9)); look = mid.clone().add(up(1.3)); break;
     case 'hero': { const m = v3(export_cross.mid[0], F, export_cross.mid[1]), uu = v3(export_cross.u[0], 0, export_cross.u[1]), pp = v3(export_cross.p[0], 0, export_cross.p[1]);
       pos = m.clone().add(uu.clone().multiplyScalar(7.6 - 0.8 * E.io(u))).add(pp.clone().multiplyScalar(-2.6)).add(up(1.05)); look = m.clone().add(uu.clone().multiplyScalar(1.5)).add(up(1.55)); fov = 36; break; }
@@ -324,7 +459,8 @@ export function camera(t, cast) {
       const cp_ = v3(...c.p); pos = cp_.clone().add(side.clone().multiplyScalar(ii % 2 ? -2.3 : 2.3)).add(ab.clone().multiplyScalar(0.5)).add(up(0.15)); look = cp_.clone().add(up(-0.25)); fov = 36 + 30 * lt; roll = ii % 2 ? 0.12 : -0.1; break; }
     default: pos = mid.clone().add(side.clone().multiplyScalar(6)).add(up(2)); look = mid.clone().add(up(1.2));
   }
-  const sh = shake(t); pos.add(sh); look = look.clone().add(sh.clone().multiplyScalar(0.6));
+  const hh = v3(0.035 * Math.sin(t * 1.7) + 0.02 * Math.sin(t * 4.3), 0.025 * Math.sin(t * 2.3 + 1), 0.03 * Math.cos(t * 1.9));   // handheld drift
+  const sh = shake(t).add(hh); pos.add(sh); look = look.clone().add(sh.clone().multiplyScalar(0.6));
   // never below the arena floor
   const fl = W.floorAt(pos.x, pos.z); if (pos.y < fl + 0.15) pos.y = fl + 0.15;
   return { pos, look, fov, roll, label: S.label };
@@ -341,26 +477,27 @@ function burst(list, t, t0, p, n, seed, power = 1) {
     const fl = W.floorAt(p[0], p[2]); let y = p[1] + v[1] * d - 6 * d * d; if (y < fl) y = fl + 0.02;
     list.push({ p: [p[0] + v[0] * d, y, p[2] + v[2] * d], c: HOT, s: 0.02 + 0.03 * h(i, seed + 4), a: (1 - d / life) * 1.2 }); }
 }
-function puff(list, t, t0, p, n, seed, spread = 0.7, rise = 0.6, col = [0.86, 0.88, 0.92], life = 1.1) {
+function puff(list, t, t0, p, n, seed, spread = 0.7, rise = 0.6, col = [0.9, 0.8, 0.62], life = 1.1) {
   const d = t - t0; if (d < 0 || d > life) return; const u = d / life;
   for (let i = 0; i < n; i++) { const th = h(i, seed) * Math.PI * 2, r = (0.15 + spread * h(i, seed + 1)) * E.o(Math.min(1, d / 0.5));
     list.push({ p: [p[0] + Math.cos(th) * r, p[1] + 0.05 + rise * d * (0.3 + h(i, seed + 2)), p[2] + Math.sin(th) * r], c: col, s: 0.28 + 0.6 * u, a: 0.5 * (1 - u) }); }
 }
 export function effects(t, cam) {
   const add = [], soft = [], flares = [], rings = [], debris = []; let flash = 0, black = 0, ca = 0, impact = 0, bloomBoost = 0; const sparkLight = { i: 0, p: [0, 0, 0] };
-  // snow (Marlow): falling + wind, wrapped in a box around the camera target
+  // desert air: drifting sand motes + low wind-blown dust near the floor (Desert Arena)
   const cx = cam.position.x, cz = cam.position.z;
-  for (let i = 0; i < 2600; i++) {
-    const sp = 1.2 + 1.0 * h(i, 3), wind = 2.6;
-    const x = ((h(i, 1) * 50 + wind * t + 0.4 * Math.sin(t * 1.3 + i)) % 50 + 50) % 50 - 25 + cx, z = ((h(i, 2) * 50 + 0.6 * t) % 50 + 50) % 50 - 25 + cz;
-    const y = F + ((h(i, 4) * 22 - sp * t) % 22 + 22) % 22;
-    soft.push({ p: [x, y, z], c: [0.93, 0.95, 1.0], s: 0.035 + 0.05 * h(i, 5), a: 0.75 });
+  for (let i = 0; i < 900; i++) {
+    const x = ((h(i, 1) * 30 + 1.4 * t + 0.3 * Math.sin(t * 0.9 + i)) % 30 + 30) % 30 - 15 + cx, z = ((h(i, 2) * 30 + 0.4 * t) % 30 + 30) % 30 - 15 + cz;
+    const y = F + 0.2 + ((h(i, 4) * 6 + 0.15 * t * (0.5 + h(i, 6)) + 0.2 * Math.sin(t * 1.3 + i)) % 6 + 6) % 6;
+    soft.push({ p: [x, y, z], c: [1.0, 0.9, 0.72], s: 0.018 + 0.025 * h(i, 5), a: 0.55 });
   }
-  // footfall puffs during runs
-  for (const c of ['A', 'B']) for (const [t0, t1] of RUN[c]) {
-    if (t < t0 - 0.01 || t > t1 + 1.2) continue;
-    const a = rootXZ(c, t0);
-    for (let st = 0; st < 12; st++) { const tc = t0 + st * 0.11; if (tc > t1) break; const pp = rootXZ(c, tc); puff(soft, t, tc, [pp[0], W.floorAt(pp[0], pp[1]), pp[1]], 4, st * 7 + (c === 'A' ? 1 : 2), 0.35, 0.3, undefined, 0.7); }
+  // ground contact: every planted step puffs sand (size from speed), landings and skids throw more
+  for (const st of STEPS) {
+    const d = t - st.t; if (d < 0 || d > 1.0) continue;
+    const g = W.floorAt(st.p[0], st.p[2]), q = [st.p[0], g, st.p[2]], seed = Math.round(st.t * 977) + (st.foot === 'r' ? 3 : 7);
+    if (st.kind === 'step') puff(soft, t, st.t, q, (st.sp || 0) > 2.5 ? 7 : 4, seed, (st.sp || 0) > 2.5 ? 0.4 : 0.25, 0.25, [0.9, 0.8, 0.62], 0.75);
+    else if (st.kind === 'land') puff(soft, t, st.t, q, 12, seed, 0.6, 0.35, [0.9, 0.8, 0.62], 1.0);
+    else if (st.kind === 'skid') puff(soft, t, st.t, q, 6, seed, 0.45, 0.45, [0.9, 0.8, 0.62], 0.9);
   }
   // per-contact effects
   for (const c of CONT) {
@@ -368,9 +505,9 @@ export function effects(t, cam) {
     if (c.kind === 'blade' || c.kind === 'cross') {
       burst(add, t, c.t, p, c.big ? 90 : 45, Math.round(c.t * 100), c.big ? 1.25 : 0.9);
       if (d >= 0 && d < (c.big ? 0.22 : 0.12)) { const u = d / (c.big ? 0.22 : 0.12), ins = shotAt(t).label === 'ins' ? 0.22 : 1; flares.push({ p, s: (c.big ? 1.5 : 0.75) * (1 - 0.5 * u) * ins, a: (1 - u) * (ins < 1 ? 0.8 : 1), rot: c.t * 3 }); sparkLight.i = Math.max(sparkLight.i, (c.big ? 9 : 4) * (1 - u)); sparkLight.p = p; }
-      if (c.big && d >= 0 && d < 0.3 && shotAt(t).label !== 'ins') rings.push({ p, s: 0.3 + 2.6 * E.o(d / 0.3), a: 0.32 * (1 - d / 0.3) });
+      
     }
-    if (c.kind === 'kick') { puff(soft, t, c.t, p, 10, 77, 0.5, 0.2); if (d >= 0 && d < 0.22) rings.push({ p, s: 0.3 + 1.6 * E.o(d / 0.22), a: 0.25 * (1 - d / 0.22) }); }
+    if (c.kind === 'kick') { puff(soft, t, c.t, p, 10, 77, 0.5, 0.2); }
     if (c.kind === 'slam') {
       const g = W.floorAt(p[0], p[2]), q = [p[0], g, p[2]];
       burst(add, t, c.t, [p[0], g + 0.1, p[2]], 60, 91, 1.1); puff(soft, t, c.t, q, 28, 93, 2.6, 0.9, [0.85, 0.8, 0.7], 1.5);
@@ -382,12 +519,11 @@ export function effects(t, cam) {
         debris.push({ p: [p[0] + Math.cos(th) * sp * dd, y, p[2] + Math.sin(th) * sp * dd], r: [d * 9 * h(i, 98), d * 7, d * 5 * h(i, 99)], s: 0.14 + 0.2 * h(i, 94) * (1 - Math.max(0, d - 1.1) / 0.3) });
       }
     }
-    if (c.kind === 'cross' && d >= 0 && d < 1.2) puff(soft, t, c.t + 0.3, [p[0], F, p[2]], 16, 51, 1.4, 0.5, [0.86, 0.88, 0.92], 1.2);
+    if (c.kind === 'cross' && d >= 0 && d < 1.2) puff(soft, t, c.t + 0.3, [p[0], F, p[2]], 16, 51, 1.4, 0.5, [0.9, 0.8, 0.62], 1.2);
   }
-  // slides kick up snow
-  for (const [c, t0, t1] of [['A', 7.0, 7.6], ['A', 17.35, 17.75], ['B', 17.35, 17.75], ['B', 15.25, 15.7], ['B', 8.7, 9.1]])
-    for (let s = 0; s < 6; s++) { const tc = t0 + (t1 - t0) * s / 6; const pp = rootXZ(c, tc); puff(soft, t, tc, [pp[0], W.floorAt(pp[0], pp[1]), pp[1]], 5, 300 + s * 13 + (c === 'A' ? 0 : 5), 0.5, 0.45); }
-  { const pb = rootXZ('B', 19.38); puff(soft, t, 19.38, [pb[0], F, pb[1]], 20, 401, 1.3, 0.4, [0.9, 0.92, 0.96], 1.4); }
+  { const pb = rootXZ('B', 19.38); puff(soft, t, 19.38, [pb[0], F, pb[1]], 20, 401, 1.3, 0.4, [0.9, 0.8, 0.62], 1.4); }
+  for (const g of GHITS) { const d = t - g.t; if (d < 0 || d > 1) continue;
+    puff(soft, t, g.t, g.p, 9, Math.round(g.t * 333), 0.5, 0.5, [0.92, 0.82, 0.62], 0.9); burst(add, t, g.t, [g.p[0], g.p[1] + 0.05, g.p[2]], 14, Math.round(g.t * 777), 0.5); }
   // bind sparks: small repeating bursts
   const bc = CONT.find(x => Math.abs(x.t - 11.62) < 0.01);
   if (bc) for (let tb = 11.7; tb < 12.5; tb += 0.11) burst(add, t, tb, bc.p, 14, Math.round(tb * 1000), 0.6);

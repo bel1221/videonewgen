@@ -18,7 +18,7 @@ const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application
 const browser = await chromium.launch({ executablePath: CHROME, headless: true,
   args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning' || /^(contacts|FLOOR|CLASHES)/.test(m.text())) console.error('[page]', m.text()); });
+page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning' || /^(contacts|FLOOR|CLASHES|GROUNDHITS)/.test(m.text())) console.error('[page]', m.text()); });
 page.on('pageerror', e => console.error('[pageerror]', e.message));
 const PAGE = '/' + (process.env.PAGE || 'anim-test/web/index.html').replace(/^\/+/, '');
 await page.goto(`http://127.0.0.1:${port}${PAGE}${process.env.QS || ''}`);
@@ -28,7 +28,8 @@ const info = await page.evaluate(() => { const gl = document.querySelector('canv
 console.error('renderer:', info);
 
 const [mode, a, b, out] = process.argv.slice(2);
-if (mode === 'still') {
+if (mode === 'eval') { console.log(JSON.stringify(await page.evaluate(a), null, 0)); }
+else if (mode === 'still') {
   fs.mkdirSync(path.join(ROOT, 'anim-test/' + (process.env.QADIR || 'qa')), { recursive: true });
   for (const s of a.split(',')) {
     const t = parseFloat(s); const t0 = Date.now(); const label = await page.evaluate(t => window.renderAt(t), t);

@@ -306,3 +306,36 @@ What still has to be worked on, most important first:
    need re-keying, not just correcting.
 7. **Weapons.** The legendary-weapon render and grips read well and are a strength over the reference's plain iron
    swords. Wrist roll now allows sideways blocks.
+
+## 6. Desert Arena SURVIVAL (Squared Media), first 20 s: weapon handling and body motion (2026-11-09)
+
+Measured with the §1 pipeline: 11 shots, median 1.83 s (longer than Marlow), camera locked 20 %, push-ins at 8 %/s,
+animated on ones at 30 fps. The pacing comes from motion inside the frame, not from cutting.
+- **Weapons are big and read clearly.** Swords are about a character's height. They are flat pixel-extruded item
+  models with dark edges, and characters dual-wield and flip to reverse grip.
+- **The blade points with intent.** The handle sits deep in the fist and the blade direction follows the action:
+  - Guard: upright and slightly forward.
+  - Wind-up: cocked behind the shoulder or head.
+  - Slash: sweeps across the body and finishes past the opposite hip.
+  - Smash: driven down.
+  - Thrust: level.
+  - Relaxed: down and forward.
+  The hand is always the pivot of the blade. This was the main error in fight test v1, where the blades were held at a
+  fixed wrist angle and so lay horizontal.
+- **Smears.** On fast swings the blade is drawn 2-4 times along its arc (multiples), on top of motion blur.
+- **Bodies bend smoothly.** The limbs are Mine-imator-style bendy, with no hinge gap at elbows and knees. Feet stay
+  planted on the ground, stances are wide and lunges very low. Bodies slide through the sand with dust plumes, and
+  characters cartwheel and flip.
+- **Light:** warm low sun, hard shadows, a sand bounce light and close depth of field.
+
+What changed in fight test v2:
+- **Rig:** a skinned bendy rig (`web/rig2.js`) with leg IK to planted feet, plus a pelvis drop so wide stances sit
+  low instead of floating.
+- **Footsteps:** a 240 Hz footstep planner with steps, skids, landings and a run flight phase.
+- **Collision:** body-to-body and against the arena posts.
+- **Motion:** spline motion through keys, with successive breaking from the hips down the arm chain.
+- **Blade aiming:** blade intent per action. The rig solves wrist bend and roll so the hand aims the blade.
+- **Weapons:** 1.15× size, 3 smear ghosts.
+- **Environment:** footprints, sand dust on every step, blade-on-ground sand and sparks, desert light, closer
+  handheld framing.
+- **Sound pack:** built in `anim-test/sfx_pack/`, from the user's pack plus cuts from the study videos.

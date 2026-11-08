@@ -1,3 +1,8 @@
 comp/
 qa/
 fight/assets/colosseum/
+fight/qa*/
+fight/dbg*/
+fight/tw*/
+fight/tw_compare.jpg
+sfx_pack/spec_grid.png

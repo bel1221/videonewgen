@@ -1,0 +1,8 @@
+{
+  "_note": "Hand-labelled from spectrograms (spec_grid.png). 'mani_*' = the user's sword pack (Manibharathi, YouTube). 'desert_*' / 'nuvguard_*' = cut from the study videos; they carry music bleed and are someone else's soundtrack work: study/test use only, do not ship in published videos without permission.",
+  "clash": ["clash/mani_06.wav", "other/mani_01.wav", "other/mani_02.wav", "clash/desert_00.wav", "clash/desert_01.wav", "clash/desert_21.wav", "clash/desert_31.wav"],
+  "slash": ["other/mani_03.wav", "unsheathe/mani_04.wav", "unsheathe/mani_08.wav", "other/mani_09.wav", "other/mani_11.wav", "unsheathe/mani_12.wav", "impact/mani_07.wav"],
+  "swoosh_big": ["unsheathe/desert_34.wav", "unsheathe/desert_22.wav", "unsheathe/desert_27.wav"],
+  "impact": ["impact/mani_05.wav", "impact/mani_10.wav", "impact/desert_18.wav", "impact/desert_35.wav", "impact/desert_23.wav"],
+  "click": ["impact/mani_00.wav"]
+}
