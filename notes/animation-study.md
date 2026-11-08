@@ -104,6 +104,91 @@ Takeaways:
   picture-in-picture.
 - Graphic transitions: white brush-stroke wipes on black (0.27 s) between cold-open beats.
 
+## 2b. How the animation is done (character craft)
+
+Cadence measured at native frame rate on calm and action stretches (`toolkit/refstudy/cadence.py`):
+
+| | MD | NV | DFY | WY |
+|---|---|---|---|---|
+| new pose every | 1 frame at **24 fps** (2:3 pattern in the 60 fps file) | 1 frame at **30 fps** | 1 frame at 30 fps (calm shots up to 55) | 1 frame at 30 fps |
+
+All four animate **on ones**: a new pose on every rendered frame, with no held drawings and no stepped "stop-motion"
+look. The smoothness comes from keyframes and easing. Our engine at 30 fps matches.
+
+Read frame by frame from 30 fps strips:
+- **Anticipation is long and the action is short.** NV axe swing (116.6-117.5 s): the body sinks and the arm draws back
+  over about 0.55 s (slow in), then the swing takes **about 0.2 s** (7 frames) with motion blur on the axe. That's
+  roughly 3:1 anticipation to action. The cut happens *mid-swing* (cut on action), and the impact lands in the next,
+  wider shot.
+- **The impact is 1 frame of brightness, then the result.** At 117.82 s: one frame of a white-yellow star burst, then
+  a ring of white air trails (a shockwave) expanding for about 0.3 s, dust, and the victim knocked flat. The hit
+  reaction is a full-body **knockback that keeps travelling**, not a flinch in place.
+- **Weapon trails.** DFY 134.35-134.65 s: a grey smear arc follows the blade's path and fades over about 0.3 s. The
+  arc *is* the motion read; the limb itself barely needs blur.
+- **Charge-ins accelerate.** MD 10.2-10.95 s: the hero walks at an even pace, then the last 4 frames become a leap
+  (body stretched, arms up, heavy motion blur) toward the lens. Ease-in into a jump, no constant speed.
+- **Nothing is ever frozen.** In DFY's two-shot (133.9-135 s) the character who isn't acting still shifts weight and
+  turns the head a little. In close-ups the head sways a few pixels over about 2 s, and the face changes expression by
+  **swapping the eye/mouth texture** (blink, squint, glare): Minecraft faces act through texture, not through bones.
+- **Secondary motion.** Hair, capes and wings lag behind body turns by 2-4 frames and settle with a small overshoot.
+- **Weight on landings.** Falls and landings compress (crouch) on contact, then settle. Bodies after a death hit stay
+  down and the camera holds on them.
+
+## 2c. Sound effects (how they're layered)
+
+Read from spectrograms plus onset and band envelopes (`specsheet.py`). earshot was unavailable, so these describe
+spectral shapes, not named sounds.
+- **MD and DFY are music-only.** The hits are carried by the score's drums and by picture flashes. Even so, they
+  shape the music like sound design: **MD's suck-out is a low-pass sweep**, with the score's top end closing from about
+  16 kHz down to about 2 kHz over 1.2 s (9.0-10.2 s). It reopens with a full-band drum hit on the first fight cut, and
+  a second, shorter close-reopen follows 0.4 s later.
+- **NV layers SFX under the score.** At the swing start (117.25 s) there's a broadband streak up to 16 kHz (the swing
+  whoosh), the air band rises into the impact (117.8 s), and a sweep follows the shockwave. So the whoosh comes on the
+  *anticipation-to-action* moment, the impact on contact, then a tail.
+- **WY is the most sound-designed.** Sharp broadband ticks and whooshes sit on the cuts (cut-to-onset within 50 ms:
+  41 % vs 35 % chance, the only video above chance). A sub-bass hit lands on each hero cut, about every 4.5 s. At the
+  title card "7 YEARS IN THE MAKING" everything drops to near-silence with **a single ringing tone at about 4 kHz** for
+  0.7 s, which makes the card feel heavy without any boom.
+- **Mix:** dense, compressed beds around -10 to -15 dB with loud sections held flat. Dynamics come from *removing*
+  content (suck-outs, silences), not from making hits louder.
+
+Applied to our rules (no booms/explosions, no file more than twice): a whoosh on each *anticipation*, a hit on contact,
+and a short sparkle or shine tail. The suck-out is done with a low-pass sweep on `sa.mp3` (a filter, not a file), and a
+quiet ringing tone can replace a boom for the BANNED stamp.
+
+## 2d. Lighting and environment
+
+Grade stats from every shot's middle frame (`light.py`; CIELAB, L 0-100):
+
+| | MD | NV | WY | DFY |
+|---|---|---|---|---|
+| black level (p2 L) | 5 | 4 | 2 | 5 |
+| brightest non-source (p98 L) | 87 | 80 | 76 | 55 |
+| highlight chroma / shadow chroma | 14.6 / 12.7 | 18.6 / 6.8 | 15.1 / 6.0 | 17.2 / 10.9 |
+| vignette (corner / centre L) | 1.04 | 0.80 | 0.98 | 0.83 |
+
+What the full-resolution frames show:
+- **Every light is motivated.** Candles, torches, blue-fire braziers, light blocks and fire are visible in frame, and
+  their colour spills onto nearby blocks and onto the characters. NV's warm light block lights the checkerboard floor
+  around it; DFY's blue braziers turn the whole hall and the character blue. Characters never have lighting that
+  doesn't belong to the set.
+- **Two-colour lighting:** a cool top or ambient fill plus a warm practical from one side or below (MD 26 s: blue
+  room, warm pink bounce from below). Complementary colours make the blocky forms read.
+- **Backlight and silhouette for menace.** MD's villain (30.5 s) is a black silhouette against a blown-out volumetric
+  sky with god-rays and drifting bokeh. Only the **emissive eyes** glow (white, then red). NV and DFY villains are lit
+  the same way.
+- **Emissives bloom:** eyes, fire, sparks and light blocks have a soft glow halo. Nothing else does.
+- **Atmosphere in every shot:** haze that fades distant blocks toward the fog colour, floating particles (snow,
+  embers, dust, bokeh discs), shallow depth of field, and a blurred foreground object (NV 60.5 s: green leaves in
+  front of the fight).
+- **Contact:** soft ambient-occlusion shadows under feet and in corners, so characters sit *in* the set.
+- **Grade:** true blacks (p2 L 2-5), highlights below clipping except light sources, colour concentrated in the
+  highlights (NV and WY have about 3x more chroma in highlights than in shadows), and a vignette in the cinematic ones.
+
+v1 by contrast: the background is a blurred, darkened screenshot, characters have one fixed directional shade, and
+their colour doesn't react to the scene. There's no rim light, haze, foreground layer or bloom, so the characters
+read as pasted on.
+
 ## 3. Techniques ranked by value for us (all fit the house rules)
 
 1. **Cut the action, not the clip.** Break any 3+ s action into 0.3-0.8 s shots from different sizes and angles;
@@ -151,6 +236,18 @@ just a different `mk()`. Also needed: a white/black flash helper, and an impact-
 additive spark/flare sprite in ORANGE). Optional: radial speed lines for the admin landing.
 Sound (`enc_sfx.py`): add a music suck-out at 3.9 s (low-pass/duck the bed, no new file) and keep each SFX file at two
 uses or fewer. Hits with no insert can share one cue.
+
+### v2 craft layer (from sections 2b-2d)
+- **Animation:** anticipation before every hit (the hacker winds up 0.15-0.25 s, then a 2-3 frame strike) and
+  knockback that travels and settles. Add a grey/white weapon-trail arc on the spin, idle breathing and sway on
+  everyone (about 0.8 units at 0.4 Hz, heads offset), a landing crouch-and-settle for the admin, and an eye-texture
+  swap for expressions (player blink and wide eyes, hacker red glow).
+- **Lighting:** colour-aware shading in `MC.Scene` with a key colour, a fill colour sampled from the background, and
+  a rim term on faces turned away from the camera. A warm admin beam lights the characters near it, and the hacker
+  gets a red under-light and glowing eyes with bloom. Also: haze plus floating embers in front of and behind the
+  characters, a blurred foreground layer, a vignette, crushed blacks and a warm/cool split tone.
+- **Sound:** a whoosh on each anticipation (different files, two uses at most each), a hit on contact, and a low-pass
+  sweep suck-out on the music before the admin lands, reopening on the landing.
 
 Open questions for the user before building v2 are unchanged from CLAUDE.md (skins, admin name, staff review wording).
 New ones: is about 11 s still fine for this scene, and should the flash and speed-line grammar stay subtle (house
