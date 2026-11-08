@@ -11,6 +11,9 @@ Full history, scripts, prompts and every past decision: `HANDOFF.md`. Read the r
 - Don't overuse any single effect (neon lines, laser sweeps). Light/ray effects never cover text.
 - **No still frames**: every scene drifts (camera push + horizontal drift), backgrounds move, transitions overlap.
 - **No grey text.** White text, key words in GREEN (112,222,132) or ORANGE (255,164,104), soft drop shadow.
+- **Length: default to 50 s or less** (keeps viewers engaged). Go longer only when the user asks for a longer video.
+  Budget the script before writing VO: Thắm at 1.2× speaks ~4.23 words/s (measured), so ~160–180 words of VO fits
+  with gaps and a ~2.6 s outro.
 - Fast pacing comes from faster animations, tighter gaps, VO at 1.2x (`atempo=1.2`), never from speeding up the file.
 - Use the user's own Minecraft assets (sprites, `.bbmodel` renders, screenshots). Never hand-draw imitations.
 - Weapon spins: 144 angles per turn with neighbour blending.
