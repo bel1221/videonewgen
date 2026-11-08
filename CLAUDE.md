@@ -39,6 +39,17 @@ Full history, scripts, prompts and every past decision: `HANDOFF.md`. Read the r
 **Before every delivery check**: no SFX >2 uses, no banned sounds, no grey text, no still frames, no overused effect,
 competitors blurred, no "kingmc.vn". Render QA stills and look at them.
 
+## Saving work (the user asked for this - do it every time)
+
+The cloud container is wiped when a session ends; only what is pushed to GitHub survives.
+- After every finished project or delivered version (e.g. a new video version, a new asset, script changes), and before
+  the user signs off, **remind the user to save and offer to push** in the reply's last line, e.g.
+  "💾 Reminder: this isn't saved to GitHub yet. Say 'push' and I'll save it."
+- When they say yes/push/save: commit and push to `origin main`, then confirm it landed (`git status -sb` shows no ahead count).
+- If the work is already pushed, say so instead ("💾 Saved to GitHub.").
+- Finished MP4s stay out of git (`renders/` is gitignored); make sure each delivered render is on Higgsfield and its media_id is
+  written into HANDOFF.md or a notes file, so it can be re-downloaded.
+
 ## Layout
 
 | Path | What |
