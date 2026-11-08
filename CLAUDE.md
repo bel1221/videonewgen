@@ -69,6 +69,9 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
 - **3D animation test** (`anim-test/`, see its README): three.js voxel world + jointed skin rig (elbows/knees/waist/wrist)
   with the user's 3 skins, run + sword fight, golden-hour lighting, rendered in headless Chrome ->
   `anim-test/out/newgen_anim_test_v2.mp4` (9.5 s; v2 = weapon grips reworked from the references, per-pose wrist). EXPERIMENTAL: user says "not quite there but getting better"; keep iterating on weapon handling/animation feel next session.
+- **Blender route (next):** user wants their real map in Blender and will test locally with their GPU. Plan: world
+  `region/*.mca` -> mesh (amulet-core or Mineways/jmc2obj) -> Blender + MCprep rig/materials. Cloud CPU benchmark
+  (bpy 5.2.3 via pip, 4 cores): Cycles 1080p 48 spp + denoise = 74 s/frame on a simple voxel scene; EEVEE did not run headless here.
 - Ranked 2vs2 v4 still awaiting feedback (MR numbers and armor trim are placeholders).
 
 ## Layout
