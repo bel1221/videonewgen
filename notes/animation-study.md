@@ -339,3 +339,95 @@ What changed in fight test v2:
 - **Environment:** footprints, sand dust on every step, blade-on-ground sand and sparks, desert light, closer
   handheld framing.
 - **Sound pack:** built in `anim-test/sfx_pack/`, from the user's pack plus cuts from the study videos.
+
+## 7. Meshing, skeletons, anatomy, lighting and weapon scale (2026-11-09)
+
+Tools: `anim-test/tools/mesh_study.py`, `anatomy_study.py`, `motion_study.py` and `light_study.py`. The images are in
+`anim-test/study_mesh/` (numbered 01-05, plus a per-clip `*_sheet.jpg` and `*_anat_sheet.jpg`).
+
+**Meshing and skeletons.** Every frame of a 2.2 s fight window per video, plus our v1 and v4 over the same seconds,
+went through YOLOv8 segmentation (silhouette, polygon outline, triangulated mesh) and YOLOv8 pose (17-joint skeleton).
+These models are trained on humans. They catch Minecraft characters in:
+- 52 % of Marlow frames, 57 % of Desert (duel), 45-56 % of our v4, and 7-14 % of Nuvguard, DFY and Wynncraft.
+
+The misses are motion blur, extreme close-ups and silhouettes, which is how those trailers are shot. The skeletons are
+good enough to read pose and facing on single frames. They are **not** stable enough to measure smoothness: tracks
+break after 5-7 frames. So the motion smoothness of our renders was measured exactly from the rig instead.
+
+**Anatomy (front/back, facing, movement).** Front/back comes from face visibility plus shoulder order (the character's
+left shoulder on the image right means it faces the camera). Facing yaw comes from shoulder width against torso height.
+Movement is hip travel relative to the facing direction.
+- Marlow is mostly FRONT (32 of 54 detections), with only 1 front/back switch in 2.2 s. Characters are framed facing
+  the lens or 3/4, and the camera holds a side of the body for a whole shot.
+- Desert duel: FRONT 7, BACK 7, SIDE 2, with 2 switches. Profile and 3/4 views across the fighting line.
+- Our v4 is mostly BACK (23 of 48) and SIDE (14), with **14 front/back switches** in the same 2.2 s (v1: 7). Our
+  cameras orbit and cut around the fighters, so the audience keeps seeing backs and flipping sides. The references keep
+  the faces.
+
+**Lighting and shadows** (`02_lighting_*.jpg`):
+
+| scene | key/fill | shadow edge | shadow tint | highlight tint |
+|---|---|---|---|---|
+| Marlow fight | 11.6 (very high contrast) | 78 px (fog-soft) | cool blue | neutral |
+| Nuvguard combat | 3.3 | 14 px | slightly cool | neutral |
+| Die For You fight | 10.0 | 9 px | neutral | warm |
+| Wynncraft cinematic | 67 (silhouette) | 56 px | neutral | strongly warm (b +64) |
+| Desert Arena | **1.5 (flat, bright)** | **5 px (hard sun)** | **warm (b +22)** | warm |
+| OURS v1 snow | 1.6 | 7 px | cool | cool |
+| OURS v4 desert | 1.8-4.3 | 7-9 px | **cool (b -7 to -16)** | warm |
+
+What it shows:
+- The references commit to one light idea per scene: very high contrast (Marlow, DFY, Wynncraft) or bright and hard
+  (Desert). Ours sits in between.
+- Desert's shadows are warm (sand bounce light). Ours are cool, because the blue sky fill wins. To match Desert,
+  raise the warm ground bounce and lower the blue hemisphere light.
+- Shadow edges are about right for hard sun (7-9 px against Desert's 5 px).
+
+**Weapon scale** (`03_weapon_scale.jpg`), as blade length / character height:
+- Marlow about 0.68, Desert one-handed about 0.72, Desert dual blades about 1.1.
+- Ours: v1 0.93, v4 0.56 (after the 40 % cut).
+- Suggested: **about 0.70** (weapon scale 0.69 → about 0.86).
+
+**Weapon smoothness** (`04_swing_smoothness.png`). Exact per-frame blade rotation in v4 swings:
+- Peaks of **112-131° in a single frame**, with large-small-large alternation (128 → 40 → 113).
+- References: about 15-35° per frame spread over 4-6 frames, never far over 45° in one frame.
+
+Causes:
+1. The wrist aim solve (roll = atan2) flips 180° when the blade lines up with the forearm (gimbal singularity).
+2. 'i' easing packs most of the arc into the final 1-2 frames.
+3. Blade intents are interpolated as vectors through the arm-swing keys, so the direction can swing the long way round.
+
+Fixes:
+- Slerp the blade direction with a continuity-preserving roll (pick the roll nearest the previous frame).
+- Cap the per-frame blade turn at about 40° and spread strikes over 4-6 frames.
+- Keep 3 smear ghosts for anything above 25°/frame.
+
+**Desert Arena, full 21 minutes.** 670 shots, median 1.67 s. Action shots run 0.93 s and calm shots 2.0 s. The camera
+is locked in 18 % of shots, pans at 5.7 %W/s and zooms at 5.5 %/s. Ranked by in-frame motion, cut rate and loudness, the
+top fight stretches are 15:00, 16:10, 18:20, 8:55 and 11:10 (`desert_fight_*.jpg`, `06_desert_fights_meshed.jpg`).
+
+In those fights:
+- **Weapons and silhouettes:** many weapon types (dual swords, sword and shield, flails on chains, axes, hammers),
+  always gripped at the end of the handle. Silhouettes stay readable against the sand.
+- **Camera:** very low, with bodies filling or crossing the frame, so the segmentation finds a clean full silhouette
+  in only 3-8 % of frames.
+- **Bodies:** they tilt 30-45° into lunges and go into rolls and falls.
+- **Impacts:** small yellow 2D star sprites at contact, not full-frame flashes.
+- **Holds:** short holds on key poses (about 0.3-0.5 s), then a burst of fast action.
+- **Light:** warm sunset grade with a low rim sun and a haze layer. Later scenes are night (blue sky, torches).
+
+### Old vs new: our fight test v1 → v4, measured against the references
+
+| | v1 | v4 | references | verdict |
+|---|---|---|---|---|
+| limbs | rigid hinged boxes | one bendy skinned mesh, 6-bone spine, clavicles | Mine-imator-style bendy | ✔ fixed |
+| feet / ground | sliding, sinking | IK planted, 99 % within 3 cm, R/L gait, 4-7 steps/s, no jitter | planted, stepping | ✔ fixed |
+| body physics | none | body collision, blade/floor/body contact pushes | n/a | ✔ new |
+| weapon grip | fixed 90° (horizontal) | aimed per action, edge leading | blade continues the forearm | ✔ fixed |
+| weapon scale | 0.93× body | **0.56× (too small)** | 0.68-0.72× (dual up to 1.1×) | ✖ go to about 0.70× |
+| weapon smoothness | jumpy | **112-131° single-frame flips** | 15-35°/frame | ✖ aim-solve singularity, needs fixing |
+| camera shot length | 0.57 s | about the same | Marlow 0.52 s (action), Desert 0.93 s | Desert holds longer; add holds |
+| camera stillness | never locked (0 %) | same | 18-26 % locked | ✖ add deliberate holds |
+| facing the audience | 7 front/back flips in 2.2 s | **14 flips** | 1-2 | ✖ keep the camera on one side of the line; favour faces |
+| shadow tint | cool | cool (b -7..-16) | Desert warm (b +22) | ✖ raise the warm ground bounce |
+| impacts | inked B/W frame | same | warm glow/flare (Marlow), small 2D stars (Desert) | ✖ swap to the reference styles |
