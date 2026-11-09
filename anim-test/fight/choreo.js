@@ -16,7 +16,7 @@ export function init(world) { W = world; F = world.FLOOR; buildAll(); simulate()
 export function resim() { STEPS.length = 0; simulate(); }
 
 // ------------------------------------------------------------------ pose library (signs: see rig.js applyPose notes)
-function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] }; for (const j of JK) p[j] = [0, 0, 0]; return p; }
+function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, tilt: [0, 0], yawAbs: null, bda: [70, 0] }; for (const j of JK) p[j] = [0, 0, 0]; return p; }
 const cp = p => { const o = JSON.parse(JSON.stringify(p)); delete o._flat; return o; };
 function S(base, d) { const o = cp(base); delete o._flat; for (const k in d) o[k] = Array.isArray(d[k]) ? d[k].slice() : d[k]; return o; }
 const L = {};
@@ -70,27 +70,27 @@ L.fallen = S(L.knees, { tilt: [82, 0], waist: [10, 0, 0], chest: [6, 0, 0], head
 // relative to the torso. The rig solves wrist bend + roll each frame so the hand aims the blade there.
 const bdv = (el, az) => { const e = el * Math.PI / 180, a = az * Math.PI / 180; return [Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a)]; };
 const BD = {
-  relaxed: [-40, -32], guard: [68, -12], windR: [38, -150], slashR: [-8, 75], windL: [40, 150], slashL: [-6, -75],
-  windO: [55, 180], slashO: [-38, 0], windT: [4, -8], thrust: [0, 0], parryH: [6, 90], parryR: [74, -28], parryL: [74, 28],
+  relaxed: [-40, -32], guard: [68, -12], windR: [40, -112], slashR: [-6, 58], windL: [42, 112], slashL: [-6, -58],
+  windO: [108, 0], slashO: [-30, 0], windT: [4, -8], thrust: [0, 0], parryH: [6, 90], parryR: [74, -28], parryL: [74, 28],
   kickW: [62, -20], kick: [55, -30], hitBack: [40, -70], slide: [-18, -150], kneelG: [70, -10], kneelBlock: [6, 90],
-  crouch: [-28, -155], takeoff: [62, 180], tuck: [72, 180], slam: [-62, 0], dodge: [64, -15], duck: [48, -35], bind: [56, 14],
-  spin: [2, -92], sweepW: [-18, -150], sweep: [-24, 65], upperW: [-42, -20], upper: [82, 0], land: [50, -15], flick: [-45, -45],
+  crouch: [-28, -155], takeoff: [118, 0], tuck: [108, 0], slam: [-62, 0], dodge: [64, -15], duck: [48, -35], bind: [56, 14],
+  spin: [2, -92], sweepW: [-16, -115], sweep: [-22, 52], upperW: [-42, -20], upper: [82, 0], land: [50, -15], flick: [-45, -45],
   knees: [-50, -25], fallen: [-10, -90],
 };
-for (const k in BD) if (L[k]) L[k].bd = bdv(...BD[k]);
+for (const k in BD) if (L[k]) L[k].bda = BD[k].slice();
 function mix(a, b, u) {
   const o = { wrist: lerp(a.wrist, b.wrist, u), roll: lerp(a.roll, b.roll, u), y: lerp(a.y, b.y, u), yawOff: lerp(a.yawOff, b.yawOff, u), tilt: [lerp(a.tilt[0], b.tilt[0], u), lerp(a.tilt[1], b.tilt[1], u)],
     yawAbs: (a.yawAbs != null && b.yawAbs != null) ? lerp(a.yawAbs, b.yawAbs, u) : (u < 0.5 ? a.yawAbs : b.yawAbs) };
   o.fkR = u < 0.5 ? a.fkR : b.fkR; o.fkL = u < 0.5 ? a.fkL : b.fkL;
-  { const ba = a.bd || [0, 1, 0], bb = b.bd || [0, 1, 0], v = ba.map((x, i) => lerp(x, bb[i], u)), n = Math.hypot(...v) || 1; o.bd = v.map(x => x / n); }
+  { const ba = a.bda || [70, 0], bb = b.bda || [70, 0]; o.bda = [lerp(ba[0], bb[0], u), lerp(ba[1], bb[1], u)]; }
   for (const j of JK) o[j] = a[j].map((v, i) => lerp(v, b[j][i], u)); return o;
 }
 // pose <-> flat numeric vector (for spline interpolation)
 const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff'];
-function flat(p) { if (p._flat) return p._flat; const a = FLAT_KEYS.map(k => p[k]); a.push(p.tilt[0], p.tilt[1]); a.push(...(p.bd || [0, 1, 0])); for (const j of JK) a.push(...p[j]); p._flat = a; return a; }
+function flat(p) { if (p._flat) return p._flat; const a = FLAT_KEYS.map(k => p[k]); a.push(p.tilt[0], p.tilt[1]); a.push(...(p.bda || [70, 0])); for (const j of JK) a.push(...p[j]); p._flat = a; return a; }
 function unflat(a, tmpl) {
   const o = { yawAbs: tmpl.yawAbs, fkR: tmpl.fkR, fkL: tmpl.fkL }; let i = 0; for (const k of FLAT_KEYS) o[k] = a[i++]; o.tilt = [a[i++], a[i++]];
-  { const v = [a[i++], a[i++], a[i++]], n = Math.hypot(...v) || 1; o.bd = v.map(x => x / n); }
+  o.bda = [a[i++], a[i++]];
   for (const j of JK) o[j] = [a[i++], a[i++], a[i++]]; return o;
 }
 // Cardinal spline through keyframes with non-uniform times; per-segment ease only warps time ('i' accelerates into an
@@ -135,7 +135,7 @@ function runLegsOld(phi, p) {
 function runArms(phi, p, swordToo) {
   const s = Math.sin(2 * Math.PI * phi);
   p.lArm = [-52 * s, 0, 8]; p.lElbow = [-84 - 16 * Math.max(0, s), 0, 0];
-  if (swordToo) { p.rArm = [28 + 12 * s, 0, -10]; p.rElbow = [-32 - 6 * s, 0, 0]; p.wrist = 214 + 6 * s; p.bd = bdv(-22 + 6 * s, -160); p.chest = [6, 10 * s, 0]; p.head = [-16, -6 * s, 0]; }
+  if (swordToo) { p.rArm = [28 + 12 * s, 0, -10]; p.rElbow = [-32 - 6 * s, 0, 0]; p.wrist = 214 + 6 * s; p.bda = [-22 + 6 * s, -160]; p.chest = [6, 10 * s, 0]; p.head = [-16, -6 * s, 0]; }
   return p;
 }
 
@@ -274,13 +274,13 @@ export function events() { return { steps: STEPS.map(s => [+s.t.toFixed(3), s.ki
 
 // clash corrections (IK-lite): solved in fight.js so the two blades physically cross at each clash time
 export const CORR = { A: [], B: [] };
-function corrW(d) { if (d < -0.16 || d > 0.22) return 0; return d < 0 ? E.io((d + 0.16) / 0.16) : 1 - E.io(d / 0.22); }
+function corrW(d) { if (d < -0.26 || d > 0.3) return 0; return d < 0 ? E.io((d + 0.26) / 0.26) : 1 - E.io(d / 0.3); }
 function rootXZ(c, t) { return evalPos(P[c], t); }
 function basePose(c, t) {
   const p = evalKeys(T[c], t); const [x, z] = rootXZ(c, t);
   for (const e of CORR[c]) { const w = corrW(t - e.t); if (!w) continue;
     p.rArm[0] += e.ax * w; p.rArm[2] += e.az * w; p.rElbow[0] += e.el * w; p.chest[1] += e.ch * w;
-    if (e.wr || e.ba) { const b = p.bd, el = Math.asin(Math.max(-1, Math.min(1, b[1]))) * 180 / Math.PI + e.wr * w, az = Math.atan2(b[0], b[2]) * 180 / Math.PI + (e.ba || 0) * w; p.bd = bdv(el, az); } p._fw = (p._fw || 0) + (e.fw || 0) * w; }
+    if (e.wr || e.ba) { p.bda = [p.bda[0] + e.wr * w, p.bda[1] + (e.ba || 0) * w]; } p._fw = (p._fw || 0) + (e.fw || 0) * w; }
   for (const [t0, t1] of RUN[c]) if (t >= t0 && t <= t1) {
     const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]); const phi = d / STRIDE;
     const blend = clamp(Math.min((t - t0) / 0.08, (t1 - t) / 0.1));
@@ -295,20 +295,22 @@ function basePose(c, t) {
   const yaw = p.yawAbs != null ? p.yawAbs : Math.atan2(ox - x, oz - z) * 180 / Math.PI;
   let X = x, Z = z;
   if (p._fw) { const dd = Math.hypot(ox - x, oz - z) || 1; X += (ox - x) / dd * p._fw; Z += (oz - z) / dd * p._fw; }   // clash step-in
-  p.pos = [X, p.y, Z]; p.yaw = yaw + p.yawOff;
+  p.pos = [X, p.y, Z]; p.yaw = yaw + p.yawOff; p.bd = bdv(...p.bda);
   return p;
 }
 
 // ------------------------------------------------------------------ simulation: collision + footstep planner (240 Hz, precomputed)
+export const STYLE = { on: true, footW: 2.8, footWk: 1.2, stagger: 1.4, leanK: 0.7, leanBase: 7, twistBend: 0.2, elbow: 14, sink: 0.1 };
+export function setStyle(o) { Object.assign(STYLE, o); }
 const HZ = 240; const SIM = { A: null, B: null }; export const STEPS = [];   // {c, t, foot, p:[x,0,z], kind:'step'|'land'|'skid'|'lift', sp}
 export const SLIDES = { A: [[6.92, 7.6], [17.32, 17.75]], B: [[4.88, 5.3], [8.76, 9.1], [15.22, 15.7], [17.32, 17.72]] };
 const inWin = (L, t) => L.some(([a, b]) => t >= a && t <= b);
 const _eu = new THREE.Euler(), _v1 = new THREE.Vector3();
-function legFK(leg, knee, hipX) {   // desired sole offset in the body frame (px) from the authored FK leg angles
+function legFK(leg, knee, hipX, plain) {   // desired sole offset in the body frame (px) from the authored FK leg angles
   _eu.set(leg[0] * Math.PI / 180, leg[1] * Math.PI / 180, leg[2] * Math.PI / 180, 'XYZ'); const R1 = new THREE.Quaternion().setFromEuler(_eu);
   _eu.set(knee[0] * Math.PI / 180, 0, 0, 'XYZ'); const R2 = new THREE.Quaternion().setFromEuler(_eu);
   _v1.set(0, -6, 0).applyQuaternion(R2).add(new THREE.Vector3(0, -6, 0)).applyQuaternion(R1);
-  const sx = hipX + _v1.x * 1.25; return [Math.sign(hipX) * Math.max(1.6, Math.abs(sx)), _v1.z * 1.2];
+  const sx = hipX + _v1.x * 1.25; return plain ? [Math.sign(hipX) * Math.max(1.6, Math.abs(sx)), _v1.z * 1.2] : [Math.sign(hipX) * Math.max(STYLE.footW, Math.abs(sx) * STYLE.footWk), _v1.z * STYLE.stagger];
 }
 function isAir(p) { return p.y > 0.22 || Math.abs(p.tilt[0]) > 30; }
 function runGait(c, root, rawXZ, N) {
@@ -380,7 +382,7 @@ function simulate() {
           out.push([lerp(fr[0], gv.swingTo[0], w), 0.26 * Math.sin(Math.PI * u), lerp(fr[1], gv.swingTo[1], w)]); step[f] = null; continue;
         }
         const fk = air || (f === 'r' && p.fkR) || (f === 'l' && p.fkL);
-        const off = legFK(leg, knee, hx), lx = off[0] / 16, lz = off[1] / 16;
+        const off = legFK(leg, knee, hx, skid || t > 17.25), lx = off[0] / 16, lz = off[1] / 16;
         const Dr = [root[i][0] + lx * cy + lz * sy, root[i][1] - lx * sy + lz * cy];
         Dsm[f] = Dsm[f] ? [lerp(Dsm[f][0], Dr[0], 1), lerp(Dsm[f][1], Dr[1], 1)] : Dr.slice(); const D = Dsm[f];   // ~0.1 s low-pass
         if (fk) { if (feet[f]) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'lift' }); feet[f] = null; step[f] = null; out.push(null); continue; }
@@ -433,10 +435,24 @@ export function pose(c, t) {
   if (c === 'C') { const p = N(); p.pos = [0, -200, 0]; return p; }
   const p = basePose(c, t), k0 = evalKeys(T[c], t);
   for (const j in LAG) { const q = evalKeys(T[c], t + LAG[j]); p[j] = p[j].map((v, i) => v + (q[j][i] - k0[j][i])); }
-  { const q = evalKeys(T[c], t - 0.03), v = p.bd.map((x, i) => x + (q.bd[i] - k0.bd[i])), n = Math.hypot(...v) || 1; p.bd = v.map(x => x / n); }
+  { let se = 0, sa = 0, sw = 0; for (const [dt, w] of [[-0.1, 0.06], [-0.083, 0.1], [-0.067, 0.14], [-0.05, 0.17], [-0.033, 0.18], [-0.017, 0.15], [0, 0.12], [0.017, 0.08]]) { const q = evalKeys(T[c], t + dt); se += q.bda[0] * w; sa += q.bda[1] * w; sw += w; }
+    p.bda = [p.bda[0] + se / sw - k0.bda[0], p.bda[1] + sa / sw - k0.bda[1]]; }
+  p.bd = bdv(...p.bda);
   const S_ = SIM[c], rt = samp(S_.root, t), rw = samp(S_.raw, t), X = rt[0] + p.pos[0] - rw[0], Z = rt[1] + p.pos[2] - rw[1], g = W.floorAt(X, Z);
   p.pos = [X, g + (isAir(p) ? p.y : p.y * 0.8) + samp(S_.yoff, t)[0], Z];
   { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]]; }
+  if (STYLE.on) {
+    const run = inWin(RUN[c], t) || inWin(SLIDES[c], t) || t > 17.25, air = isAir(p), k = run || air ? 0.35 : 1, cl = (v, a, b) => Math.max(a, Math.min(b, v));
+    const w0 = p.waist[0];
+    p.waist[0] = cl(p.waist[0] * (1 + STYLE.leanK * k) + (run || air ? 0 : STYLE.leanBase), -70, 72);       // commit the torso into the action
+    p.chest[0] = cl(p.chest[0] * (1 + 0.45 * k), -50, 60);
+    p.waist[2] = p.waist[2] * (1 + 0.9 * k) + STYLE.twistBend * k * p.chest[1];                          // twist couples into side bend
+    p.chest[2] = p.chest[2] * (1 + 0.6 * k) + 0.6 * STYLE.twistBend * k * p.chest[1];
+    p.head[0] -= 0.55 * (p.waist[0] - w0);                                                              // eyes stay on the opponent
+    p.rElbow[0] -= STYLE.elbow * k; p.lElbow[0] -= STYLE.elbow * 1.8 * k;                               // loaded, bent arms
+    if (!run && p.lArm[0] > -35) { p.lArm[0] -= 28 * k; p.lArm[2] += 12 * k; }                            // off-hand up for balance
+    if (!run && !air) p.pos[1] -= STYLE.sink;                                                           // lower centre of gravity -> knees bend (IK)
+  }
   const fr = samp(S_.r, t), fl = samp(S_.l, t);
   { const sw = f => f && f[1] > 0.004 ? Math.min(1, f[1] / 0.08) : 0, rs = sw(fr), ls = sw(fl);
     // weight shift: swinging right foot -> hips over the left (stance) foot, spine bends back to keep the head centred
@@ -451,7 +467,7 @@ export function pose(c, t) {
     for (const [k, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const tg = p.ik[k]; if (!tg) continue;
       const hxw = p.pos[0] + hx * Math.cos(yaw), hzw = p.pos[2] - hx * Math.sin(yaw), dh = Math.hypot(tg[0] - hxw, tg[2] - hzw), reach = 0.735;
       if (dh < reach) { const need = hipY - tg[1] - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } else drop = Math.max(drop, hipY - tg[1]); }
-    p.pos[1] -= Math.min(0.42, drop); }
+    p.pos[1] -= Math.min(0.55, drop); }
   return p;
 }
 

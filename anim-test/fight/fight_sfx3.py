@@ -9,7 +9,10 @@ import json, os, subprocess, glob
 import numpy as np
 from scipy.signal import butter, sosfilt
 
-SR = 48000; TOTAL = 20.0; PK = 'sfx_pack'; MUTE_CLASH = [6.46]
+SCENE = os.environ.get('SCENE', 'a')
+CFG = {'a': dict(total=20.0, mute=[6.46], big=(13.2, 13.95, 9.4), fall=19.38, cross=17.3),
+       'b': dict(total=14.0, mute=[], big=(1.5, 4.0, 7.6), fall=12.7, cross=11.3)}[SCENE]
+SR = 48000; TOTAL = CFG['total']; PK = 'sfx_pack'; MUTE_CLASH = CFG['mute']
 EV = json.load(open('fight/comp/events.json')); CUR = json.load(open(f'{PK}/curated.json'))
 MC_SAND = sorted(glob.glob(f'{PK}/mc/step_sand*.ogg')); MC_FALL = f'{PK}/mc/damage_fallsmall.ogg'
 rng = np.random.default_rng(11)
@@ -70,7 +73,7 @@ muted = lambda t: any(abs(t - m) < 0.03 for m in MUTE_CLASH)
 for t, c in EV['swings']:
     if muted(t): continue
     place(1, hp(load(pick('slash'), rng.uniform(0.92, 1.12)), 300), t - 0.03, -9 + rng.uniform(-2, 1), pan=0.25 if c == 'A' else -0.25)
-for t in (13.2, 13.95, 9.4): place(1, load(pick('swoosh_big'), rng.uniform(0.95, 1.05)), t + 0.1, -11)
+for t in CFG['big']: place(1, load(pick('swoosh_big'), rng.uniform(0.95, 1.05)), t + 0.1, -11)
 for t, big, kind in EV['clashes']:
     if muted(t): continue
     if kind == 'kick': place(1, load(pick('impact'), 0.85), t, -6); thump(1, t, -10, 80); continue
@@ -90,14 +93,14 @@ for t, kind, sp, c, foot, run in sorted(EV['steps']):
 for c, wins in EV['slides'].items():
     for t0, t1 in wins: slide(t0, t1, -13)
 for t in EV['ghits']: noise(2, t, -12, 0.22, 400, 5200)
-mc_step(19.38, -9, 'r', 0.8); thump(2, 19.38, -12, 60)
+mc_step(CFG['fall'], -9, 'r', 0.8); thump(2, CFG['fall'], -12, 60)
 # ---------------- BUS 3: random
 for i, tb in enumerate(np.arange(11.7, 12.5, 0.055)):
     noise(3, tb, -22, 0.04, 2000, 9000)
-SS = round(135.5 - 17.4, 2); os.makedirs('fight/comp', exist_ok=True)
+SS = round(135.5 - (CFG['cross'] + 0.1), 2); os.makedirs('fight/comp', exist_ok=True)
 subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', str(SS), '-t', str(TOTAL), '-i', '../newgen-ranked/audio/sa.mp3', '-af',
                 f'loudnorm=I=-26:TP=-6:LRA=11,afade=t=in:d=1.5,afade=t=out:st={TOTAL - 1.4}:d=1.4', '-ar', str(SR), '-ac', '2', 'fight/comp/music.wav'], check=True)
-m = load('fight/comp/music.wav') * 0.42; y = m.copy(); zi = np.zeros((2, 2, 2)); a0, a1 = int(16.3 * SR), int(17.3 * SR)
+m = load('fight/comp/music.wav') * 0.42; y = m.copy(); zi = np.zeros((2, 2, 2)); a0, a1 = int((CFG['cross'] - 1.0) * SR), int(CFG['cross'] * SR)
 for s in range(a0, a1, 256):
     u = (s - a0) / (a1 - a0); sos = butter(4, 16000 * (380 / 16000) ** (u ** 0.8), 'low', fs=SR, output='sos')
     for ch in range(2): y[s:s + 256, ch], zi[ch] = sosfilt(sos, m[s:s + 256, ch], zi=zi[ch])

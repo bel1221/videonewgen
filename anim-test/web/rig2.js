@@ -146,7 +146,7 @@ export function applyPose(ch, P) {
     // aim the blade: desired direction (torso frame) -> world -> forearm (rEl) frame; solve roll about the forearm and
     // wrist bend so Ry(roll)*Rx(wrist)*(0,1,0) == d  ->  wrist = acos(d.y), roll = atan2(d.x, d.z)
     ch.root.updateMatrixWorld(true);
-    const ty = (P.yaw || 0) + (w[1] || 0) + ((P.chest || [0, 0, 0])[1] || 0);
+    const ty = (P.yaw || 0) + 0.3 * ((w[1] || 0) + ((P.chest || [0, 0, 0])[1] || 0));   // blade aim follows the body heading, only partly the torso twist
     const d = new THREE.Vector3(...P.bd).applyAxisAngle(new THREE.Vector3(0, 1, 0), ty * D2R).normalize();
     const qEl = new THREE.Quaternion(); b.rEl.getWorldQuaternion(qEl); qEl.invert();
     const aim = dir => { const dL = dir.clone().applyQuaternion(qEl);

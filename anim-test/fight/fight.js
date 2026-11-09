@@ -9,9 +9,10 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { loadSkin, buildCharacter, buildWeapon, applyPose, setTwist } from '../web/rig2.js';
-import * as C from './choreo.js';
 
 const W = 1920, H = 1080, params = new URLSearchParams(location.search);
+const SCENE = params.get('scene') || 'a';
+const C = await import(SCENE === 'b' ? './choreo_b.js' : './choreo.js');
 if (params.get('twist') !== null) setTwist(+params.get('twist'));
 const SUB = +(params.get('sub') || 5);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
@@ -26,7 +27,7 @@ scene.fog = new THREE.FogExp2(FOGC, 0.006);
 scene.background = FOGC.clone();
 
 // ------------------------------------------------------------------ cold overcast light (Marlow): cool sky, pale low sun behind, warm only from sparks
-const hemi = new THREE.HemisphereLight(0x9fc2ff, 0xd8b98a, 1.05); scene.add(hemi);
+const hemi = SCENE === 'b' ? new THREE.HemisphereLight(0xa8bce0, 0xf0b070, 1.15) : new THREE.HemisphereLight(0x9fc2ff, 0xd8b98a, 1.05); scene.add(hemi);   // b: warm sand bounce -> warm shadows (Desert)
 const sun = new THREE.DirectionalLight(0xffe0b0, 3.3); sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.03; sun.shadow.radius = 1.5;
 Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 260 }); scene.add(sun, sun.target);
@@ -68,12 +69,13 @@ console.log('FLOOR', FLOOR);
 // ------------------------------------------------------------------ cast
 const [s1, s2, s3, aeg, veil] = await Promise.all([
   loadSkin('/anim-test/src/skins/1.png'), loadSkin('/anim-test/src/skins/2.png'), loadSkin('/anim-test/src/skins/3.png'),
-  fetch(base + 'w/aegisblade.json').then(r => r.json()), fetch(base + 'w/veilblade.json').then(r => r.json())]);
-const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), 0.69), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), 0.69), C: buildCharacter(s3, null) };
+  fetch(base + (SCENE === 'b' ? 'w/ocean%20sword.json' : 'w/aegisblade.json')).then(r => r.json()), fetch(base + (SCENE === 'b' ? 'w/thundermaul.json' : 'w/veilblade.json')).then(r => r.json())]);
+const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), 0.86), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), SCENE === 'b' ? 0.95 : 0.86), C: buildCharacter(s3, null) };
 for (const k in cast) scene.add(cast[k].root);
 for (const k in cast) cast[k].floorAt = floorAt;   // blade/ground physics in rig2
 await new Promise(r => setTimeout(r, 400));
 const world = { floorAt, FLOOR };
+if (params.get('style') === '0') C.setStyle({ on: false, footW: 1.6, footWk: 1, stagger: 1.2 });
 C.init(world);
 
 // blade points (px along the blade, grip at 0) in world space
@@ -88,7 +90,7 @@ function segClosest(p1, q1, p2, q2) {
 }
 // solve clash corrections: coordinate descent on both sword arms so the blades cross (distance -> 0)
 function bladeDist(t) { const [a0, a1] = blade('A', t, [8, 26]), [b0, b1] = blade('B', t, [8, 26]); return segClosest(a0, a1, b0, b1).dist; }
-const VARS = ['ax', 'az', 'el', 'wr', 'ba', 'ch', 'fw'], LIM = { ax: 60, az: 60, el: 50, wr: 50, ba: 70, ch: 45, fw: 1.2 };
+const VARS = ['ax', 'az', 'el', 'wr', 'ba', 'ch', 'fw'], LIM = { ax: 60, az: 60, el: 50, wr: 30, ba: 30, ch: 45, fw: 1.2 };
 for (const cl of C.CLASHES) {
   if (cl.at || !(cl.kind === 'blade' || cl.kind === 'cross')) continue;
   const eA = { t: cl.t, ax: 0, az: 0, el: 0, wr: 0, ba: 0, ch: 0, fw: 0 }, eB = { ...eA }; C.CORR.A.push(eA); C.CORR.B.push(eB);
@@ -298,6 +300,18 @@ window.dbgPose = function (k, t) { const p = C.pose(k, t); applyPose(cast[k], p)
   const sole = n => b[n].localToWorld(new THREE.Vector3(0, -6, 0)).toArray().map(v => +v.toFixed(3));
   return { pos: p.pos.map(v => +v.toFixed(3)), y: +p.y.toFixed(3), floor: +floorAt(p.pos[0], p.pos[2]).toFixed(3), ik: p.ik, hips: w('hips'), rTh: w('rTh'), rSn: w('rSn'), rSole: sole('rSn'), lSole: sole('lSn'), rLegFK: p.rLeg, rKnee: p.rKnee }; };
 window.events = () => C.events();
+window.bladeDiag = function (k, t0, t1) { const out = []; let pi = null, pa = null; const v = new THREE.Vector3(), h = new THREE.Vector3();
+  for (let t = t0; t <= t1 + 1e-6; t += 1 / 30) { const P = C.pose(k, t); applyPose(cast[k], P); cast[k].root.updateMatrixWorld(true);
+    cast[k].weapon.localToWorld(v.set(0, 26, 0)); cast[k].bones.rHand.getWorldPosition(h); const act = v.clone().sub(h).normalize();
+    const yaw = (P.yaw + 0.3 * ((P.waist||[0,0,0])[1] + (P.chest||[0,0,0])[1])) * Math.PI / 180; const it = new THREE.Vector3(...P.bd).applyAxisAngle(new THREE.Vector3(0,1,0), yaw).normalize();
+    const ang = (a, b) => b ? +(Math.acos(Math.min(1, Math.max(-1, a.dot(b)))) * 180 / Math.PI).toFixed(0) : 0;
+    out.push([+t.toFixed(3), 'intentStep', ang(it, pi), 'actualStep', ang(act, pa), 'actual-vs-intent', ang(act, it), 'bda', P.bda.map(x => Math.round(x)), 'yaw', Math.round(P.yaw)]); pi = it; pa = act; }
+  return out; };
+window.swingProfile = function (k, t0, t1) { const out = []; const v = new THREE.Vector3(), h = new THREE.Vector3();
+  let prev = null; for (let t = t0; t <= t1 + 1e-6; t += 1 / 30) { applyPose(cast[k], C.pose(k, t)); cast[k].root.updateMatrixWorld(true);
+    cast[k].weapon.localToWorld(v.set(0, 26, 0)); cast[k].bones.rHand.getWorldPosition(h);
+    const d = v.clone().sub(h).normalize(); if (prev) out.push([+t.toFixed(3), +(Math.acos(Math.min(1, Math.max(-1, d.dot(prev)))) * 180 / Math.PI).toFixed(1)]); prev = d; }
+  return out; };
 window.shake = function (k, a, b) { const P = []; for (let t = a; t <= b + 1e-6; t += 1 / 30) { applyPose(cast[k], C.pose(k, t)); cast[k].root.updateMatrixWorld(true); P.push([t, cast[k].bones.head.getWorldPosition(new THREE.Vector3())]); }
   const rev = {}; for (let i = 2; i < P.length; i++) { const v1 = P[i - 1][1].clone().sub(P[i - 2][1]), v2 = P[i][1].clone().sub(P[i - 1][1]);
     if (v1.length() > 0.012 && v2.length() > 0.012 && v1.dot(v2) / (v1.length() * v2.length()) < -0.5) { const s = Math.floor(P[i][0] * 2) / 2; rev[s] = (rev[s] || 0) + 1; } }
