@@ -785,3 +785,66 @@ So the legs pop at **run-gait <-> fight-pose transitions** (sprint start, skid, 
 1. Blend the run gait in and out over about 0.15 s at RUN window edges instead of switching.
 2. Re-key the flurry so the 10.98 and 11.88 contacts meet. The circle radius 1.05 is too wide for the blade reach.
 3. Push spacing back above v6's min gap of 0.11.
+
+## 16. Fight v8 "blade masters": user review of v7 and a new 30 s fight (2026-11-10)
+
+**User review of v7:** "good movements so far". These were the problems:
+- **Sitting skid at about 2 s:** the fighters crouch on the ground; it should be a real slide.
+- **Impact frame at 6.95 s:** it was a lone, weak sound (`clash/desert_01.wav`). It needs a clash and a louder swoosh to support it.
+- **Ground too dark:** the sun looked removed compared with the bright QA stills.
+- **Sword:** stiff, hardly following the arm. It needs sword skill (twirls) and smooth motion, and should be 1.15x bigger.
+- **Collisions:** check that there is no blade or body phasing.
+
+The user also said: "new video with different fight scenes, don't remake v7". **Rule: each fight video gets new scenes.**
+
+**Why the sand got darker:** the bright stills (`qa/v7/still_*.jpg`) were rendered at 01:10:20. At 01:10:47 the session lowered
+the sun (hemi 1.05 -> 0.55, sun 3.3 -> 2.5, exposure 0.9) and rendered v7 with that. Matching the stills by
+measurement (sand brightness 237 at 0.6 s) gives **sun 4.0, hemi 1.05, exposure 1.0**. These are the v8 defaults; override
+them with `?sunI=&hemi=&exp=`.
+
+**v8** (`anim-test/fight_v8/`, built by `python fight_v8/parts/assemble.py` from v7's mechanics plus `parts/build_v8.js` and
+`parts/camera_v8.js`). It has a new 30 s choreography in 10 scenes:
+1. Sword-skill intro: A twirls at the side, B twirls in front and levels the blade at A.
+2. Sprint in, then an exchange while strafing sideways, ending in a big clash and a standing skid apart.
+3. B's flat cut: A ducks and slips past, does two spin cuts, then a rising cut.
+4. B's sprint into an aerial spinning overhead; A blocks and is driven back.
+5. B thrusts, A deflects and sidesteps, B overruns. A strikes, flourishes, then an overhead.
+6. A straight six-strike drive; B ducks the seventh strike and counters upward.
+7. Stalking with B's twirl, a running thrust deflected aside, then a jump slash.
+8. A sweep that A hops into an air cut, a dodged thrust, a trade, and a shoulder check.
+9. A double spin-cut into a drifting bind, a shove, B's three strikes, and A's riposte.
+10. A mirrored twirl standoff, then a sprint where A slides under B's cut and rips upward (flash); B falls to the knees and A flourishes.
+
+**Mechanics added in v8:**
+- **Sword moves with the arm** (`rig2_v8.js`): the blade aim blends the torso-frame intent with a rigid grip (the pose's own
+  wrist and roll, fixed in the forearm frame). The weight is `GK` = 0.38 (`?gk=`). It eases off near contacts (so the solver
+  stays exact) and when the sword arm whips faster than 25°/frame.
+- **Twirls:** `TWIRL[c] = [t0, t1, turns]`. The blade spins about the forearm axis (wrist 90°, roll = spin angle) and fades
+  in and out over 0.14 s. Poses `L.twirlS` (at the side) and `L.twirlF` (in front). Each half turn adds a `twirls` event,
+  which plays a soft swish.
+- **Standing slides:** `L.skid`, upright and braced with the feet dragging. A sand spray is emitted every 0.045 s, and drag
+  marks every 0.05 s (they were every 0.25 s). `L.slide`, the sitting pose, is no longer used.
+- **Sword 1.15x:** weapon scale 0.69 x 1.15.
+- **Parry auto-pick** (`fight.js`): before solving, each defence (`blk()` in the build, listed in `C.PARRY`) tries parryL, parryR
+  and parryH against the real blade geometry and keeps the closest. Which side the attack ENDS on decides which parry meets
+  it. v7's slashL-vs-parryR pairs all missed by about 1 block. **Contact miss mean went from 0.39 to 0.16, max 1.2 -> 0.58.**
+- **Solver pass 3:** after the last resim, a pass on the arms only, with wider limits plus a body-gap penalty. Arm
+  corrections don't move roots or feet, so the sim stays valid. A wider pass *with* step-ins (fw) was tried and was worse:
+  the resim undid it.
+- **Collision QA** (`tools/collide_qa.js`, 120 Hz, `window.__qa_hz`) checks body overlap (root gap under 0.6), blade inside
+  the opponent's body, blade-through-blade outside contacts (within 0.035), and blade below the sand. **v8: 0 / 0 / 0 / 0**,
+  after widening two passes (5.7 s and 9.87 s).
+- **Impact-frame sound** (`SCENE=v8 python fight/fight_sfx3.py`): every impact frame and the flash get a fixed layered hit.
+  The layers are a big swoosh peaking 70 ms before the hit, `clash/mani_06` and `other/mani_01`, a thump, a ring and a click.
+  `clash/desert_01.wav` is dropped. A limiter follows loudnorm (true peak -0.64 dBFS, -15 LUFS).
+
+| metric (A / B, novfx) | v6 (20 s) | v7 (20 s) | **v8 (30 s)** |
+|---|---|---|---|
+| joint pops per second (both) | 8.1 | 14.1 | **6.1** |
+| joint angular acceleration p95 | 12.4 / 14.0 | 15.4 / 16.1 | 13.3 / 13.0 |
+| root acceleration p95 | 4.7 / 5.4 | 4.0 / 3.5 | **2.3 / 1.6** |
+| blade step max (°/frame) | 105 / 60 | 77 / 88 | 95 / 109 |
+| contact miss mean / max (blocks) | - | 0.39 / 1.04 | **0.16 / 0.58** |
+
+Blade steps over 45°/frame went up (60 per fighter). They are the intended spins and twirls; with the grip blend off the
+numbers are the same. Pops cluster at 5.5 s (A, duck pass), 7.5 s (B, knockback skid) and 16.5 s (B, running thrust).

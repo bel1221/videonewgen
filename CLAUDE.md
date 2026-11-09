@@ -99,6 +99,12 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   Render: `PAGE=anim-test/fight_v7/index.html QS="?sub=5" node render.mjs frames 0 600 out/newgen_fight_test_v7_video.mp4`;
   events: `node render.mjs eval "window.events()" > fight_v7/comp/events.json`; sound: `SCENE=v7 python fight/fight_sfx3.py`
   (-> `fight_v7/comp/fight_audio.m4a`). Metrics vs v6 and open issues: notes §15.
+- **Fight v8 "blade masters"** (`anim-test/fight_v8/`, 30 s, NEW choreography; user rule: each fight video gets new scenes,
+  never a remake). Build: `python fight_v8/parts/assemble.py` (v7 mechanics + `parts/build_v8.js` + `parts/camera_v8.js`).
+  Render: `PAGE=anim-test/fight_v8/index.html QS="?sub=5" node render.mjs frames 0 900 out/newgen_fight_test_v8_video.mp4`;
+  events -> `fight_v8/comp/events.json`; sound `SCENE=v8 python fight/fight_sfx3.py`. Collision QA: `tools/collide_qa.js`.
+  Includes all v7-review fixes (bright sun 4.0, standing slides, layered impact-frame hits, sword twirls and grip blend, sword
+  1.15x, parry auto-pick). Details and metrics: notes §16. Waiting on the user's feedback.
 - **NewGen studio (our own animation system)**: `anim-test/studio/` + skill `.claude/skills/newgen-animate`. Prompt ->
   beat script JSON -> contact-first generated motion on rig2 -> render. Demos: `studio/scripts/demo.json` (voxel meadow),
   `demo_colosseum.json` (the user's colosseum, converted by `anim-test/tools/mca2obj.py`; `fight/assets/colosseum/` is

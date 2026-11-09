@@ -16,10 +16,18 @@ CFG = {'a': dict(total=20.0, mute=[6.46], big=(13.2, 13.95, 9.4), fall=19.38, cr
        # v7 movement duel (fight_v7/choreo.js: FLASH 17.3, BIND 12.45-13.3, FALL_T 18.9); big swooshes lead the leap
        # overhead (slam 4.4), the leaping slash (10.1) and the mid-air cross (17.3)
        'v7': dict(total=20.0, mute=[], big=(4.15, 9.85, 16.95), fall=18.9, cross=17.3, bind=(12.53, 13.3),
-                  events='fight_v7/comp/events.json', out='fight_v7/comp/fight_audio.m4a')}[SCENE]
+                  events='fight_v7/comp/events.json', out='fight_v7/comp/fight_audio.m4a'),
+       # v8 blade masters (fight_v8: FLASH 26.38, BIND 20.78-21.5, FALL_T 27.75). Big swooshes lead the spin combo, the aerial
+       # spin, the jump slash and the finale uppercut. impact=True: every impact frame gets a fixed LAYERED hit (user: an impact
+       # frame is never a lone sound) and the weak clash clip from v7 6.95 s is dropped.
+       'v8': dict(total=30.0, mute=[], big=(5.98, 8.36, 17.02, 26.22), fall=27.75, cross=26.38, bind=(20.86, 21.5), impact=True,
+                  drop=['clash/desert_01.wav'], events='fight_v8/comp/events.json', out='fight_v8/comp/fight_audio.m4a')}[SCENE]
 BIND = CFG.get('bind', (11.7, 12.5)); EVF = CFG.get('events', 'fight/comp/events.json'); OUTF = CFG.get('out', 'fight/comp/fight_audio.m4a')
 SR = 48000; TOTAL = CFG['total']; PK = 'sfx_pack'; MUTE_CLASH = CFG['mute']
 EV = json.load(open(EVF)); CUR = json.load(open(f'{PK}/curated.json'))
+for _k in CUR:
+    if isinstance(CUR[_k], list): CUR[_k] = [f for f in CUR[_k] if f not in CFG.get('drop', [])]
+INS = set(round(x, 3) for x in EV.get('ins', [])) | ({round(EV['flash'], 3)} if CFG.get('impact') and 'flash' in EV else set()) if CFG.get('impact') else set()
 MC_SAND = sorted(glob.glob(f'{PK}/mc/step_sand*.ogg')); MC_FALL = f'{PK}/mc/damage_fallsmall.ogg'
 rng = np.random.default_rng(11)
 N = int(TOTAL * SR) + SR
@@ -80,8 +88,17 @@ for t, c in EV['swings']:
     if muted(t): continue
     place(1, hp(load(pick('slash'), rng.uniform(0.92, 1.12)), 300), t - 0.03, -9 + rng.uniform(-2, 1), pan=0.25 if c == 'A' else -0.25)
 for t in CFG['big']: place(1, load(pick('swoosh_big'), rng.uniform(0.95, 1.05)), t + 0.1, -11)
+def impact_hit(t):
+    # impact frame: whoosh peaking just before the hit + the strongest clash + a second clash layer + low thump + ring + click
+    place(1, load(f'{PK}/unsheathe/desert_34.wav', 1.0), t - 0.07, -8)
+    place(1, load(f'{PK}/clash/mani_06.wav', 0.97), t, -1)
+    place(1, load(f'{PK}/other/mani_01.wav', 1.04), t + 0.006, -7)
+    thump(1, t, -7, 85); ring(t + 0.004, -13, True); place(3, load(pick('click')), t + 0.012, -12)
+for t, c in EV.get('twirls', []):                                   # sword twirl: a soft air swish per half turn
+    place(1, hp(load(pick('slash'), rng.uniform(1.2, 1.35)), 1400), t, -21 + rng.uniform(-2, 1), pan=0.3 if c == 'A' else -0.3)
 for t, big, kind in EV['clashes']:
     if muted(t): continue
+    if round(t, 3) in INS and kind in ('blade', 'cross'): impact_hit(t); continue
     if kind == 'kick': place(1, load(pick('impact'), 0.85), t, -6); thump(1, t, -10, 80); continue
     if kind == 'hit': place(1, load(pick('impact'), 0.9), t, -5); thump(1, t, -9, 75); place(1, hp(load(pick('slash'), 1.1), 900), t - 0.01, -14); continue
     if kind == 'slam': thump(1, t, -2, 55); place(1, load(pick('impact'), 0.8), t, -4); noise(2, t + 0.01, -8, 0.5, 250, 1800); continue
@@ -126,7 +143,7 @@ e1 = env(BUS[1]); e2 = env(BUS[2])
 b2 = duck(BUS[2], e1, 10)                                 # surroundings dip 10 dB under fighting
 b3 = duck(duck(BUS[3], e1, 12), env(b2), 5)               # random dips under both
 mix = BUS[1] + b2 + b3; mix = mix[:int(TOTAL * SR)]; mix *= min(1.0, 0.95 / np.abs(mix).max())
-subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(SR), '-ac', '2', '-i', '-', '-af', 'loudnorm=I=-14:TP=-1.0:LRA=11',
+subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(SR), '-ac', '2', '-i', '-', '-af', 'loudnorm=I=-14:TP=-1.0:LRA=11' + (',alimiter=limit=0.89:attack=1:release=60:level=disabled' if CFG.get('impact') else ''),   # v8: loudnorm overshot to +2 dBFS on impact hits
                 '-c:a', 'aac', '-b:a', '256k', OUTF], input=mix.astype(np.float32).tobytes(), check=True)
 nst = sum(1 for s in EV['steps'] if s[1] == 'step')
 print('swings', len(EV['swings']), 'clashes', len(EV['clashes']) - len(MUTE_CLASH), 'mc steps', nst, 'muted', MUTE_CLASH)
