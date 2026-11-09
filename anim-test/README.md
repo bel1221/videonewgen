@@ -22,3 +22,18 @@ ffmpeg -y -i comp/anim_video.mp4 -i comp/anim_audio.m4a -map 0:v -map 1:a -c cop
 bash ../toolkit/deliver.sh comp/anim_master.mp4 out/newgen_anim_test_v1.mp4
 ```
 Weapons: `python anim-test/tools/export_weapon.py Aegisblade 22` (from the repo root).
+
+## Mocap clips from text (AnimationGPT)
+
+Local only (Windows PC, RTX 2060): AnimationGPT = MotionGPT + the AGPT combat checkpoint, installed in
+`Desktop\mcrefs\motion\` (Python 3.10 venv in `motion\.venv`, not in git). One command turns prompts into rig clips:
+```bash
+motion/.venv/Scripts/python.exe motion/agpt.py "a man swings a sword horizontally from right to left"   # from Desktop\mcrefs
+```
+-> `anim-test/mocap/<slug>.json` (20 fps, up to ~9.8 s, one character). `tools/motion2rig.py` does the retarget
+(HumanML3D 22 joints -> rig.js/rig2.js `applyPose` format: pos/yaw/tilt + XYZ Euler per joint; elbow = -x, knee = +x).
+Use in a scene with `web/mocap.js`: `applyPose(ch, sampleClip(clip, t, { at: [x, z], yaw, wrist }))`, `blendPose()` to
+ease between hand-keyed poses and a clip. Preview any clip: `web/mocap.html?clip=<name>.json&t=<sec>`.
+Not in the mocap: wrist/weapon angle (set `wrist`/`roll` yourself), hand contact between fighters.
+The motion style is deep, crouched game-combat; trim the part you need. Licensing: the training data comes from
+commercial game animations, so treat clips as previs / a base to hand-polish rather than final motion for paid promos.
