@@ -44,14 +44,36 @@ joint data in a video. The style numbers it inspired live in `anim-test/studio/s
   `tools/export_weapon.py`. Positions are blocks; the colosseum arena centre is (0,0), sand is flat to about ±35 x ±20.
 - **Attacks** (`t` = the moment of contact): `slash` with `dir` = `h` (forehand), `lr` (backhand), `diag`,
   `diag_down_right`, `rising`, `diag_up`, `diag_up_right`; `overhead`; `thrust`; `jump_attack` (leap + overhead, `leap`,
-  `height`). `power`: `light` | `medium` | `heavy` (heavy = two-handed, longer wind-up, deeper sink, bigger knockback).
-- **Defender response** `vs`: `hit` (`knock` multiplier), `block`, `parry` (active, meets the blade), `dodge_back`,
-  `dodge_left`, `dodge_right`, `duck`, `none` (swing at air).
+  `height`). `power`: `quick` (flurries: 4-frame wind-up, 3-frame strike) | `light` | `medium` | `heavy` (two-handed,
+  longer wind-up, deeper sink, bigger knockback).
+- **Defender response** `vs`: `hit` (`knock` multiplier), `block`, `parry` (active, meets the blade), `bind` (the blades
+  lock and grind for `bind` seconds, then spring apart), `dodge_back`, `dodge_left`, `dodge_right`, `duck`, `none`
+  (swing at air).
+- **Pace.** For a fast fight like the user's v4, aim for about 1.2 contacts per second of fighting: flurries of `quick`
+  attacks 0.3-0.4 s apart (alternating or one fighter pressing), a bind or a jump every 5-7 s, and almost no standing
+  still. Measured in notes §13.
 - **Footwork:** `approach` / `retreat` / `charge` (`gap`, `dur`), `circle` (`angle` deg, `dur`), `step` (`by`: [left, fwd]),
   `move` (`to`: [x, z]). Attackers also close distance by themselves before an attack.
 - **Other actions:** `cheer`, `taunt`, `kneel`, `fall`, `guard`, `idle` (`dur`).
-- **Camera:** shot `type` = `side` (default, one side of the fighting line), `three4`, `low`, `close` (`on`: a cast id);
-  optional `dist`, `height`, `angle`, `fov`, `push` (default 4 %/s), `drift`. Keep cuts few: 2-3 s shots, never orbit.
+- **Camera** (times are action times): shot `type` =
+  - `side` (default; one side of the fighting line), `three4`, `wide`, `est` (crane-in establishing shot)
+  - `face` / `close` / `ots` / `run` (all on the cast id in `on`)
+  - `low` (from the ground, looking up; great for jumps), `high` (top-down; jump landings), `ecu` (on the nearest contact)
+  - `orbit` (`from`/`to` degrees)
+  - Optional on any shot: `roll` (Dutch tilt, degrees), `dist`, `height`, `fov`, `push`, `drift`.
+  - Calm scenes: 2-3 s shots. Flashy fights (the user's v4 is the reference): 0.5-1.2 s shots that rotate types, with
+    face / close-up inserts between exchanges.
+- **Impact frames / hit-stop:** a contact with `"impact": true` (default: heavy and jump-attack hits and clashes) freezes
+  the action for 3 frames. The insert shows 1 inked black-and-white frame, then 2 warm colour frames from a camera at the
+  contact, followed by a punch-in zoom, shake and chromatic fringe. Scene time = action time + 0.1 s per impact.
+  Use about 5-7 in 30 s; more stops feeling like impacts. `"fx": {"inserts": false, "ghosts": false, "motes": false,
+  "shake": 0.5}` tones the effects down for calm pieces.
+- **Other effects, automatic:**
+  - Clash: spark burst, cross-star flare, warm point light.
+  - Hit: hurt tint, small sparks and a puff.
+  - Every step puffs sand. A jump landing throws a dust ring, debris and shake.
+  - Fast blades get trails and ghost copies.
+  - The colosseum gets drifting sand motes.
 
 **Timing a script** (the engine warns if you break these):
 - One character's attacks need about `antic + hold + strike + follow` between contacts: light 0.5 s, medium 0.7 s,
@@ -89,6 +111,19 @@ reference video timestamp or a measured study). Then add a script that exercises
 
 ## 4. Sound and delivery
 
-`node render.mjs eval "events()"` returns the engine's `contacts` (t, kind, act, power, big) and footstep `steps`.
-Build the SFX bed from those times with the project's sound
-rules (no SFX more than twice, no banned files; see CLAUDE.md), mix, then `toolkit/deliver.sh`. Remind the user to push.
+```bash
+node render.mjs eval "events()" > studio/comp/NAME_events.json        # scene-time swings, contacts, steps, jumps, holds
+python studio/studio_sfx.py studio/comp/NAME_events.json studio/comp/NAME_audio.m4a
+ffmpeg -i out/NAME_video.mp4 -i studio/comp/NAME_audio.m4a -map 0:v -map 1:a -c:v libx264 -crf 18 -preset medium -pix_fmt yuv420p -c:a copy -movflags +faststart out/NAME_v1.mp4
+```
+(PowerShell: `| Out-File -Encoding ascii` instead of `>`.)
+
+`studio_sfx.py` follows the house sound rules:
+- **Limits:** no file more than twice, nothing from `boom/`, never `rs50`.
+- **Sources:** only shippable ones: the user's mani_* pack, Minecraft's own sounds (via the Lunar Client asset
+  index), and the CC0 library. The desert_* cuts are someone else's work and are never used.
+- **Synthesized:** footsteps, blade rings, thumps and pre-impact swells.
+- **Mix:** priority ducking, sa.mp3 underneath with a suck-out into the first impact, and a master at -14 LUFS with a
+  look-ahead limiter.
+
+Remind the user to push.

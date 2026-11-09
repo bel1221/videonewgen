@@ -82,6 +82,16 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
 - **Blender route (next):** user wants their real map in Blender and will test locally with their GPU. Plan: world
   `region/*.mca` -> mesh (amulet-core or Mineways/jmc2obj) -> Blender + MCprep rig/materials. Cloud CPU benchmark
   (bpy 5.2.3 via pip, 4 cores): Cycles 1080p 48 spp + denoise = 74 s/frame on a simple voxel scene; EEVEE did not run headless here.
+- **FIGHT BASELINE = v6** (`anim-test/fight_v6/`, `out/newgen_fight_test_v6.mp4`; user, 2026-11-10): "not well done
+  but smooth, and has the core fighting mechanics mapped out good."
+  - **What v6 is:** v4's choreography and mechanics (fast, real blocks and clashes, clean movement) plus v5 smoothing,
+    continuous blade collision, a blade-flip limiter and a 2-pass clash solver (notes §14).
+  - **How to work on it:** every new fight version starts from v6 and keeps its mechanics, pacing, effects and v4 sound
+    design (`fight/fight_sfx3.py`). Polish it; don't re-choreograph from scratch.
+  - **Known gaps:** flurry clashes at 11.35, 13.56 and 13.96 s miss by 1.2-1.5 blocks and need those swings re-keyed;
+    blades flip where a swing passes through a body (9.9, 14.6 s).
+  - **Rejected:** the studio-engine fights (duel30 v1/v2) were slow and childish, with gliding legs.
+  - **Before publishing:** `fight_sfx3.py` uses `desert_*` clips cut from other creators' videos; replace them.
 - **NewGen studio (our own animation system)**: `anim-test/studio/` + skill `.claude/skills/newgen-animate`. Prompt ->
   beat script JSON -> contact-first generated motion on rig2 -> render. Demos: `studio/scripts/demo.json` (voxel meadow),
   `demo_colosseum.json` (the user's colosseum, converted by `anim-test/tools/mca2obj.py`; `fight/assets/colosseum/` is

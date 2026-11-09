@@ -13,6 +13,8 @@ export const FPS = 30;
 // settle : follow-through end -> back in guard
 // wind/foll: arc degrees behind / past the contact; lunge: root travel toward the target; drop: pelvis sink (AGPT 0.25 cap)
 export const POWER = {
+  // quick: flurry strikes (REF MD fight: 2-4 frame inserts, action shots 0.3-0.5 s; DFY flick 0.17 s lift)
+  quick:  { antic: 0.13, hold: 0.0,  strike: 3 / FPS, follow: 0.15, settle: 0.22, wind: 70,  foll: 55,  lunge: 0.06, drop: 0.05, twist: 0.4 },
   light:  { antic: 0.20, hold: 0.03, strike: 4 / FPS, follow: 0.22, settle: 0.32, wind: 95,  foll: 65,  lunge: 0.12, drop: 0.08, twist: 0.45 },
   medium: { antic: 0.34, hold: 0.07, strike: 5 / FPS, follow: 0.28, settle: 0.40, wind: 115, foll: 80,  lunge: 0.20, drop: 0.15, twist: 0.55 },
   heavy:  { antic: 0.52, hold: 0.14, strike: 5 / FPS, follow: 0.36, settle: 0.55, wind: 135, foll: 100, lunge: 0.32, drop: 0.24, twist: 0.65 },
@@ -36,9 +38,10 @@ export const GAP = { hit: 1.8, clash: 2.7, whiff: 1.9, guard: 3.0, close: 1.3 };
 export const BODY_R = 0.26;                    // torso capsule radius for hits
 
 // ---------------------------------------------------------------- reactions
-export const KNOCK = { light: 0.30, medium: 0.6, heavy: 1.1 };   // REF: knockback keeps travelling, not a flinch in place
-export const RECOIL = { light: 14, medium: 22, heavy: 32 };      // torso recoil degrees
-export const BLOCK_PUSH = { light: 0.06, medium: 0.12, heavy: 0.22 };
+export const KNOCK = { quick: 0.2, light: 0.30, medium: 0.6, heavy: 1.1 };   // REF: knockback keeps travelling, not a flinch in place
+export const RECOIL = { quick: 10, light: 14, medium: 22, heavy: 32 };      // torso recoil degrees
+export const BLOCK_PUSH = { quick: 0.04, light: 0.06, medium: 0.12, heavy: 0.22 };
+export const BLOCK_LOCK = { quick: 0.12, light: 0.16, medium: 0.24, heavy: 0.32 };   // how long a block holds the defender's root
 
 // ---------------------------------------------------------------- life (REF: nothing is ever frozen)
 export const IDLE = { breath: [1.4, 0.27], sway: [1.6, 0.19], shift: [0.016, 0.15], bob: [0.012, 0.31] };   // [amplitude, Hz]

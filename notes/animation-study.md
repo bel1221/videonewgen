@@ -674,9 +674,80 @@ and `B_height.json`, all gitignored.
 - **Size:** 1.0M visible faces, greedy-merged to 695k quads; the GLB is 106 MB.
 - **Arena:** the floor is flat at y = 0 for about ±37 x ±20 blocks.
 
+## 13. Pacing: why duel30 v1 felt slower than v4, and v2 (2026-11-10)
+
+The user called v4 (`anim-test/out/newgen_fight_test_v4_small.mp4`) the reference for a flashy, fast fight and asked
+for that pace. Measured with the §1 pipeline (`toolkit/refstudy/analyze.py`) and the engines' own event lists:
+
+| | v4 (20 s) | duel30 v1 (31.2 s) |
+|---|---|---|
+| contacts per second of fighting | **1.2** (18 in 15 s) | 0.8 (20 in 25 s) |
+| typical gap between contacts | **0.27-0.42 s** (flurries) | 0.7-1.0 s |
+| footsteps per second | **10.5** | 5.7 |
+| median shot (p25-p75) | 0.57 s (0.43-0.75) | 0.60 s (0.47-0.95) |
+| in-frame motion mean / frames above 3 | **4.7 / 54 %** | 3.0 / 34 % |
+| camera motion | **3.2** | 2.2 |
+
+**Verdict:** the cut rate was already at v4's level. The pace gap was action density and movement. v1 had standoffs,
+circling and retreats between exchanges; v4 is close to wall-to-wall flurries with constant footwork and moving cameras.
+
+**v2** (`studio/scripts/duel30_v2.json`):
+- **Script:** 33 contacts in about 27 s of fighting, with three flurries 0.3-0.4 s apart, three binds, three jump
+  attacks and seven impact frames. There are about 58 shots averaging 0.53 s, with more orbits and running tracks.
+- **New in the engine:**
+  - `quick` power: 4-frame wind-up, 3-frame strike, 70° arc.
+  - Shorter defender locks after a block (`BLOCK_LOCK`).
+  - Faster small spacing steps.
+  - `vs: "bind"`: the blades lock and grind for `bind` seconds, then both spring apart. It comes with repeating sparks
+    and a grinding scrape.
+- **QA:** every contact misses by 0.04 or less, there are no warnings, and blade turn is at most 49°/frame (one swing).
+
+## 14. User verdict on the studio fights, and v6 = v4 retouched (2026-11-10)
+
+**v6 is the fight baseline** (user): "not well done but smooth, and has the core fighting mechanics mapped out good".
+Every next fight version starts from `anim-test/fight_v6/`.
+
+**User verdict:**
+- The studio-engine fights (duel30 v1/v2) are smooth but "badly implemented": slow, with no fighting style, and they
+  look like children playing.
+- The legs are "super cursed": sprinting looks like hovering and gliding.
+- v4 has the right core: fast, sharp decisions, real blocking and clashing, clean movement, flashy effects, and the
+  best SFX of every version. It only lacks smoothness.
+
+**Decision:** fights build on v4. Retouch, don't re-choreograph. The studio engine stays as a tool, but its fight
+choreography is not the base.
+
+**v6** (`anim-test/fight_v6/`, a copy of fight_v5; v4 and v5 are untouched). Render with
+`PAGE=anim-test/fight_v6/index.html QS="?sub=5" node render.mjs frames 0 600 out/...`, sound with
+`fight/fight_sfx3.py` after exporting `events()` to `fight/comp/events.json`. Changes:
+1. **v5 smoothing:** zero-phase passes on the key curves (sig 50 ms) and the final pose (psig 30 ms).
+2. **Continuous blade collision** (`rig2_v4.js`). v4 added a flat +0.04 push per touch, up to 16 times, so a blade
+   JUMPED the moment it touched a body or the floor. The push is now proportional to penetration (x1.8, 28
+   iterations), with a 0.1-block fade at the capsule ends.
+3. **Blade-direction rate limit** (`choreo.js`, `buildBladeTracks`). v4's blade-intent keys are sometimes near-opposite,
+   and blending them flipped the blade 100-134° in a frame. After the final clash solve, the intent is sampled at
+   240 Hz and slerped at no more than 1800°/s (60°/frame). Real strikes (under 40°/frame) pass untouched.
+4. **Two-pass clash solver** (`fight.js`): solve, resimulate, then solve again on the final poses, with v4's limits.
+   Wider limits (fw 1.6) made the bodies collide (gap 0.03) and were dropped.
+5. **Tried and dropped:** sharper smoothing within ±0.12 s of each clash. Some clashes improved, but there were 3x the
+   joint pops. It's kept off behind `?sharp=1`.
+
+| metric (A / B, 0.2-19.8 s) | v4 | v5 | **v6** |
+|---|---|---|---|
+| joint pops (>25°/frame²) | 515 / 519 | 53 / 87 | **53 / 105** |
+| joint angular acceleration p95 | 32.9 / 33.8 | 12.5 / 13.6 | **12.4 / 14.0** |
+| blade step max (°/frame) | 140 / 138 | 120 / 134 | **105 / 60** |
+| root acceleration p95 | 8.2 / 7.4 | 4.4 / 4.6 | **4.7 / 5.4** |
+| clash miss 4.2-5.5 s | 0.03-0.47 | 0.13-0.92 | 0.07-0.86 |
+| clash miss 10.5-14.4 s (flurry) | 0.66-1.99 | 0.32-1.52 | 0.18-1.53 |
+
+**Still open:**
+- The flurry clashes at 11.35, 13.56 and 13.96 s miss by 1.2-1.5 blocks. That is v4's original key geometry, and those
+  swing arcs need re-keying (as §5 already said).
+- Blades still flip about 100° where the choreography swings a blade through the opponent's body (9.9, 14.6 s): the
+  push changes sides as the blade crosses the body's centre.
+
 **Not done yet:**
-- No sound bed for studio scenes (`events()` exports the timings).
-- No hit-stop / time remap.
 - No left-handed fighters.
 - No spin or kick moves.
 - The camera has only basic shot types.

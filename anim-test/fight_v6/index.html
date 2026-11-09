@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>NewGenMC fight test</title>
+<style>
+  @font-face { font-family: 'MontEB'; src: url('/toolkit/fonts/Montserrat-ExtraBold.ttf'); }
+  @font-face { font-family: 'InterV'; src: url('/toolkit/fonts/Inter-Variable.ttf'); font-weight: 100 900; }
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  .hud { position: fixed; color: #fff; text-shadow: 0 2px 6px rgba(8,6,12,.7); font-family: 'InterV'; font-size: 22px; }
+  #tl { left: 60px; top: 30px; font-family: 'MontEB'; }
+  #tr { right: 60px; top: 32px; font-weight: 500; }
+  #bl { left: 60px; bottom: 64px; font-weight: 600; }
+  #bl b { color: rgb(112,222,132); font-weight: 700; margin-right: 10px; }
+  #bar { position: fixed; right: 60px; bottom: 60px; width: 300px; height: 2px; background: rgba(255,255,255,.16); }
+  #fill { height: 2px; width: 0; background: rgba(112,222,132,.86); }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/anim-test/node_modules/three/build/three.module.js",
+               "three/addons/": "/anim-test/node_modules/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div class="hud" id="tl">NEWGENMC</div>
+<div class="hud" id="tr">newgenmc.net</div>
+<div class="hud" id="bl"><b>00</b>— FIGHT TEST</div>
+<div id="bar"><div id="fill"></div></div>
+<script type="module" src="./fight.js"></script>
+</body>
+</html>

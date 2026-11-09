@@ -3,7 +3,7 @@
 // spot the dodger just left). Timing/mechanics come from style.js (the studies). Everything is precomputed at HZ and
 // sampled by pose(c, t); the page applies it with rig2.applyPose (hand IK in the root frame: hRw/bdR).
 import { POWER, CHAIN, PLANT_BEFORE, DROP_LAG, MAX_DROP, IDLE_SINK, BLADE_LEN, SWEET, GAP, BODY_R, KNOCK, RECOIL,
-  BLOCK_PUSH, IDLE, STANCE, GAIT, DIRS } from './style.js';
+  BLOCK_PUSH, BLOCK_LOCK, IDLE, STANCE, GAIT, DIRS } from './style.js';
 
 const HZ = 120, D2R = Math.PI / 180, R2D = 180 / Math.PI;
 const P0 = [-0.14, 1.30, 0.02];                  // swing pivot (root frame): upper chest, toward the sword side
@@ -73,9 +73,9 @@ export function build(script, world) {
     if (['slash', 'overhead', 'rising', 'thrust', 'jump_attack', ...Object.keys(DIRS)].includes(act)) {
       const d = b.target || C[who].opp, pw = POWER[b.power || (act === 'jump_attack' ? 'heavy' : 'medium')];
       const vs = b.vs || 'hit', tc = b.t;
-      const kind = vs === 'hit' ? 'hit' : (vs === 'block' || vs === 'parry') ? 'clash' : vs === 'none' ? 'air' : 'whiff';
+      const kind = vs === 'hit' ? 'hit' : (vs === 'block' || vs === 'parry' || vs === 'bind') ? 'clash' : vs === 'none' ? 'air' : 'whiff';
       const g = b.gap || (kind === 'hit' ? GAP.hit : kind === 'clash' ? GAP.clash : GAP.whiff);
-      const lunge = act === 'jump_attack' ? (b.leap || 2.2) : pw.lunge * (act === 'thrust' ? 1.5 : 1);
+      const lunge = act === 'jump_attack' ? (b.leap || 2.6) : pw.lunge * (act === 'thrust' ? 1.5 : 1);
       const tAnt = tc - pw.strike - pw.hold - pw.antic, tCk = tc - pw.strike - pw.hold;
       const dirAD = unit2(pos[who], pos[d]);
       const pd = pos[d];
@@ -83,11 +83,11 @@ export function build(script, world) {
       const pre = [paC[0] - dirAD[0] * lunge, paC[1] - dirAD[1] * lunge];        // before the lunge / leap
       const far = d2(pos[who], pre);
       if (far > 0.08) {                                                          // close (or open) the distance first
-        const speed = far > 2.6 ? 4.2 : 1.7, dur = Math.max(0.35, far / speed);
+        const speed = far > 2.6 ? 4.2 : far > 0.6 ? 2.4 : 1.7, dur = Math.max(far < 0.35 ? 0.18 : 0.3, far / speed);
         footwork(who, Math.max(lastT[who], tAnt - 0.05 - dur), tAnt - 0.05, pre);
         if (lastT[who] > tAnt + 0.15) warnings.push(`${who}: not enough time to get in range before ${tc.toFixed(2)} s (needs ${dur.toFixed(2)} s)`);
       } else hold(who, tAnt);
-      if (act === 'jump_attack') { hold(who, tc - 0.62); key(who, tc - 0.02, paC); C[who].air.push({ t0: tc - 0.62, t1: tc - 0.02, h: b.height || 0.95 }); }
+      if (act === 'jump_attack') { const ta = b.air || 0.7; hold(who, tc - ta); key(who, tc - 0.02, paC); C[who].air.push({ t0: tc - ta, t1: tc - 0.02, h: b.height || 1.35 }); }
       else { hold(who, tc - pw.strike - 0.06); key(who, tc + 0.05, [paC[0] + dirAD[0] * 0.03, paC[1] + dirAD[1] * 0.03]); }
       // lead foot steps in and plants just before contact (AGPT example: ~130 ms)
       if (act !== 'jump_attack' && lunge > 0.05) C[who].steps.push({ foot: 'lead', t1: tc - PLANT_BEFORE, dur: Math.max(0.16, pw.strike + 0.1) });
@@ -98,6 +98,7 @@ export function build(script, world) {
       // defender
       const dirDA = [-dirAD[0], -dirAD[1]];
       const ct = { t: tc, att: who, def: d, kind, vs, power: b.power || 'medium', big: b.power === 'heavy' || act === 'jump_attack', act };
+      ct.impact = b.impact ?? (ct.big && kind !== 'whiff' && kind !== 'air');   // impact frame + hit-stop in the scene
       if (kind === 'hit') (C[who].passWin = C[who].passWin || []).push([tc - 0.12, tc + pw.follow]);   // a landed cut carries through
       contacts.push(ct);
       if (vs === 'hit') {
@@ -105,11 +106,17 @@ export function build(script, world) {
         key(d, tc + 0.28 + kb * 0.35, [pd[0] + dirAD[0] * kb, pd[1] + dirAD[1] * kb]);
         C[d].segs.push({ type: 'hit', t0: tc, tc, tEnd: tc + 0.75 + kb * 0.4, power: b.power || 'medium', from: who });
         C[d].drops.push({ tc: tc + 0.12, amt: 0.05 + 0.1 * kb, w: 0.5, lag: 0 });
-      } else if (vs === 'block' || vs === 'parry') {
-        hold(d, tc); const pu = BLOCK_PUSH[b.power || 'medium'];
-        key(d, tc + 0.3, [pd[0] + dirAD[0] * pu, pd[1] + dirAD[1] * pu]);
-        C[d].segs.push({ type: vs, t0: tc - (vs === 'parry' ? 0.30 : 0.26), tc, tEnd: tc + 0.62, from: who, power: b.power || 'medium' });
-        C[d].drops.push({ tc: tc + 0.05, amt: 0.06, w: 0.35, lag: 0 });
+      } else if (vs === 'block' || vs === 'parry' || vs === 'bind') {
+        // bind: blades lock and grind for b.bind seconds (both lean in, sparks), then both spring apart
+        const pw2 = b.power || 'medium', bind = vs === 'bind' ? (b.bind || 0.7) : 0, pu = BLOCK_PUSH[pw2] * (bind ? 2.5 : 1);
+        hold(d, tc + bind); key(d, tc + bind + BLOCK_LOCK[pw2], [pd[0] + dirAD[0] * pu, pd[1] + dirAD[1] * pu]);
+        const quickDef = pw2 === 'quick' || pw2 === 'light';
+        C[d].segs.push({ type: vs === 'parry' ? 'parry' : 'block', t0: tc - (vs === 'parry' ? 0.30 : quickDef ? 0.2 : 0.26), tc, tEnd: tc + bind + (quickDef ? 0.4 : 0.62), from: who, power: pw2, bind });
+        C[d].drops.push({ tc: tc + 0.05, amt: bind ? 0.12 : 0.06, w: 0.35 + bind, lag: 0 });
+        if (bind) { ct.bind = bind; ct.kind = 'clash';
+          const sg = C[who].segs[C[who].segs.length - 1]; sg.bind = bind; sg.tEnd += bind;
+          hold(who, tc + bind); key(who, tc + bind + 0.25, [paC[0] - dirAD[0] * pu, paC[1] - dirAD[1] * pu]);   // attacker springs back too
+          C[who].drops.push({ tc: tc + 0.1, amt: 0.1, w: 0.3 + bind, lag: 0 }); }
       } else if (vs.startsWith('dodge') || vs === 'duck') {
         const side = vs === 'dodge_left' ? 1 : vs === 'dodge_right' ? -1 : 0;
         // defender's left (+x local) = rotate dirDA by +90 deg around y: forward (fx,fz) -> left (fz, -fx)
@@ -182,6 +189,8 @@ export function build(script, world) {
     const fl = { l: [], r: [] };
     for (let i = 0; i < N; i++) {
       const t = tt(i), air = jump[i] > 0.02;
+      if (i > 0 && jump[i - 1] > 0.02 && !air) for (const f of ['l', 'r']) STEPS.push({ c: k, t, foot: f, p: [F[f].p[0], 0, F[f].p[1]], kind: 'land' });
+      if (i > 0 && jump[i - 1] <= 0.02 && air) STEPS.push({ c: k, t, foot: 'r', p: [rx[i], 0, rz[i]], kind: 'takeoff' });
       for (const f of ['l', 'r']) {
         const st = F[f], o = f === 'l' ? 'r' : 'l';
         if (st.sw && t >= st.sw.t1) { st.p = st.sw.to; STEPS.push({ c: k, t, foot: f, p: [st.p[0], 0, st.p[1]], kind: st.sw.kind }); st.sw = null; st.last = t; }
@@ -243,6 +252,9 @@ export function build(script, world) {
     const twC = clamp(Math.atan2(u[0], Math.max(0.05, u[2])) * R2D * seg.pw.twist * (seg.type === 'thrust' ? 0.5 : 1), -55, 55);
     let r = Math.min(clamp(D - SWEET * BLADE_LEN, 0.3, 0.7), reachR(u, twC)), sb = D - r;
     if (sb > 0.97 * BLADE_LEN || sb < 0.25) warnings.push(`${ct.att} at ${ct.t.toFixed(2)} s: contact ${D.toFixed(2)} from the pivot is ${sb > 0.97 * BLADE_LEN ? 'out of' : 'inside'} blade reach`);
+    // upward swings come up beside the sword-side leg, never straight through "blade pointing down" (heading undefined
+    // there -> flips): keep at least ~35 deg of sideways travel
+    if (seg.type === 'swing') { const dd = ((seg.dir % 360) + 360) % 360; if (dd > 235 && dd < 305) seg.dir = dd < 262 ? 235 : 305; }
     const left = nrm(sub([1, 0, 0], mul(u, u[0])));
     const down = nrm(sub(sub([0, -1, 0], mul(u, -u[1])), mul(left, dot([0, -1, 0], left))));
     const m = nrm(add(mul(left, Math.cos(seg.dir * D2R)), mul(down, Math.sin(seg.dir * D2R))));
@@ -268,8 +280,10 @@ export function build(script, world) {
       if (t < s.tCk) return { ph: 'antic', u: ease((t - s.t0) / (s.tCk - s.t0)), s: -pw.wind };
       if (t < tS) return { ph: 'hold', s: -pw.wind - 6 * sstep((t - s.tCk) / Math.max(1e-3, tS - s.tCk)) };
       if (t < s.tc) { const u = (t - tS) / pw.strike; return { ph: 'strike', s: -(pw.wind + 6) + (pw.wind + 6) * Math.pow(u, 1.3) }; }
-      const dt = t - s.tc;
-      if (clash) { const rb = 14 * Math.exp(-dt / 0.06) * Math.sin(dt / 0.05) - 10 * sstep(dt / 0.2); return { ph: dt < pw.follow ? 'follow' : 'settle', s: rb, u: sstep((dt - pw.follow * 0.6) / pw.settle) }; }
+      const bnd = s.bind || 0, dt0 = t - s.tc;
+      if (clash && dt0 < bnd) return { ph: 'follow', s: 3 * Math.sin(dt0 * 38) * Math.min(1, dt0 / 0.08) + 2 * sstep(dt0 / bnd) };   // blades grinding in the bind
+      const dt = dt0 - bnd;
+      if (clash) { const rb = 14 * Math.exp(-dt / 0.06) * Math.sin(dt / 0.05) - (bnd ? 22 : 10) * sstep(dt / 0.2); return { ph: dt < pw.follow ? 'follow' : 'settle', s: rb, u: sstep((dt - pw.follow * 0.6) / pw.settle) }; }
       const sF = foll * (1 - Math.exp(-dt / tau));
       if (dt < pw.follow) return { ph: 'follow', s: sF };
       return { ph: 'settle', s: foll * (1 - Math.exp(-pw.follow / tau)), u: ease((dt - pw.follow) / pw.settle) };
@@ -330,16 +344,19 @@ export function build(script, world) {
         lean = 4 + lw * sl * (sg.pw === POWER.heavy ? 18 : sg.pw === POWER.medium ? 13 : 9) * (sg.dir === 90 ? 1.25 : 1);
         side = lw * Math.sin(sg.dir * D2R) * 0 + lw * (q.ph === 'strike' || q.ph === 'follow' ? -4 : 2) * Math.cos(sg.dir * D2R);
         two = sg.two ? lw : 0;
-        if (C[k].air.length) for (const a of C[k].air) if (t > a.t0 - 0.1 && t < a.t1 + 0.1) { tiltP = 8 * Math.sin(clamp((t - a.t0) / (a.t1 - a.t0), 0, 1) * Math.PI); }
+        if (C[k].air.length) for (const a of C[k].air) if (t > a.t0 - 0.1 && t < a.t1 + 0.1) {   // tuck back on the rise, pitch into the strike on the way down
+          const u = clamp((t - a.t0) / (a.t1 - a.t0), 0, 1); tiltP = -10 * Math.sin(Math.min(1, u / 0.55) * Math.PI) + 16 * sstep((u - 0.55) / 0.45) * (1 - sstep((t - a.t1) / 0.1)); }
       } else if (sg && (sg.type === 'block' || sg.type === 'parry')) {
-        const tIn = sg.tc - (sg.type === 'parry' ? 0.04 : 0.07), dt = t - sg.tc, pu = BLOCK_PUSH[sg.power] * 1.4;
+        const tIn = sg.tc - (sg.type === 'parry' ? 0.04 : 0.07), bnd = sg.bind || 0, dt0 = t - sg.tc, dt = Math.max(0, dt0 - bnd), pu = BLOCK_PUSH[sg.power] * (bnd ? 2.5 : 1.4);
         let Ht = sg.H, Bt = sg.B;
         if (sg.type === 'parry' && t < sg.tc) Ht = sub(sg.H, mul(sg.push, 0.1 * (1 - sstep((t - sg.t0) / (sg.tc - sg.t0)))));
-        const pushV = dt > 0 ? mul(sg.push, pu * (1 - Math.exp(-dt / 0.05)) * Math.exp(-dt / 0.35)) : [0, 0, 0];
+        if (bnd && dt0 > 0 && dt0 < bnd) Ht = add(Ht, mul(sg.push, 0.012 * Math.sin(dt0 * 38)));            // grinding tremor in the bind
+        const pushV = dt0 > bnd ? mul(sg.push, pu * (1 - Math.exp(-dt / 0.05)) * Math.exp(-dt / 0.35)) : [0, 0, 0];
+        const hold2 = 0.22 + bnd, rel = Math.max(0.05, sg.tEnd - sg.tc - hold2);
         if (t < tIn) { const u = ease((t - sg.t0) / (tIn - sg.t0)); H = arcPoint(P0, startHB.H, Ht, u); B = slerp3(startHB.B, Bt, u); }
-        else if (dt < 0.22) { H = add(Ht, pushV); B = Bt; }
-        else { const u = ease((dt - 0.22) / (sg.tEnd - sg.tc - 0.22)); H = arcPoint(P0, add(Ht, pushV), g.H, u); B = slerp3(Bt, g.B, u); }
-        const w = t < tIn ? ease((t - sg.t0) / (tIn - sg.t0)) : dt < 0.22 ? 1 : 1 - ease((dt - 0.22) / (sg.tEnd - sg.tc - 0.22));
+        else if (dt0 < hold2) { H = add(Ht, pushV); B = Bt; }
+        else { const u = ease((dt0 - hold2) / rel); H = arcPoint(P0, add(Ht, pushV), g.H, u); B = slerp3(Bt, g.B, u); }
+        const w = t < tIn ? ease((t - sg.t0) / (tIn - sg.t0)) : dt0 < hold2 ? 1 : 1 - ease((dt0 - hold2) / rel);
         tw = (sg.tw ?? -8) * w; lean = 4 - (dt > 0 ? 7 * Math.exp(-dt / 0.2) * (1 - Math.exp(-dt / 0.03)) : 0) + 3 * w; two = sg.power === 'heavy' ? w : 0.6 * w;
       } else if (sg && sg.type === 'hit') {
         const dt = t - sg.tc, rc = RECOIL[sg.power], env = (1 - Math.exp(-dt / 0.04)) * Math.exp(-dt / 0.38);
@@ -364,6 +381,10 @@ export function build(script, world) {
       }
       // two-handed grip: the left hand sits on the hilt below the right, if it can reach
       if (!L) { const grip = sub(H, mul(B, 0.13)); L = lerp3(lerp3(GUARD_L, add(GUARD_L, [-0.05 * tw / 30, 0, -0.08 * Math.abs(tw) / 30]), 1), grip, two); }
+      // the blade tip never asks to go into the ground: lift the direction just enough (smooth, keeps its heading),
+      // otherwise the rig's floor collision shoves it and the blade flips (rising swings' low wind-up)
+      { const bn = nrm(B), tipY = H[1] + bn[1] * BLADE_LEN, minY = 0.22;
+        if (tipY < minY) { const ny = clamp((minY - H[1]) / BLADE_LEN, -1, 1), hz = Math.hypot(bn[0], bn[2]) || 1e-6, sc = Math.sqrt(Math.max(0, 1 - ny * ny)) / hz; B = [bn[0] * sc, ny, bn[2] * sc]; } }
       // idle life layered on top (breath, sway)
       const br = Math.sin(2 * Math.PI * IDLE.breath[1] * t + ph) * IDLE.breath[0], sw = Math.sin(2 * Math.PI * IDLE.sway[1] * t + ph * 1.7) * IDLE.sway[0];
       cur = { H, B };
@@ -397,5 +418,8 @@ export function build(script, world) {
     if (o && !(C[k].passWin || []).some(([a, b]) => t > a && t < b)) P.opp = [s(RX[o]), s(LOW[o].ry), s(RZ[o])];
     return P;
   }
-  return { pose, T, contacts, warnings, steps: STEPS, ids, fighters, root: (k, t) => ({ x: sample(RX[k], clamp(t * HZ, 0, N - 1)), z: sample(RZ[k], clamp(t * HZ, 0, N - 1)) }), segs: Object.fromEntries(ids.map(k => [k, C[k].segs])) };
+  // swing timing for sound/fx: strike start (whoosh) and contact per attack
+  const swings = []; for (const k of ids) for (const s of C[k].segs) if (s.type === 'swing' || s.type === 'thrust') swings.push({ c: k, t0: s.tc - s.pw.strike, tc: s.tc, power: s.pw === POWER.heavy ? 'heavy' : s.pw === POWER.light ? 'light' : 'medium', act: s.act, kind: s.kind });
+  const jumps = []; for (const k of ids) for (const a of C[k].air) jumps.push({ c: k, t0: a.t0, t1: a.t1, h: a.h });
+  return { pose, T, contacts, warnings, steps: STEPS, swings: swings.sort((a, b) => a.t0 - b.t0), jumps, ids, fighters, root: (k, t) => ({ x: sample(RX[k], clamp(t * HZ, 0, N - 1)), z: sample(RZ[k], clamp(t * HZ, 0, N - 1)) }), segs: Object.fromEntries(ids.map(k => [k, C[k].segs])) };
 }
