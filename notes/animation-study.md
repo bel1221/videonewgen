@@ -511,3 +511,28 @@ targets and joints (sigma `?psig=` ms). sig=0 reproduces v4 exactly. Sweep resul
 248/284, sig60 253/195, sig40+psig25 98/145, sig40+psig40 41/74 (rejected: bodies touch, gap 0.06), **sig50+psig30 53/87**.
 Open: the first clash (4.2 s) misses by 0.41 vs 0.03 in v4, so the clash solver should be re-tuned for v5. Overlapping
 action and weight still need work: smoothing removes the pops but doesn't add follow-through.
+
+## 10. AnimationGPT preview verdict and the next system (2026-11-09)
+
+User verdict on `anim-test/out/newgen_fight_agpt_preview_small.mp4`: the motion is smooth, but the implementation is bad:
+the fighters swing at the air. Measured in QA (`tools/agpt_qa.js`): blade-to-blade miss at clashes is 0.35-1.0 blocks,
+and the final hit misses by 1.2.
+
+Why the fighters swing at the air: each generated clip is a solo performance. Its swing arc, reach and strike frame were
+never aimed at an opponent. Turning and spacing a clip afterwards (`fight_agpt/choreo_agpt.js`) can line up one point at
+best, never the arc. Better prompts would not fix this.
+
+Decision: AnimationGPT stays a REFERENCE for how good combat motion is built, not a runtime source. We build our own moves
+on our rig, contact first:
+1. **Measure the references** (the 30 vetted clips in `mocap/fight20`, raw joints in `raw/*.npy`): phase timings
+   (anticipation / strike / follow-through / recovery as % of the move), the hip -> chest -> shoulder -> elbow -> wrist delay
+   (successive breaking, ms), weight shift and step timing against the strike, pelvis drop, and the hand speed profile.
+   Output: a small table of motion "laws" per move type (horizontal, diagonal, overhead, thrust, parry, dodge, hit
+   reaction).
+2. **Parametric move generator on our rig:** each move = contact point + contact time + move type. The blade path is solved
+   backwards from the contact (arm IK through wind-up -> contact -> follow-through points). The torso, legs and timing come
+   from the measured laws, so the motion feels like the references but every swing is aimed at the opponent.
+3. **Exchange solver:** the attacker's contact point comes from the defender's actual pose: the blade for a parry, the body for
+   a hit, empty space for a dodge. Defender moves are built from the same contact.
+4. **Isolated A/B gate** (same harness as section 9): blade miss at clashes < 0.1 block, foot slide ~0, joint pops at or
+   below v5. Only then a full cinematic render.
