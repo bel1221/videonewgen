@@ -1,0 +1,14 @@
+{
+  "walk2": "a man Movement ,root motion get Forward,Steady and Relative Fast.",
+  "walk3": "a man Movement ,root motion get Forward,Light-Weighted and Uniform Speed.",
+  "walk4": "The character walks forward steadily with a sword in the right hand, ready to fight.",
+  "run_attack": "weapon attack a man holding a Straight Sword,executing a Right-Handed,One-Handed,Run Attack,root motion get Forward, Steady,Straightforward,Powerful and Relative Fast,Cleanly.",
+  "light_attack": "weapon attack a man holding a Straight Sword,executing a Right-Handed,One-Handed,Light Attack,root motion get Forward, Steady,Straightforward,Powerful and Relative Fast,Cleanly.",
+  "heavy_attack": "weapon attack a man holding a Straight Sword,executing a Right-Handed,One-Handed,Heavy Attack,root motion get Forward, Steady,Powerful and Relative Slow,First slow then fast,Cleanly.",
+  "step_back": "a man Movement ,root motion get Backward,Steady and Uniform Speed.",
+  "dodge_back2": "a man Dodge ,root motion get Backward,Steady and Swift,Cleanly.",
+  "sidestep_left": "a man Movement ,root motion get Towards Left,Steady and Relative Fast.",
+  "sidestep_right": "a man Movement ,root motion get Towards Right,Steady and Relative Fast.",
+  "slash_rl2": "The character performs a light attack with their right hand weapon in its initial form, firmly stepping forward with their right foot and swinging the weapon from right to left.",
+  "slash_combo": "The character wields their weapon in its initial form in their right hand and performs two quick consecutive slashes, first from right to left and then from left to right, stepping forward."
+}

@@ -1,0 +1,20 @@
+{
+  "idle_guard": "a man Idle ,root motion get In-Place,Steady and Uniform Speed.",
+  "walk_fwd": "a man Movement ,root motion get Forward,Steady and Uniform Speed.",
+  "run_fwd": "a man Movement ,root motion get Forward,Light-Weighted and Swift.",
+  "strafe_right": "a man Movement ,root motion get Towards Right,Steady and Uniform Speed.",
+  "slash_h": "The character wields their weapon in its initial form in their right hand, taking a light step forward and swiftly swinging the weapon from right to left.",
+  "slash_lr": "The character takes a step forward with their left foot, wielding their weapon in its initial form, and swings horizontally from the left to the right.",
+  "slash_diag": "The character performs a light attack with their right hand weapon in its initial form, firmly stepping forward with their right foot and swinging the weapon from the upper right to the lower left.",
+  "slash_up": "The character wields their weapon in its initial form in their right hand, taking a light step forward and swiftly swinging the weapon from the left side to the upper right.",
+  "overhead": "The character takes a step forward with their right foot, wielding their weapon in its initial form, and vertically chops from the top down.",
+  "thrust": "The character performs a light attack with their right hand weapon in its initial form, firmly stepping forward with their left foot and thrusting the weapon forward.",
+  "jump_attack": "The character wields their weapon in their right hand in the initial form, attacking with a jumping attack. They swing the weapon with a light, powerful, and straightforward manner, swiftly and cleanly. After jumping forward, they strike downward with the weapon from above.",
+  "heavy_finisher": "The character charges a heavy attack with a weapon in their right hand in the initial form, takes a heavy step forward, raises the weapon to the top of the head, and grips it with both hands to deliver a powerful downward strike.",
+  "parry": "weapon attack a man holding a Straight Sword,executing a One-Handed,Parry,root motion get In-Place, Straightforward,Steady and Relative Fast,Cleanly.",
+  "dodge_back": "a man Dodge ,root motion get Backward,Light-Weighted and Swift,Cleanly.",
+  "dodge_left": "a man Dodge ,root motion get Towards Left,Light-Weighted and Swift,Cleanly.",
+  "dodge_right": "a man Dodge ,root motion get Towards Right,Light-Weighted and Swift,Cleanly.",
+  "hit_light": "a man Get Hit ,root motion get Backward,Steady,Light Stagger and Uniform Speed.",
+  "hit_heavy": "a man Get Hit ,root motion get Backward,Heavy Stagger and Slow,Slow Recovery."
+}

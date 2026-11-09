@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Clip contact sheet</title>
+<style>html,body{margin:0;background:#20242c;overflow:hidden;font:13px system-ui;color:#fff} canvas{display:block} .lab{position:fixed;left:6px;color:#fff;text-shadow:0 1px 2px #000}</style>
+<script type="importmap">{ "imports": { "three": "/anim-test/node_modules/three/build/three.module.js", "three/addons/": "/anim-test/node_modules/three/examples/jsm/" } }</script>
+</head><body>
+<script type="module">
+// Contact sheet of AnimationGPT clips on the v4 rig: one row per clip, COLS evenly spaced frames, side view, root
+// motion removed (height kept), floor line at the clip's lowest foot. ?clips=a,b,c&cols=10&dir=fight20&view=side|front
+import * as THREE from 'three';
+import { loadSkin, buildCharacter, applyPose } from '/anim-test/fight_v5/rig2_v4.js';
+const qs = new URLSearchParams(location.search), W = 1920, H = 1080;
+const names = (qs.get('clips') || '').split(',').filter(Boolean), COLS = +(qs.get('cols') || 10), dir = qs.get('dir') || 'fight20';
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); R.setSize(W, H); R.setScissorTest(true); document.body.appendChild(R.domElement);
+const scene = new THREE.Scene(); scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x403528, 1.3)); const sun = new THREE.DirectionalLight(0xffffff, 2.0); sun.position.set(3, 6, 4); scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ color: 0x55606f })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const ch = buildCharacter(await loadSkin('/anim-test/src/skins/1.png'), null); scene.add(ch.root);
+const clips = await Promise.all(names.map(n => fetch(`/anim-test/mocap/${dir}/${n}.json`).then(r => r.json())));
+const cam = new THREE.PerspectiveCamera(30, 1, 0.05, 50);
+const rows = clips.length, cw = W / COLS, chh = H / rows;
+window.renderAt = () => {
+  R.setScissor(0, 0, W, H); R.setViewport(0, 0, W, H); R.setClearColor(0x20242c); R.clear();
+  clips.forEach((c, r) => {
+    const n = c.frames.length, p0 = c.frames[0].pos;
+    let lo = 9; for (const f of c.frames) lo = Math.min(lo, f.pos[1]);
+    for (let k = 0; k < COLS; k++) {
+      const i = Math.round(k * (n - 1) / (COLS - 1)), f = c.frames[i];
+      const P = { ...f, pos: [0, f.pos[1] - lo, 0], yaw: f.yaw - c.frames[0].yaw, wrist: 160 };
+      applyPose(ch, P); ch.root.updateMatrixWorld(true);
+      const side = qs.get('view') === 'front' ? 0 : Math.PI / 2;
+      cam.aspect = cw / chh; cam.updateProjectionMatrix(); cam.position.set(Math.sin(side) * 5.2, 1.0, Math.cos(side) * 5.2); cam.lookAt(0, 0.85, 0);
+      const x = k * cw, y = H - (r + 1) * chh; R.setScissor(x + 1, y + 1, cw - 2, chh - 2); R.setViewport(x, y, cw, chh); R.setClearColor(k % 2 ? 0x2a2f38 : 0x262b33); R.clear(); R.render(scene, cam);
+    }
+  });
+  return 'sheet';
+};
+document.body.insertAdjacentHTML('beforeend', names.map((n, r) => `<div class="lab" style="top:${r * chh + 4}px">${n} (${clips[r].duration}s, ${COLS} frames)</div>`).join(''));
+window.TOTAL = 1; window.ready = true;
+</script></body></html>

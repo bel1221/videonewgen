@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mocap preview</title>
+<style>
+  html, body { margin: 0; background: #1b1f27; overflow: hidden; font: 14px system-ui, sans-serif; color: #fff; }
+  canvas { display: block; }
+  #ui { position: fixed; left: 12px; top: 10px; right: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #ui input[type=text] { width: 320px; } #t { width: 300px; } #info { opacity: .85; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/anim-test/node_modules/three/build/three.module.js",
+               "three/addons/": "/anim-test/node_modules/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="ui">
+  <input id="clip" type="text" value="overhead_slash.json"> <button id="load">Load</button>
+  <button id="play">Pause</button> <input id="t" type="range" min="0" max="1000" value="0">
+  <span id="info"></span>
+</div>
+<script type="module">
+// Preview a tools/motion2rig.py clip on the rig.js character: /anim-test/web/mocap.html?clip=name.json&skin=1&t=2.4
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { loadSkin, buildCharacter, applyPose } from './rig.js';
+import { loadClip, sampleClip } from './mocap.js';
+
+const qs = new URLSearchParams(location.search);
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(devicePixelRatio);
+R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b1f27);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 200); cam.position.set(4.5, 2.2, 5.5);
+const ctl = new OrbitControls(cam, R.domElement); ctl.target.set(0, 1, 0); ctl.update();
+scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x3a3020, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(4, 8, 5); sun.castShadow = true; scene.add(sun);
+const grid = new THREE.GridHelper(20, 20, 0x5a6475, 0x2c3340); scene.add(grid);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({ opacity: 0.35 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+
+const skin = await loadSkin(`/anim-test/src/skins/${qs.get('skin') || 1}.png`);
+const ch = buildCharacter(skin, null); scene.add(ch.root);
+
+let clip = null, t = 0, playing = !qs.has('t'), last = performance.now();
+const $ = id => document.getElementById(id);
+async function load(name) {
+  clip = await loadClip(`/anim-test/mocap/${name}`); t = +(qs.get('t') || 0);
+  $('info').textContent = `${clip.duration}s  ${clip.prompt || ''}`;
+}
+$('load').onclick = () => load($('clip').value);
+$('play').onclick = () => { playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; };
+$('t').oninput = e => { if (clip) { t = e.target.value / 1000 * clip.duration; playing = false; $('play').textContent = 'Play'; } };
+if (qs.get('clip')) $('clip').value = qs.get('clip');
+await load($('clip').value);
+if (!playing) $('play').textContent = 'Play';
+
+function frame(now) {
+  const dt = (now - last) / 1000; last = now;
+  if (clip) {
+    if (playing) t = (t + dt) % clip.duration;
+    applyPose(ch, sampleClip(clip, t));
+    $('t').value = Math.round(t / clip.duration * 1000);
+  }
+  R.render(scene, cam); requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.__ready = true;
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+</script>
+</body>
+</html>
