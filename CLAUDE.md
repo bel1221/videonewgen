@@ -69,6 +69,11 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
 - **3D animation test** (`anim-test/`, see its README): three.js voxel world + jointed skin rig (elbows/knees/waist/wrist)
   with the user's 3 skins, run + sword fight, golden-hour lighting, rendered in headless Chrome ->
   `anim-test/out/newgen_anim_test_v2.mp4` (9.5 s; v2 = weapon grips reworked from the references, per-pose wrist). EXPERIMENTAL: user says "not quite there but getting better"; keep iterating on weapon handling/animation feel next session.
+- **Fight test** (`anim-test/fight/`, experimental): 20 s sword fight in the user's colosseum (three.js + `web/rig2.js` bendy rig with
+  6-bone spine, leg IK, footstep planner, run gait, blade intent/physics). Latest: `anim-test/out/newgen_fight_test_v4.mp4`
+  (render: `PAGE=anim-test/fight/index.html QS="?sub=5" node render.mjs frames 0 600 ...`, sound: `python fight/fight_sfx3.py` after
+  exporting `window.events()`). User says "getting better, still things to fix". Open: 4 flurry clashes miss (10.5-14 s), trailing
+  leg straightens during clash lunges, sound not ear-checked. Minecraft sounds come from `~/.lunarclient/shared/assets` (index 29).
 - Ranked 2vs2 v4 still awaiting feedback (MR numbers and armor trim are placeholders).
 
 ## Layout
