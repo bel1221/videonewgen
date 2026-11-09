@@ -11,7 +11,7 @@
   for (let t = 0; t <= T1 + 1e-6; t += DT) {
     const P = { A: C.pose('A', t), B: C.pose('B', t) }, BL = {};
     for (const k of ['A', 'B']) { applyPose(cast[k], P[k]); cast[k].root.updateMatrixWorld(true);
-      BL[k] = [4, 10, 16, 22, 28].map(a => cast[k].weapon.localToWorld(v.set(0, a, 0)).clone()); }
+      BL[k] = (cast[k].seg || [4, 10, 16, 22, 28]).map(a => cast[k].weapon.localToWorld(v.set(0, a, 0)).clone()); }
     const g = Math.hypot(P.A.pos[0] - P.B.pos[0], P.A.pos[2] - P.B.pos[2]); if (g < 0.6) out.bodyOverlap.push([+t.toFixed(2), +g.toFixed(2)]);
     for (const k of ['A', 'B']) { const o = P[k === 'A' ? 'B' : 'A'].pos; let pen = 0, fl = 0;
       for (const p of BL[k]) { const r = Math.hypot(p.x - o[0], p.z - o[2]); if (p.y > o[1] + 0.1 && p.y < o[1] + 1.8 && r < 0.2) pen = Math.max(pen, 0.2 - r);

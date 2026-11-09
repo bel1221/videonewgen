@@ -21,7 +21,14 @@ CFG = {'a': dict(total=20.0, mute=[6.46], big=(13.2, 13.95, 9.4), fall=19.38, cr
        # spin, the jump slash and the finale uppercut. impact=True: every impact frame gets a fixed LAYERED hit (user: an impact
        # frame is never a lone sound) and the weak clash clip from v7 6.95 s is dropped.
        'v8': dict(total=30.0, mute=[], big=(5.98, 8.36, 17.02, 26.22), fall=27.75, cross=26.38, bind=(20.86, 21.5), impact=True,
-                  drop=['clash/desert_01.wav'], events='fight_v8/comp/events.json', out='fight_v8/comp/fight_audio.m4a')}[SCENE]
+                  drop=['clash/desert_01.wav'], events='fight_v8/comp/events.json', out='fight_v8/comp/fight_audio.m4a'),
+       # fight_w weapon duels (20 s): wpn = B's weapon sound family; fall=None (no fall), bind only where there is one
+       'spear': dict(total=20.0, mute=[], big=(5.12, 9.3, 11.25, 17.4), fall=None, cross=17.85, bind=(15.5, 16.15), impact=True, wpn='spear',
+                     drop=['clash/desert_01.wav'], events='fight_w/comp/events_spear.json', out='fight_w/comp/audio_spear.m4a'),
+       'hammer': dict(total=20.0, mute=[], big=(3.6, 6.4, 8.55, 16.55), fall=None, cross=16.95, bind=(0, 0), impact=True, wpn='hammer',
+                      drop=['clash/desert_01.wav'], events='fight_w/comp/events_hammer.json', out='fight_w/comp/audio_hammer.m4a'),
+       'bow': dict(total=20.0, mute=[], big=(5.8, 14.62), fall=None, cross=14.95, bind=(0, 0), impact=True, wpn='bow',
+                   drop=['clash/desert_01.wav'], events='fight_w/comp/events_bow.json', out='fight_w/comp/audio_bow.m4a')}[SCENE]
 BIND = CFG.get('bind', (11.7, 12.5)); EVF = CFG.get('events', 'fight/comp/events.json'); OUTF = CFG.get('out', 'fight/comp/fight_audio.m4a')
 SR = 48000; TOTAL = CFG['total']; PK = 'sfx_pack'; MUTE_CLASH = CFG['mute']
 EV = json.load(open(EVF)); CUR = json.load(open(f'{PK}/curated.json'))
@@ -84,9 +91,16 @@ def slide(t0, t1, g):
 
 muted = lambda t: any(abs(t - m) < 0.03 for m in MUTE_CLASH)
 # ---------------- BUS 1: action / fighting
+WPN = CFG.get('wpn'); MC = f'{PK}/mc/'
 for t, c in EV['swings']:
     if muted(t): continue
-    place(1, hp(load(pick('slash'), rng.uniform(0.92, 1.12)), 300), t - 0.03, -9 + rng.uniform(-2, 1), pan=0.25 if c == 'A' else -0.25)
+    pan = 0.25 if c == 'A' else -0.25
+    if c == 'B' and WPN == 'hammer':      # heavy: a low mace whoosh instead of a blade swish
+        place(1, load(MC + f'item_mace_smash_air{1 + int(rng.integers(3))}.ogg', rng.uniform(0.78, 0.86)), t - 0.05, -6, pan=pan); continue
+    if c == 'B' and WPN == 'spear':       # thrusts: trident throw whoosh + a thin swish
+        place(1, load(MC + f'item_trident_throw{1 + int(rng.integers(2))}.ogg', rng.uniform(1.0, 1.12)), t - 0.04, -10, pan=pan)
+        place(1, hp(load(pick('slash'), rng.uniform(1.05, 1.2)), 900), t - 0.03, -15, pan=pan); continue
+    place(1, hp(load(pick('slash'), rng.uniform(0.92, 1.12)), 300), t - 0.03, -9 + rng.uniform(-2, 1), pan=pan)
 for t in CFG['big']: place(1, load(pick('swoosh_big'), rng.uniform(0.95, 1.05)), t + 0.1, -11)
 def impact_hit(t):
     # impact frame: whoosh peaking just before the hit + the strongest clash + a second clash layer + low thump + ring + click
@@ -94,6 +108,10 @@ def impact_hit(t):
     place(1, load(f'{PK}/clash/mani_06.wav', 0.97), t, -1)
     place(1, load(f'{PK}/other/mani_01.wav', 1.04), t + 0.006, -7)
     thump(1, t, -7, 85); ring(t + 0.004, -13, True); place(3, load(pick('click')), t + 0.012, -12)
+for tn, t0, t1, mode in EV.get('arrows', []):                     # bow: the shot, and a pass-by whoosh for dodged arrows
+    place(1, load(MC + 'random_bow.ogg', rng.uniform(0.95, 1.05)), t0, -5, align='onset', pan=-0.2)
+    noise(3, tn + 0.05, -26, max(0.15, t0 - tn - 0.1), 300, 1200)                                # string creak while drawing
+    if mode == 'dodge': place(1, hp(load(pick('slash'), 1.3), 1500), t1, -12)
 for t, c in EV.get('twirls', []):                                   # sword twirl: a soft air swish per half turn
     place(1, hp(load(pick('slash'), rng.uniform(1.2, 1.35)), 1400), t, -21 + rng.uniform(-2, 1), pan=0.3 if c == 'A' else -0.3)
 for t, big, kind in EV['clashes']:
@@ -101,8 +119,21 @@ for t, big, kind in EV['clashes']:
     if round(t, 3) in INS and kind in ('blade', 'cross'): impact_hit(t); continue
     if kind == 'kick': place(1, load(pick('impact'), 0.85), t, -6); thump(1, t, -10, 80); continue
     if kind == 'hit': place(1, load(pick('impact'), 0.9), t, -5); thump(1, t, -9, 75); place(1, hp(load(pick('slash'), 1.1), 900), t - 0.01, -14); continue
-    if kind == 'slam': thump(1, t, -2, 55); place(1, load(pick('impact'), 0.8), t, -4); noise(2, t + 0.01, -8, 0.5, 250, 1800); continue
+    if kind == 'slam':
+        thump(1, t, -2, 55); place(1, load(pick('impact'), 0.8), t, -4); noise(2, t + 0.01, -8, 0.5, 250, 1800)
+        if WPN == 'hammer': place(1, load(MC + 'item_mace_smash_ground_heavy.ogg', 0.92), t, -3 if big else -6)
+        if round(t, 3) in INS or big: place(1, load(f'{PK}/unsheathe/desert_34.wav', 0.9), t - 0.08, -10)   # impact frame: never a lone sound
+        continue
+    if kind == 'arrow':                    # an arrow cut out of the air: bright tick + light clash + arrow hit
+        place(1, load(pick('clash'), rng.uniform(1.1, 1.25)), t, -6 if not big else -2); place(1, load(MC + f'random_bowhit{1 + int(rng.integers(4))}.ogg', 1.1), t + 0.01, -9)
+        ring(t + 0.004, -19 if not big else -14, big)
+        if round(t, 3) in INS or big: place(1, load(f'{PK}/unsheathe/desert_34.wav', 1.0), t - 0.07, -9); thump(1, t, -9, 85)
+        continue
+    if kind == 'arrowg': place(1, load(MC + f'random_bowhit{1 + int(rng.integers(4))}.ogg', 0.95), t, -7); noise(2, t, -14, 0.18, 400, 4000); continue
     place(1, load(pick('clash'), rng.uniform(0.94, 1.08)), t, -3 if big else -7)
+    if WPN == 'hammer': place(1, load(MC + f'mob_irongolem_hit{1 + int(rng.integers(4))}.ogg', 0.85), t, -9)          # steel on the stone/iron hammer
+    if WPN == 'spear': place(1, load(MC + f'item_shield_block{1 + int(rng.integers(5))}.ogg', 1.05), t, -14)             # wood/steel shaft knock
+    if WPN == 'bow': place(1, load(MC + f'item_shield_block{1 + int(rng.integers(5))}.ogg', 1.2), t, -12)
     if big: thump(1, t, -11, 90)
     ring(t + 0.004, -15 if big else -20, big)                       # tail = random bus
     if big: place(3, load(pick('click')), t + 0.012, -14)
@@ -117,7 +148,7 @@ for t, kind, sp, c, foot, run in sorted(EV['steps']):
 for c, wins in EV['slides'].items():
     for t0, t1 in wins: slide(t0, t1, -13)
 for t in EV['ghits']: noise(2, t, -12, 0.22, 400, 5200)
-mc_step(CFG['fall'], -9, 'r', 0.8); thump(2, CFG['fall'], -12, 60)
+if CFG['fall'] is not None: mc_step(CFG['fall'], -9, 'r', 0.8); thump(2, CFG['fall'], -12, 60)
 # ---------------- BUS 3: random
 for i, tb in enumerate(np.arange(BIND[0], BIND[1], 0.055)):
     noise(3, tb, -22, 0.04, 2000, 9000)

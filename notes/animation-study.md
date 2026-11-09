@@ -848,3 +848,112 @@ them with `?sunI=&hemi=&exp=`.
 
 Blade steps over 45°/frame went up (60 per fighter). They are the intended spins and twirls; with the grip blend off the
 numbers are the same. Pops cluster at 5.5 s (A, duck pass), 7.5 s (B, knockback skid) and 16.5 s (B, running thrust).
+
+## 17. Weapon-style duels: sword vs spear, hammer and bow (fight_w, 2026-11-10)
+
+**User request** (after approving v8 as "ready for video making"): three 20 s videos testing different mechanics, each
+with a different weapon and fighting style: a spear (Boltspear; Lancebolt as an option), one-handed with a switch to
+two hands; a heavy two-handed hammer (golem_hammer or Thundermaul); and a bow legendary. Twirls are show-off only, once
+or twice per video.
+
+**Weapons** (`tools/export_weapon.py NAME LENGTH GRIP OUTDIR`; grip is the fraction from the bottom):
+
+| weapon | export | used as |
+|---|---|---|
+| Boltspear | 40 px, grip 0.38 | B, spear video |
+| Lancebolt | 40 px, grip 0.38 | spare, same shape |
+| golem_hammer | 34 px, grip 0.32 | B, hammer video |
+| Voidbow | 26 px, grip 0.5, left hand | B, bow video |
+
+The sword is Aegisblade (A) in all three. Every weapon is shown at 1.15x the v7 scale.
+
+**One codebase** (`anim-test/fight_w/`): `?vid=spear|hammer|bow` picks the weapon, choreography and HUD title (`?cho=test` is
+a pose check). Each `choreo_<vid>.js` is assembled from v8's mechanics plus these parts:
+- `parts/poses_w.js`: weapon poses.
+- `parts/common_w.js`: build helpers `hit`, `blk`, `slide`, `sprint`, `tw` and `arrow`.
+- `parts/build_<vid>.js` and `parts/camera_<vid>.js`.
+
+Build with `python fight_w/parts/assemble_w.py <vid>`.
+
+**New mechanics** (`rig2_w.js`, `fight.js`):
+- **Per-weapon config** (`WC` in `fight.js`): collision sample points along the weapon (`seg`), clash segment, tip, trail,
+  two-hand point (`lh`), bow string anchors, and which hand holds it.
+- **Two-handed grip:** the left arm reaches the shaft by IK (the leg solver generalised to the arm: upper arm 4 px, forearm
+  5.5 px), blended in by the pose channel `lh`.
+- **Bow:** the weapon is held in a new `lHand` bone, and the bow arm aims at the opponent's chest by IK (`aimK`). The right
+  hand nocks at the string and draws it to the jaw (`rh`, `draw`). The model's straight string is removed and replaced by
+  an animated string (two thin cylinders, top tip -> hand -> bottom tip).
+- **Bow orientation:** twist 270 (`?btw=`). User: at 90 the bow was held backwards, with the grip facing the archer.
+- **Arrows:** length = full draw (string hand at the jaw to the bow handle) + head, measured from the rig (0.99 block); the
+  user asked for that. While nocked, the tail rides the string and the shaft rests on the handle. In flight, an arrow
+  starts at the drawn tip and flies at about 30 blocks/s. It is either cut by the sword (sparks, tumbles away, sticks in
+  the sand), dodged (flies past), or a warning shot into the sand.
+- **Collision bug fixed:** weapon points behind the hand (spear butt, lower bow limb, hammer pommel) were pushed the wrong
+  way by the floor/body collision; the push now flips sign for them.
+- **Defence choice per weapon** (`CANDS`): spear shaft blocks (`spBlock`, `spBlockL`, `spBlockV`, `spBlockH`), hammer haft blocks,
+  bow block. The auto-pick from v8 chooses among them. Contact miss mean: spear 0.06, hammer about 0.05, bow about 0.03
+  blocks.
+- **Sound** (`SCENE=spear|hammer|bow python fight/fight_sfx3.py`): Minecraft sounds from the Lunar Client assets were copied
+  to `sfx_pack/mc/`:
+  - hammer: mace air whooshes and `smash_ground_heavy` on slams, iron golem hits when steel meets the hammer
+  - spear: trident throw whooshes on thrusts, shield-block knocks on shaft blocks
+  - bow: `random/bow` on each shot, `bowhit` on cuts and arrows into the sand, a faint creak while drawing
+  - every impact frame still gets the layered hit
+
+**Fighting styles:**
+- **Spear:** fights at reach (about 2 blocks). One-hand jabs, two-hand power thrusts, leg sweeps, shaft blocks and shoves,
+  a spinning sweep, a five-jab flurry and a leaping thrust finale. The sword tries to get inside the reach.
+- **Hammer:** slow heavy wind-ups, ground slams with debris that A dodges, a flat swing whose momentum spins into a second
+  swing (A blocks it and is blown 2.6 blocks away), uppercut, low sweep, haft shoves, and a leaping slam finale.
+  The sword relies on speed and angles.
+- **Bow:** a far shot cut out of the air, then A charges through a volley (cut, side-stepped). The archer hops back, blocks
+  with the bow and kicks, jump-shoots mid-air, kites sideways with a warning shot, and finishes with a charged shot that A
+  cuts on the run before stopping with the blade at the archer's throat.
+
+**Collision QA (120 Hz):** no body overlaps in any video. What remains is small:
+- the spear: one 8 ms sample during the spinning sweep
+- the hammer head resting up to 0.09 into the sand on slams
+- the bow touching A by up to 0.08 at one bow block
+- one sword/bow crossing at the end
+
+### 17.1 User review of the first weapon renders: shaking, standing still, glide (2026-11-10)
+
+**"Characters are shaking back and forth so much." Cause: the gait overlay in `poseRaw` is marked BAD in the code.**
+These two lines came from v7 (v6 had shift 5 and twist 7):
+```js
+const shift = ls - rs; p.waist[2] += 7 * shift; p.chest[2] -= 5 * shift; p.head[2] -= 2.5 * shift;
+const twist = 11 * (rs - ls); p.waist[1] += twist; p.chest[1] -= twist * 1.4; p.head[1] -= (p.waist[1] + p.chest[1]) * 0.35 * Math.max(rs, ls);
+```
+They fired on every planner step at full strength. Fighting on the spot, the planner re-steps about 4.7 times a second. In the
+spear video, A's hip tilt went 2, 4, 1.6, -3.1, -4.3, -0.5, 3.7, 6° and pelvis yaw went -17, -20, -16, -9, -7, -13, -20, -24°, every
+0.1-0.15 s. The head yaw also toggled by a third of the torso turn. In v8 the fighters travelled most of the time, so it
+read as walking. **Fix:** the overlay is weighted by real root speed (0 below 0.8 blocks/s, full from about 2.4) and
+reduced to shift 5, twist 8.
+
+**"Where did the fast paced pvp go? They're standing in place swinging."** The first weapon choreographies put the
+exchanges at fixed spots. **Fix: DRIFT** (`assemble_w.py`). Builds add `[t0, t1, mode, speed]` segments:
+- `strafeL` / `strafeR`: both fighters slide sideways to the fight line
+- `pushA` / `pushB`: one fighter presses the other back
+
+The drift is integrated at 240 Hz and added to both roots, so spacing and contacts are unchanged while the exchange travels.
+A now covers 26-33 blocks per 20 s (v8: 32).
+
+**Rule: every exchange is on the move. Never fight on the spot.**
+
+**v8 at about 5 s: "after sliding back their legs never recovered and glided/hovered into the fight."** Two bugs, both fixed
+in `fight_v8/parts/assemble.py`:
+1. **No slide recovery.** The skid drags the planted feet. When the slide ends they stayed where it left them, and the
+   `L.skid` back leg was very long. Now each foot takes a recovery step back under the hips as the slide ends (right foot,
+   then left 0.07 s later), and the skid stance is narrower. A floating-point edge (`t - 1/HZ` vs `(i - 1)/HZ`) had kept
+   the trigger from firing.
+2. **Run start.** Run contacts sat at 0.25 / 0.75 of a 2.7-block stride, so the second foot first landed after about 2
+   blocks (0.5 s). In short runs it got no run contact at all and dragged behind. Now contacts are at 0.12 / 0.62, and a
+   foot whose first contact is late or missing gets a push-off step at the start of the run. B's left foot is now within
+   0.35 of the hips during the 5.05 s run; it was up to 1.05 behind.
+
+**Also:**
+- **Sword low blocks** (`parryLowR`, `parryLowL`) added to A's auto-pick candidates for sweeps.
+- **Contacts:** spear mean 0.06, hammer 0.05, bow 0.04 blocks.
+- **Collisions (60 Hz QA):** no body overlap anywhere. Small items remain: the hammer head resting on the sand on slams, and
+  the bow touching A by up to 0.07 at one block.
+- **v8 re-rendered** with the fixes (the flurry spacing went from 1.2 to 1.28 to clear a brief overlap).

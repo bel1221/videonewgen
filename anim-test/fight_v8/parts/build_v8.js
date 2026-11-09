@@ -68,7 +68,7 @@ function buildAll() {
   at('A', 12.15, 2.7, 2.65, 'io'); at('B', 12.1, 2.62, 1.3);
   const FL = ['R', 'L', 'O', 'R', 'L', 'T'];
   for (let i = 0; i < FL.length; i++) { const t = 12.4 + 0.28 * i, az = 2.5 - 0.33 * i, sx = 0.08 * (i % 2 ? 1 : -1);
-    at('A', t, 2.68 + sx, az, 'io'); at('B', t, 2.62 - sx, az - 1.2, 'io'); ex('A', 'B', t, FL[i], false, 0.15); }
+    at('A', t, 2.68 + sx, az, 'io'); at('B', t, 2.62 - sx, az - 1.28, 'io'); ex('A', 'B', t, FL[i], false, 0.15); }
   K('A', 13.92, L.windR, 'o'); K('A', 14.08, L.slashR, 'i');                                      // whiff: B ducks under it
   K('B', 13.96, L.duck, 'o'); K('B', 14.12, L.duck, 'lin'); K('B', 14.18, L.upperW, 'o'); K('B', 14.3, L.upper, 'i');
   blk('A', 14.2, 14.3, 'parryR', {}, { y: -0.2 }); clash(14.3, true);

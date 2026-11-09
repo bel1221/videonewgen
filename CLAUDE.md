@@ -1,5 +1,25 @@
 # NewGenMC promo videos
 
+# ⚠️ MOST IMPORTANT: the fight animation standard (permanent, from the user)
+
+**Before ANY fight, duel or combat animation work, read `notes/fight-animation-standard.md` in full.** It holds the user's own
+prompt, word for word, plus the QA checklist. Check every item and measure it before showing a render. It overrides
+every other note, skill default and older decision. v8 (`anim-test/fight_v8`) is the reference for good combat scenes.
+
+The core of it:
+- **Fast but clear:** no frame jumps or snapping, fewer half-second camera changes, readable transitions between actions.
+- **Movement-based combat:** sliding, dodging, blocking, parrying, jump plunges, stabbing, strafing, running, being
+  pushed back. Exchanges travel; never fight on the spot.
+- **Physics must make sense:** no phasing or collisions, no foot sliding, floating or gliding, no legs through the floor,
+  no bouncing, shaking or bad stance repeating through the video.
+- **Body:** shoulders, torso, hips and legs work together. Proper elbow and wrist articulation, weight and balance, momentum.
+- **Weapon:** follows the arm with a correct grip, anticipation, controlled acceleration, a believable arc, follow-through
+  and recovery.
+- **Hit reactions:** direction, knockback and recovery. Secondary motion: head, torso and follow-through.
+- **Polish:** close-ups and dramatic angles are good. Twirls and bow spins are a fine touch, once or twice per video.
+- **Criticism only:** when the user is only criticising ("DO NOT MAKE A NEW VIDEO"), record and diagnose. Don't render.
+
+
 Marketing videos for **NewGenMC** (newgenmc.net), a Vietnamese Minecraft server (Battle Royale + Competitive Duels,
 legendary weapons, ranked MR leaderboard with a top-10 "Champion" tier). Audience: Vietnamese Minecraft players.
 Full history, scripts, prompts and every past decision: `HANDOFF.md`. Read the relevant section before changing a video.
@@ -105,6 +125,11 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   events -> `fight_v8/comp/events.json`; sound `SCENE=v8 python fight/fight_sfx3.py`. Collision QA: `tools/collide_qa.js`.
   Includes all v7-review fixes (bright sun 4.0, standing slides, layered impact-frame hits, sword twirls and grip blend, sword
   1.15x, parry auto-pick). Details and metrics: notes §16. Waiting on the user's feedback.
+- **Weapon-style duels** (`anim-test/fight_w/`, 3 x 20 s): sword vs spear (Boltspear), vs heavy hammer (golem_hammer), vs bow
+  (Voidbow). `?vid=spear|hammer|bow`; build `python fight_w/parts/assemble_w.py <vid>`; render
+  `PAGE=anim-test/fight_w/index.html QS="?sub=5&vid=<vid>" node render.mjs frames 0 600 out/newgen_fight_w_<vid>_video.mp4`;
+  events -> `fight_w/comp/events_<vid>.json`; sound `SCENE=<vid> python fight/fight_sfx3.py`. Two-hand IK, bow draw/arrows,
+  per-weapon collision and sounds: notes §17. User rule: twirls only once or twice per video (show-off).
 - **NewGen studio (our own animation system)**: `anim-test/studio/` + skill `.claude/skills/newgen-animate`. Prompt ->
   beat script JSON -> contact-first generated motion on rig2 -> render. Demos: `studio/scripts/demo.json` (voxel meadow),
   `demo_colosseum.json` (the user's colosseum, converted by `anim-test/tools/mca2obj.py`; `fight/assets/colosseum/` is

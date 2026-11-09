@@ -31,7 +31,7 @@ s = rep(s, "if (i % 60 === 0) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, fee
         "if (i % 12 === 0) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'skid' });")
 # ---- new poses
 s = rep(s, "L.fallen = S(L.knees,", """// v8 poses
-L.skid = S(G, { waist: [-4, -10, 0], chest: [-6, -6, 0], head: [-8, 14, 0], rLeg: [-38, 0, -10], rKnee: [46, 0, 0], lLeg: [34, 0, 14], lKnee: [22, 0, 0],
+L.skid = S(G, { waist: [-4, -10, 0], chest: [-6, -6, 0], head: [-8, 14, 0], rLeg: [-30, 0, -8], rKnee: [40, 0, 0], lLeg: [22, 0, 10], lKnee: [18, 0, 0],
   rArm: [-40, 0, -52], rElbow: [-18, 0, 0], wrist: 150, lArm: [-24, 0, 60], lElbow: [-20, 0, 0], y: -0.3 });   // standing slide (feet drag), never sitting
 L.twirlS = S(G, { rArm: [-38, 0, -72], rElbow: [-24, 0, 0], wrist: 90, chest: [2, -14, 0], waist: [6, -8, 0], head: [-6, 22, 0], lArm: [-30, 0, 34], lElbow: [-50, 0, 0],
   rKnee: [26, 0, 0], lKnee: [22, 0, 0], y: -0.1 });                                                              // sword spun at the side
@@ -72,5 +72,40 @@ s = rep(s, "  // bind sparks: small repeating bursts",
     for (let ts = a; ts <= Math.min(t, b); ts += 0.045) { const q = rootXZ(c, ts), g = W.floorAt(q[0], q[1]);
       puff(soft, t, ts, [q[0], g, q[1]], 3, Math.round(ts * 911) + (c === 'A' ? 1 : 2), 0.22, 0.5, [0.92, 0.82, 0.62], 0.8); } }
   // bind sparks: small repeating bursts""")
+# ---- gait overlay: BAD as v7 had it (user 2026-11-10, fight_w spear/hammer: "characters are shaking back and forth so much").
+s = rep(s, """    const shift = ls - rs; p.waist[2] += 7 * shift; p.chest[2] -= 5 * shift; p.head[2] -= 2.5 * shift;
+    // pelvis rotates with the swinging leg, shoulders counter-rotate (contralateral gait), head holds its aim
+    const twist = 11 * (rs - ls); p.waist[1] += twist; p.chest[1] -= twist * 1.4; p.head[1] -= (p.waist[1] + p.chest[1]) * 0.35 * Math.max(rs, ls); }""",
+"""    // BAD (do not restore): v7 applied this gait overlay on EVERY planner step at full strength (shift 7, twist 11, head
+    // counter-turn 0.35 x torso yaw). Fighting on the spot the planner re-steps ~4.7x/s, so the hips tilted +-7 deg and the
+    // pelvis twisted +-11 deg every 0.1-0.15 s and the head yaw toggled -> the whole body shook back and forth (user:
+    // "characters are shaking back and forth so much"). Fixed: the overlay only applies in proportion to real travel speed.
+    const r0 = samp(S_.root, Math.max(0, t - 0.04)), r1 = samp(S_.root, Math.min(TOTAL, t + 0.04)), gsp = Math.hypot(r1[0] - r0[0], r1[1] - r0[1]) / 0.08;
+    const gate = clamp((gsp - 0.8) / 1.6);                      // 0 standing / shuffling, 1 from ~2.4 blocks/s (walk-run)
+    const shift = (ls - rs) * gate; p.waist[2] += 5 * shift; p.chest[2] -= 3.5 * shift; p.head[2] -= 2 * shift;
+    // pelvis rotates with the swinging leg, shoulders counter-rotate (contralateral gait), head holds its aim
+    const twist = 8 * (rs - ls) * gate; p.waist[1] += twist; p.chest[1] -= twist * 1.4; p.head[1] -= (p.waist[1] + p.chest[1]) * 0.35 * Math.max(rs, ls) * gate; }""")
+# ---- slide recovery (user, v8 ~5 s: "after sliding back their legs never fully recovered and just glided/hovered into the fight
+# again"): the skid drags the planted feet; when the slide ends they stayed where the slide left them, so the next move glided
+# on split legs. Now each foot takes a real recovery step back under the body as the slide ends (right, then left 0.07 s later).
+s = rep(s, "const feet = { r: null, l: null }, step = { r: null, l: null }, outs = { r: [], l: [] }, Dsm = { r: null, l: null }, lastStep = { r: -9, l: -9 };",
+        "const feet = { r: null, l: null }, step = { r: null, l: null }, outs = { r: [], l: [] }, Dsm = { r: null, l: null }, lastStep = { r: -9, l: -9 }, rec = { r: null, l: null };")
+s = rep(s, "        const o = f === 'r' ? 'l' : 'r';\n        if (step[f]) {",
+        "        if (i > 0 && inWin(SLIDES[c], (i - 1) / HZ) && feet[f] && rec[f] == null) rec[f] = t + (f === 'r' ? 0 : 0.07);   // slide just ended\n"
+        "        if (rec[f] != null && t >= rec[f] && !step[f]) { const sd = f === 'r' ? -1 : 1; step[f] = { from: feet[f].slice(), to: [root[i][0] + sd * 0.14 * cy + 0.05 * sy + vx * 0.12, root[i][1] - sd * 0.14 * sy + 0.05 * cy + vz * 0.12], t0: t, dur: 0.15, h: 0.16 }; rec[f] = null; }   // neutral stance under the hips\n"
+        "        const o = f === 'r' ? 'l' : 'r';\n        if (step[f]) {")
+# ---- run start: BAD as v7 had it (user, v8 ~5 s: legs "glided/hovered into the fight"). Contacts sit at 0.25 / 0.75 of a 2.7-block
+# stride, so the second foot first lands after ~2 blocks of travel (~0.5 s) and hangs behind the accelerating body. Now a
+# foot whose first contact is late gets a push-off step right at the start of the run.
+s = rep(s, """    for (const f of ['r', 'l']) {
+      const cs = con.filter(q => q.f === f);""",
+"""    { const mk = (i, f) => { const vx = root[i][0] - root[Math.max(i0, i - 6)][0], vz = root[i][1] - root[Math.max(i0, i - 6)][1], vn = Math.hypot(vx, vz) || 1;
+        const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1; return { i, f, p: [root[i][0] + fx * 0.28 + fz * 0.16 * side, root[i][1] + fz * 0.28 - fx * 0.16 * side] }; };
+      for (const f of ['r', 'l']) { const fc = con.find(q => q.f === f), lim = fc ? fc.i : i1; if (fc && (fc.i - i0) / HZ <= 0.2) continue;
+        let ie = i0 + 1; while (ie < lim && phiAt(ie) < 0.06) ie++; ie = Math.min(ie + Math.round(0.06 * HZ), lim - Math.round(0.12 * HZ)); if (ie > i0) con.push(mk(ie, f)); }
+      con.sort((a, b) => a.i - b.i); }
+    for (const f of ['r', 'l']) {
+      const cs = con.filter(q => q.f === f);""")
+s = rep(s, "for (const [f, off] of [['r', 0.25], ['l', 0.75]]) if", "for (const [f, off] of [['r', 0.12], ['l', 0.62]]) if")   # first contacts sooner after a run starts
 open('fight_v8/choreo.js', 'w', encoding='utf-8').write(s)
 print('fight_v8/choreo.js', len(s), 'chars')
