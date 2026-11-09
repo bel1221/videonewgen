@@ -536,3 +536,86 @@ on our rig, contact first:
    a hit, empty space for a dodge. Defender moves are built from the same contact.
 4. **Isolated A/B gate** (same harness as section 9): blade miss at clashes < 0.1 block, foot slide ~0, joint pops at or
    below v5. Only then a full cinematic render.
+
+## 11. How much of AnimationGPT can go into our animation? (2026-11-09, step 1 of §10)
+
+**Inputs.**
+- **AGPT library:** the 144 generated clips in `anim-test/mocap/fight20` (rig JSON, 20 fps). The raw joints `raw/*.npy`
+  are gitignored and weren't on this PC, so joint positions were rebuilt with forward kinematics that mirror
+  `web/rig2.js`.
+  - `anim-test/tools/agpt_laws.py` measures timing, weight and the movement chain.
+  - `anim-test/tools/agpt_reach.py` measures blade reach.
+  - `mocap/fight20/vet.json` holds the raw-joint quality scores.
+- **References:** the 4 videos in `Desktop\mcrefs`, measured two ways.
+  - Per-frame motion bursts: `toolkit/refstudy/analyze.py`, then `bursts.py`, giving each burst's peak width (FWHM),
+    rise and decay.
+  - Swings read frame by frame: MD 10.0-12.4 s, NV 116.4-118.0 s, DFY 133.9-135.0 s.
+- **This PC's MotionGPT folder:** `Desktop\MotionGPT-MotionGPT-V1.0` is the MotionGPT V1.0 source only, with no
+  checkpoints, no AnimationGPT fine-tune, no T5, no SMPL and no evaluators. New clips can't be generated here until those
+  are downloaded.
+
+**Library size.** The seed often doesn't change the output: thrust gives 6 seeds and 1 motion, and overhead, slash_lr,
+slash_up and heavy_finisher give 2 each. Only **96 of the 144 clips are unique**, including **32 unique attacks and 5
+unique parries**.
+
+**Reference swings, frame by frame.**
+
+| | anticipation | action (cocked -> contact) | after |
+|---|---|---|---|
+| MD 11.17-12.04 s (24 fps) | about 0.45 s cocked high, with drift | about 3 frames (0.125 s) | 2-frame flare insert, then the result |
+| NV 116.57-117.80 s | about 0.6 s coil / draw-back | 4-5 frames (0.13-0.17 s), cut mid-swing | 1-frame impact star, then 0.2 s rings |
+| DFY 134.17-134.9 s | about 0.17 s lift | 4 frames (0.13 s) | smear fades over 0.4 s, the other fighter keeps idling |
+
+**Motion bursts inside shots** (median FWHM / rise): MD 0.10 / 0.03 s, NV 0.13 / 0.07 s, WY 0.10 / 0.10 s,
+DFY 0.07 / 0.03 s. The fast part of a reference move lasts **2-4 frames**.
+
+**AGPT against the references** (32 unique attacks, p25 / median / p75):
+
+| law | AGPT | references | usable? |
+|---|---|---|---|
+| fast part (hand speed >= 50 % of peak) | 0.20 / **0.23** / 0.30 s | 0.07-0.13 s | ✖ about 2x too slow; retime |
+| anticipation (wind + hold) | 0 / **0.02** / 0.26 s; only 14 of 32 have >= 0.15 s | 0.17-0.6 s | ✖ mostly missing |
+| anticipation : action | 0 / 0.12 / 0.35 | 1.3:1 (DFY) to 3.5:1 (MD, NV) | ✖ |
+| blade turn per frame (30 fps, forearm) | median 12°, max 17° | 15-35°, over 4-6 frames | ✖ too slow, small sweep (median 61°) |
+| follow-through | 0.16 / **0.27** / 0.43 s | smear and settle 0.3-0.5 s | ✔ matches |
+| pelvis drop | 0.21 / **0.25** / 0.30 blocks, lowest **about 200 ms after** the hand peak | landings compress (qualitative) | ✔ use |
+| front-foot plant | **about 133 ms before** the hand peak (16 of 32 step) | weight goes in before the hit | ✔ use |
+| step-in during the strike | 0.11 / 0.16 / 0.32 blocks | lunges | ✔ use |
+| root yaw lead | yaw peaks **about 100 ms before** the hand | hips lead | ✔ use |
+| successive breaking | waist and chest peak *after* the hand (+67-83 ms); correct order in only 3 of 32 | hip -> chest -> shoulder -> elbow | ✖ no usable chain |
+
+The chain result may partly come from the 20 fps source and the 3-frame retarget smoothing, which blur timings under
+about 100 ms.
+
+**Contact feasibility** (blade = forearm line + 1.4 blocks, 0.70x height):
+- Median tip reach at the strike is 1.52 blocks (p90 2.22).
+- **Only 11 of 37 reach a body at our 2.0-block gap.**
+- **Only 1 of 37 crosses a clash point** (the centre line, 0.6-1.6 ahead, 0.6-1.8 high).
+- The horizontal slashes (slash_h, slash_lr, slash_up) are the worst. Their tips stay 0.3-0.9 blocks ahead and
+  0.1-0.4 blocks off the ground, so they are low sweeps beside the body. Fixing them needs more than 0.3 blocks of hand
+  correction, which means more than 20-57° of arm change: a new arm, not a correction.
+- This is the measured cause of the "swinging at the air" verdict in §10.
+
+**Raw-joint quality** (vet.json):
+- Bone lengths drift 10-20 % in every category, from position-only output, which the rotation retarget absorbs.
+- Planted feet slide 0.17-0.26 m/s, which needs our foot IK.
+- **55 of 69 attack clips go into a deep crouch** (pelvis below 72 % of standing height).
+
+### Verdict: what to take from AnimationGPT
+
+Overall, about a third of what makes a fight move works when taken from AnimationGPT: the weight and lower body. The
+arm, the timing and the aim can't be fixed with corrections and have to be built.
+
+1. **Use the clips directly: no.** No anticipation, a strike twice as slow as the references, and 70 % of the attacks
+   can't reach the opponent.
+2. **Take the body layer, build the arm: yes.** This is the recommended route, and it refines step 2 of §10.
+   - From AGPT: root yaw lead (-100 ms), front-foot plant (-133 ms), step-in (0.16 blocks), pelvis drop (0.25 blocks,
+     bottoming out +200 ms after the strike) and follow-through length (0.27 s).
+   - Not from AGPT: the arm and blade are solved from the contact point. Timing comes from the references:
+     anticipation 0.2-0.6 s, strike 3-5 frames, blade 15-35° per frame.
+   - Cap the pelvis drop at about 0.25 blocks, against the deep crouches.
+3. **Locomotion and idle:** walk, run, strafe and idle are the most varied part of the library (26 unique). Their skate
+   is fixable with our foot IK. They are worth an isolated A/B test as the between-exchange layer (footwork, spacing
+   resets) before hand-keyed footwork is built.
+4. **Hit reactions** (6 unique): the least broken category (bone drift 0.14, half not deep). Usable as the torso/root
+   layer of knockback, timed to the contact.
