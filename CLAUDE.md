@@ -92,6 +92,13 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
     blades flip where a swing passes through a body (9.9, 14.6 s).
   - **Rejected:** the studio-engine fights (duel30 v1/v2) were slow and childish, with gliding legs.
   - **Before publishing:** `fight_sfx3.py` uses `desert_*` clips cut from other creators' videos; replace them.
+- **Fight v7 "movement duel"** (`anim-test/fight_v7/`, built from v6 by `fight_v7/parts/assemble.py`; edit the parts, then
+  re-run it from `anim-test/`): new movement-led choreography (running cross, slide under a leap, kick/roll, zig-zag
+  dash, circling flurry, drifting bind, mid-air cross at 17.3 s), wider limb swings, Minecraft grip offset (`?grip=1.6`),
+  near-noon overhead sun. **User likes the overhead sun lighting up the sand: keep it for v7** (final verdict pending).
+  Render: `PAGE=anim-test/fight_v7/index.html QS="?sub=5" node render.mjs frames 0 600 out/newgen_fight_test_v7_video.mp4`;
+  events: `node render.mjs eval "window.events()" > fight_v7/comp/events.json`; sound: `SCENE=v7 python fight/fight_sfx3.py`
+  (-> `fight_v7/comp/fight_audio.m4a`). Metrics vs v6 and open issues: notes §15.
 - **NewGen studio (our own animation system)**: `anim-test/studio/` + skill `.claude/skills/newgen-animate`. Prompt ->
   beat script JSON -> contact-first generated motion on rig2 -> render. Demos: `studio/scripts/demo.json` (voxel meadow),
   `demo_colosseum.json` (the user's colosseum, converted by `anim-test/tools/mca2obj.py`; `fight/assets/colosseum/` is

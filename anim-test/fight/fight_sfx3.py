@@ -12,9 +12,14 @@ from scipy.signal import butter, sosfilt
 SCENE = os.environ.get('SCENE', 'a')
 CFG = {'a': dict(total=20.0, mute=[6.46], big=(13.2, 13.95, 9.4), fall=19.38, cross=17.3),
        'b': dict(total=14.0, mute=[], big=(1.5, 4.0, 7.6), fall=12.7, cross=11.3),
-       'c': dict(total=12.0, mute=[], big=(), fall=10.5, cross=10.02)}[SCENE]
+       'c': dict(total=12.0, mute=[], big=(), fall=10.5, cross=10.02),
+       # v7 movement duel (fight_v7/choreo.js: FLASH 17.3, BIND 12.45-13.3, FALL_T 18.9); big swooshes lead the leap
+       # overhead (slam 4.4), the leaping slash (10.1) and the mid-air cross (17.3)
+       'v7': dict(total=20.0, mute=[], big=(4.15, 9.85, 16.95), fall=18.9, cross=17.3, bind=(12.53, 13.3),
+                  events='fight_v7/comp/events.json', out='fight_v7/comp/fight_audio.m4a')}[SCENE]
+BIND = CFG.get('bind', (11.7, 12.5)); EVF = CFG.get('events', 'fight/comp/events.json'); OUTF = CFG.get('out', 'fight/comp/fight_audio.m4a')
 SR = 48000; TOTAL = CFG['total']; PK = 'sfx_pack'; MUTE_CLASH = CFG['mute']
-EV = json.load(open('fight/comp/events.json')); CUR = json.load(open(f'{PK}/curated.json'))
+EV = json.load(open(EVF)); CUR = json.load(open(f'{PK}/curated.json'))
 MC_SAND = sorted(glob.glob(f'{PK}/mc/step_sand*.ogg')); MC_FALL = f'{PK}/mc/damage_fallsmall.ogg'
 rng = np.random.default_rng(11)
 N = int(TOTAL * SR) + SR
@@ -97,7 +102,7 @@ for c, wins in EV['slides'].items():
 for t in EV['ghits']: noise(2, t, -12, 0.22, 400, 5200)
 mc_step(CFG['fall'], -9, 'r', 0.8); thump(2, CFG['fall'], -12, 60)
 # ---------------- BUS 3: random
-for i, tb in enumerate(np.arange(11.7, 12.5, 0.055)):
+for i, tb in enumerate(np.arange(BIND[0], BIND[1], 0.055)):
     noise(3, tb, -22, 0.04, 2000, 9000)
 SS = round(135.5 - (CFG['cross'] + 0.1), 2); os.makedirs('fight/comp', exist_ok=True)
 subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', str(SS), '-t', str(TOTAL), '-i', '../newgen-ranked/audio/sa.mp3', '-af',
@@ -122,6 +127,6 @@ b2 = duck(BUS[2], e1, 10)                                 # surroundings dip 10 
 b3 = duck(duck(BUS[3], e1, 12), env(b2), 5)               # random dips under both
 mix = BUS[1] + b2 + b3; mix = mix[:int(TOTAL * SR)]; mix *= min(1.0, 0.95 / np.abs(mix).max())
 subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(SR), '-ac', '2', '-i', '-', '-af', 'loudnorm=I=-14:TP=-1.0:LRA=11',
-                '-c:a', 'aac', '-b:a', '256k', 'fight/comp/fight_audio.m4a'], input=mix.astype(np.float32).tobytes(), check=True)
+                '-c:a', 'aac', '-b:a', '256k', OUTF], input=mix.astype(np.float32).tobytes(), check=True)
 nst = sum(1 for s in EV['steps'] if s[1] == 'step')
 print('swings', len(EV['swings']), 'clashes', len(EV['clashes']) - len(MUTE_CLASH), 'mc steps', nst, 'muted', MUTE_CLASH)

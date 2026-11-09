@@ -751,3 +751,37 @@ choreography is not the base.
 - No left-handed fighters.
 - No spin or kick moves.
 - The camera has only basic shot types.
+
+## 15. Fight v7 "movement duel": first render and metrics vs v6 (2026-11-10)
+
+v7 (`anim-test/fight_v7/`) keeps v6's mechanics (smoothing, continuous blade collision, blade-flip limiter, 2-pass
+clash solver, v4 sound design) and replaces the choreography with a movement-led one (`parts/build_v7.js`, camera in
+`parts/camera_v7.js`, assembled by `parts/assemble.py`). Also wider limb swings, a Minecraft grip offset and a
+near-noon overhead sun. **User: the overhead sun lighting up the sand "looks pretty cool", keep it for v7** (final
+verdict pending).
+
+Sound: `fight/fight_sfx3.py` now has `SCENE=v7` (big swooshes before 4.4/10.1/17.3, bind grind 12.53-13.3, fall 18.9,
+cross 17.3; reads `fight_v7/comp/events.json`, writes `fight_v7/comp/fight_audio.m4a`). Scene `a` is unchanged.
+
+| metric (A / B, 0.2-19.8 s, `?novfx=1`) | v6 | **v7** |
+|---|---|---|
+| joint pops (>25°/frame²) | 53 / 105 | **112 / 164** |
+| joint angular acceleration p95 | 12.4 / 14.0 | 15.4 / 16.1 |
+| worst bones p95 | legs ~17-22 | legs 20-30 (rTh 28.5 / 30.4) |
+| blade step max (°/frame) | 105 / 60 | 77 / 88 |
+| blade steps over 45° | 18 / 17 | 12 / 20 |
+| root acceleration p95 | 4.7 / 5.4 | **4.0 / 3.5** |
+| body overlap % / min gap | 1.9 / 0.11 | 5.1 / 0.05 |
+
+v7 has 17 contacts and 21 swings. These contacts miss by more than 0.6 blocks: 10.98 s (1.04), 11.88 s (1.03), the 17.3 s
+mid-air cross (0.85), 12.45 s bind (0.62) and 11.28 s (0.61). Most of them are in the circling flurry.
+
+**Where the extra pops are** (pops per 0.5 s bin): B 3.0-3.5 s **40** (sprint start into the leap), B 14.0 s 19 (low-sweep
+rush), B 2.5 s 15 and A 2.0 s 17 (skid after the running clash), B 17.0 s 14 (launch to the mid-air clash), A 6.0 s 12.
+So the legs pop at **run-gait <-> fight-pose transitions** (sprint start, skid, launch), made worse by the wider stride
+(2.7) and higher knee lift (0.42). They are not caused by the wider arms.
+
+**Next fixes (isolated tests first):**
+1. Blend the run gait in and out over about 0.15 s at RUN window edges instead of switching.
+2. Re-key the flurry so the 10.98 and 11.88 contacts meet. The circle radius 1.05 is too wide for the blade reach.
+3. Push spacing back above v6's min gap of 0.11.
