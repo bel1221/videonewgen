@@ -72,6 +72,7 @@ const [s1, s2, s3, aeg, veil] = await Promise.all([
   fetch(base + (SCENE !== 'a' ? 'w/ocean%20sword.json' : 'w/aegisblade.json')).then(r => r.json()), fetch(base + (SCENE === 'b' ? 'w/thundermaul.json' : 'w/veilblade.json')).then(r => r.json())]);
 const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), 0.86), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), SCENE === 'b' ? 0.95 : 0.86), C: buildCharacter(s3, null) };
 for (const k in cast) scene.add(cast[k].root);
+window.__probe = { cast, C, applyPose, THREE, floorAt };
 for (const k in cast) cast[k].floorAt = floorAt;   // blade/ground physics in rig2
 await new Promise(r => setTimeout(r, 400));
 const world = { floorAt, FLOOR };
@@ -253,6 +254,8 @@ function drawState(t) {
   updateGhosts(t);
   for (const k in cast) applyPose(cast[k], C.pose(k, t));
   let cam = C.camera(t, cast);
+  if (params.get('iso')) { let mx = 0, mz = 0, n = 0; for (let d = -0.5; d <= 0.501; d += 0.125) { const a = C.pose('A', t + d).pos, b = C.pose('B', t + d).pos; mx += (a[0] + b[0]) / 2; mz += (a[2] + b[2]) / 2; n++; }
+    mx /= n; mz /= n; cam = { pos: new THREE.Vector3(mx, FLOOR + 1.5, mz + 7.2), look: new THREE.Vector3(mx, FLOOR + 1.0, mz), fov: 40, roll: 0, label: 'iso' }; }
   const DBG = params.get('dbg');
   if (DBG) { const p = C.pose(DBG, t), yaw = p.yaw * Math.PI / 180, side = +(params.get('side') || 90) * Math.PI / 180;
     const c0 = new THREE.Vector3(p.pos[0], FLOOR + 0.9, p.pos[2]);
@@ -266,6 +269,9 @@ function drawState(t) {
   rim.position.copy(focus).add(new THREE.Vector3(70, 30, 60)); rim.target.position.copy(focus);
   fillL.position.copy(cam.pos).add(new THREE.Vector3(0, 3, 0)); fillL.target.position.copy(cam.look);
   const fx = C.effects(t, camera);
+  if (params.get('novfx')) { fx.add = []; fx.soft = []; fx.flares = []; fx.rings = []; fx.debris = []; fx.flash = 0; fx.black = 0; fx.ca = 0; fx.impact = 0; fx.bloomBoost = 0; fx.sparkLight = { i: 0, p: [0, 0, 0] };
+    for (const k of ['A', 'B']) { TRAIL[k].mesh.visible = false; if (typeof GHOSTS !== 'undefined') GHOSTS[k].forEach(g => g.visible = false); }
+    if (typeof FP !== 'undefined') FP.count = 0; }
   writeP(PADD, fx.add); writeP(PSOFT, fx.soft);
   FLARES.forEach((s, i) => { const f = fx.flares[i]; s.visible = !!f; if (f) { s.position.set(...f.p); s.scale.setScalar(f.s); s.material.opacity = f.a; s.material.color.setRGB(...(f.c || [3, 2.4, 1.6])); s.material.rotation = f.rot || 0; } });
   RINGS.forEach((s, i) => { const f = fx.rings[i]; s.visible = !!f; if (f) { s.position.set(...f.p); s.scale.setScalar(f.s); s.material.opacity = f.a; s.material.color.setRGB(1.6, 1.6, 1.8); } });

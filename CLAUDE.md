@@ -74,6 +74,11 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   (render: `PAGE=anim-test/fight/index.html QS="?sub=5" node render.mjs frames 0 600 ...`, sound: `python fight/fight_sfx3.py` after
   exporting `window.events()`). User says "getting better, still things to fix". Open: 4 flurry clashes miss (10.5-14 s), trailing
   leg straightens during clash lunges, sound not ear-checked. Minecraft sounds come from `~/.lunarclient/shared/assets` (index 29).
+- **Fight v5** (`anim-test/fight_v5/`, positive improvement, user-approved): v4 + zero-phase smoothing of the key curves and
+  the final pose; joint pops 515 -> 53 in isolated A/B tests. B/C regressed (effects/ghosting, not skeleton). A/B harness:
+  `anim-test/tools/ab_harness.py` (`?iso=1`, `?novfx=1`), `tools/ab_metrics.js`; report in `notes/animation-study.md` section 9.
+  Rule from the user: no new full cinematic render until isolated tests show a measurable improvement. Next: re-tune the
+  clash solver (4.2 s clash misses), add follow-through/weight.
 - **Blender route (next):** user wants their real map in Blender and will test locally with their GPU. Plan: world
   `region/*.mca` -> mesh (amulet-core or Mineways/jmc2obj) -> Blender + MCprep rig/materials. Cloud CPU benchmark
   (bpy 5.2.3 via pip, 4 cores): Cycles 1080p 48 spp + denoise = 74 s/frame on a simple voxel scene; EEVEE did not run headless here.

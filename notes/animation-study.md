@@ -470,3 +470,44 @@ Measured on `newgen_fight_test_b1`:
   no orbit, and a light 3-sample blur.
 - **Subtle effects:** a small spark at blade contact, small dust on hard landings and slides, no trails, ghosts,
   flashes or rings.
+
+## 9. A/B investigation: why B regressed, and the v5 smoothing fix (2026-11-09)
+
+Setup: v4 is kept untouched in the worktree `../v4base` (commit 2e723bd). Both versions get the same harness
+(`anim-test/tools/ab_harness.py`: `?iso=1` locked side camera, `?novfx=1` every effect off, `window.__probe`), the same
+choreography (scene a), the same rigs, sub=1 (no motion blur), and the same window (frames 114-270 = 3.8-9.0 s).
+Clips are in `anim-test/out/ab/`; metrics come from `anim-test/tools/ab_metrics.js` (fighter A / fighter B, 0.2-19.8 s at 30 fps).
+
+| metric | v4 | B-era code | v5 (sig=50, psig=30) |
+|---|---|---|---|
+| joint pops (>25 deg/frame^2), A/B | 515 / 519 | 517 / 545 | **53 / 87** |
+| joint ang. accel p95, A/B | 32.9 / 33.8 | 33.4 / 35.9 | **12.5 / 13.6** |
+| blade direction step p95 (deg/frame) | 48.2 / 50.7 | 39.7 / 33.7 | 33.7 / 33.4 |
+| blade steps > 45 deg | 32 / 35 | 17 / 14 | 20 / 18 |
+| root accel p95 | 8.18 / 7.44 | 3.6 / 3.6 | 4.35 / 4.56 |
+| min gap between bodies | 0.57 | (B: 0.34, 26% overlap) | 0.46 |
+| mean clash miss | 0.57 | - | 0.55 |
+
+Findings for each suspect:
+- **Retargeting:** none exists. No mocap is retargeted; every pose is hand-keyed FK angles plus leg IK. Retargeting can't be the cause.
+- **Hierarchy/rest pose/pivots, local space:** unchanged between v4 and later versions (same rig2.js bones). The later
+  arm IK (`P.hR`) works in the chest2 frame and was used only in scene C.
+- **Blending conflicts:** yes, mild. After v4, the STYLE pass (lean/twist/elbows) was added *after* the LAG/aim
+  stage, and the blade got its own 8-sample smoothing kernel while the arm stayed raw. The blade and the hand then disagree by
+  a few frames, and the wrist absorbs it. That made the blade smoother but left the joints as jerky as before (pops 517/545).
+- **Double root motion:** none. The root comes once from `evalPos` and is remapped by the 240 Hz sim; root accel actually fell.
+- **Weapon-hand alignment:** grip offset is 0 in every version. The weapon is parented to the hand.
+- **Motion blur / ghosting:** B's smearing comes from post effects, not the skeleton: sub=5 accumulation plus GHOSTS
+  copies plus large slash arcs. With VFX on, effects cover 4% of the screen on average, 24% at p95 and up to 55% on
+  impact frames (same in v4 and new). With VFX off, the B-era skeleton looks like v4.
+- **Interpolation artifacts (the real root cause of the stiffness in v4 itself):** `evalKeys` eases each key segment
+  on its own and zeroes tangents at 'i'/'o'/'lin' keys. Velocity therefore stops or jumps at almost every key, and those
+  jumps are the pops (worst: rSh/rEl during slashes 4-6 s and 9-10 s, then the thighs and shins).
+
+v5 fix (`anim-test/fight_v5/`: v4 choreography + v4 rig (`rig2_v4.js`), v4 code itself untouched; defaults sig=50, psig=30;
+render: `PAGE=anim-test/fight_v5/index.html QS="?sub=1&iso=1&novfx=1" node render.mjs frames 114 270 out.mp4`): `choreo.js` gets two zero-phase Gaussian passes.
+`evalKeysS` filters the key curve (sigma `?sig=` ms), and `pose()` filters the final pose: root, pelvis drop, IK foot
+targets and joints (sigma `?psig=` ms). sig=0 reproduces v4 exactly. Sweep results (pops A/B): sig25 350/384, sig40
+248/284, sig60 253/195, sig40+psig25 98/145, sig40+psig40 41/74 (rejected: bodies touch, gap 0.06), **sig50+psig30 53/87**.
+Open: the first clash (4.2 s) misses by 0.41 vs 0.03 in v4, so the clash solver should be re-tuned for v5. Overlapping
+action and weight still need work: smoothing removes the pops but doesn't add follow-through.
