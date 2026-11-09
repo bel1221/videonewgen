@@ -1,0 +1,20 @@
+{
+  "title": "Studio demo: a short duel",
+  "prompt": "Two fighters duel. A walks in and opens with a diagonal slash that B parries. B counters with a quick thrust; A slips it to the left. B swings again, A blocks, then A lands a heavy overhead and B is knocked back. C cheers from the side.",
+  "chapter": "STUDIO TEST",
+  "end": 7.0,
+  "cast": {
+    "A": { "skin": 1, "weapon": "aegisblade", "start": [-2.3, 0.2] },
+    "B": { "skin": 2, "weapon": "veilblade", "start": [2.3, -0.2] },
+    "C": { "skin": 3, "role": "crowd", "start": [1.0, 4.2], "target": "A" }
+  },
+  "beats": [
+    { "t": 0.2, "who": "A", "do": "approach", "gap": 3.2 },
+    { "t": 1.9, "who": "A", "do": "slash", "dir": "diag", "power": "medium", "vs": "parry" },
+    { "t": 2.9, "who": "B", "do": "thrust", "power": "light", "vs": "dodge_left" },
+    { "t": 3.9, "who": "B", "do": "slash", "dir": "h", "power": "medium", "vs": "block" },
+    { "t": 5.1, "who": "A", "do": "overhead", "power": "heavy", "vs": "hit", "knock": 1.0 },
+    { "t": 5.2, "who": "C", "do": "cheer", "dur": 1.6 }
+  ],
+  "camera": { "side": 1, "shots": [ { "t": 0, "type": "side" } ] }
+}

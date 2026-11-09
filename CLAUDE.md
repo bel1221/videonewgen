@@ -82,10 +82,16 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
 - **Blender route (next):** user wants their real map in Blender and will test locally with their GPU. Plan: world
   `region/*.mca` -> mesh (amulet-core or Mineways/jmc2obj) -> Blender + MCprep rig/materials. Cloud CPU benchmark
   (bpy 5.2.3 via pip, 4 cores): Cycles 1080p 48 spp + denoise = 74 s/frame on a simple voxel scene; EEVEE did not run headless here.
+- **NewGen studio (our own animation system)**: `anim-test/studio/` + skill `.claude/skills/newgen-animate`. Prompt ->
+  beat script JSON -> contact-first generated motion on rig2 -> render. Demos: `studio/scripts/demo.json` (voxel meadow),
+  `demo_colosseum.json` (the user's colosseum, converted by `anim-test/tools/mca2obj.py`; `fight/assets/colosseum/` is
+  gitignored, rebuild it from `Desktop\mcrefs\worlds\...` with the command in notes §12). Renders:
+  `anim-test/out/studio_demo_v1.mp4`, `studio_demo_colosseum_v1.mp4`. Waiting on the user's feedback.
 - **AnimationGPT integration study** (`notes/animation-study.md` §11, `anim-test/tools/agpt_laws.py`, `agpt_reach.py`,
-  `toolkit/refstudy/bursts.py`): use AGPT only for the body layer (yaw lead, foot plant, step-in, pelvis drop, follow-through)
-  and build the arm/blade from the contact with reference timing (anticipation 0.2-0.6 s, strike 3-5 frames). The local
-  `Desktop\MotionGPT-MotionGPT-V1.0` is source only (no checkpoints), so it can't generate new clips yet.
+  `toolkit/refstudy/bursts.py`). **User rule: AnimationGPT is only an example of good combat motion; never put its
+  clips/poses/joints in our videos.** We generate every motion with our own system (§12, `anim-test/studio/`), designed to
+  the studied numbers (yaw lead 100 ms, foot plant -130 ms, step-in 0.16, pelvis drop 0.25 at +200 ms, follow-through
+  0.27 s; reference timing: anticipation 0.2-0.6 s, strike 3-5 frames, blade 15-35°/frame).
 - Ranked 2vs2 v4 still awaiting feedback (MR numbers and armor trim are placeholders).
 
 ## Layout

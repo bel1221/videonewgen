@@ -1,0 +1,21 @@
+{
+  "title": "Studio demo in the colosseum",
+  "prompt": "Same duel as demo.json, staged on the sand of the user's colosseum.",
+  "chapter": "STUDIO TEST",
+  "world": "colosseum",
+  "end": 7.0,
+  "cast": {
+    "A": { "skin": 1, "weapon": "aegisblade", "start": [-2.3, 0.2] },
+    "B": { "skin": 2, "weapon": "veilblade", "start": [2.3, -0.2] },
+    "C": { "skin": 3, "role": "crowd", "start": [5.5, 7.5], "target": "A" }
+  },
+  "beats": [
+    { "t": 0.2, "who": "A", "do": "approach", "gap": 3.2 },
+    { "t": 1.9, "who": "A", "do": "slash", "dir": "diag", "power": "medium", "vs": "parry" },
+    { "t": 2.9, "who": "B", "do": "thrust", "power": "light", "vs": "dodge_left" },
+    { "t": 3.9, "who": "B", "do": "slash", "dir": "h", "power": "medium", "vs": "block" },
+    { "t": 5.1, "who": "A", "do": "overhead", "power": "heavy", "vs": "hit", "knock": 1.0 },
+    { "t": 5.2, "who": "C", "do": "cheer", "dur": 1.6 }
+  ],
+  "camera": { "side": 1, "shots": [ { "t": 0, "type": "side" }, { "t": 3.4, "type": "low", "angle": -20 } ] }
+}

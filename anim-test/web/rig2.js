@@ -158,21 +158,38 @@ export function applyPose(ch, P) {
       solveLeg(sh, el, sh.position.clone(), tL, poleL, 4, 5.5);
     }
   }
+  // ARM IK (studio): hand targets as points in the ROOT frame (blocks; x = character's left, y up, z forward), so a
+  // director can aim a hand at an exact world contact. Additive: only used when P.hRw / P.hLw are set.
+  if (P.hRw || P.hLw) {
+    ch.root.updateMatrixWorld(true);
+    const qC = new THREE.Quaternion(); b.chest2.getWorldQuaternion(qC);
+    for (const [side, H, sh, el, clav, pole] of [['r', P.hRw, b.rSh, b.rEl, b.rClav, [-0.55, -0.7, -0.45]], ['l', P.hLw, b.lSh, b.lEl, b.lClav, [0.55, -0.7, -0.45]]]) {
+      if (!H) continue;
+      const e = Math.min(1, Math.max(0, (H[1] - 1.45) / 0.5)); clav.rotation.set(-5 * e * D2R, 0, (side === 'r' ? -1 : 1) * 13 * e * D2R, 'XYZ');
+      ch.root.updateMatrixWorld(true);
+      const tgW = ch.root.localToWorld(new THREE.Vector3(H[0] / PX, H[1] / PX, H[2] / PX));
+      const inv = new THREE.Matrix4().copy(clav.matrixWorld).invert();
+      const tL = tgW.clone().applyMatrix4(inv), poleL = new THREE.Vector3(...(P[side + 'Pole'] || pole)).applyQuaternion(qC).transformDirection(inv).normalize();
+      solveLeg(sh, el, sh.position.clone(), tL, poleL, 4, 5.5);
+    }
+  }
   b.rHand.rotation.set(0, (P.roll || 0) * D2R, 0);
   if (ch.weapon) ch.weapon.rotation.set((P.wrist ?? 160) * D2R, 0, 0);
-  if (ch.weapon && P.bd) {
+  if (ch.weapon && (P.bd || P.bdR)) {
     // aim the blade: desired direction (torso frame) -> world -> forearm (rEl) frame; solve roll about the forearm and
     // wrist bend so Ry(roll)*Rx(wrist)*(0,1,0) == d  ->  wrist = acos(d.y), roll = atan2(d.x, d.z)
     ch.root.updateMatrixWorld(true);
     const ty = (P.yaw || 0) + 0.3 * ((w[1] || 0) + ((P.chest || [0, 0, 0])[1] || 0));   // blade aim follows the body heading, only partly the torso twist
     let d;
-    if (P.hR) { const qC2 = new THREE.Quaternion(); b.chest2.getWorldQuaternion(qC2); d = new THREE.Vector3(...P.bd).applyQuaternion(qC2).normalize(); }
+    if (P.bdR) { const qR = new THREE.Quaternion(); ch.root.getWorldQuaternion(qR); d = new THREE.Vector3(...P.bdR).applyQuaternion(qR).normalize(); }   // studio: root frame
+    else if (P.hR) { const qC2 = new THREE.Quaternion(); b.chest2.getWorldQuaternion(qC2); d = new THREE.Vector3(...P.bd).applyQuaternion(qC2).normalize(); }
     else d = new THREE.Vector3(...P.bd).applyAxisAngle(new THREE.Vector3(0, 1, 0), ty * D2R).normalize();
     const qEl = new THREE.Quaternion(); b.rEl.getWorldQuaternion(qEl); qEl.invert();
+    const hum = P.hR || P.hRw;
     const aim = dir => { const dL = dir.clone().applyQuaternion(qEl);
-      const wr = Math.acos(Math.max(-1, Math.min(1, dL.y))), wrC = P.hR ? Math.min(160 * D2R, Math.max(30 * D2R, wr)) : wr;   // human wrist range
+      const wr = Math.acos(Math.max(-1, Math.min(1, dL.y))), wrC = hum ? Math.min((P.hRw ? 178 : 160) * D2R, Math.max(30 * D2R, wr)) : wr;   // human wrist range (studio: blade may continue the forearm, REF)
       // roll is undefined when the blade points along the forearm: bias it toward the natural forward grip there (no flips)
-      const hz = Math.hypot(dL.x, dL.z), bias = P.hR ? 0.45 * (1 - Math.min(1, Math.max(0, (hz - 0.15) / 0.45))) : 0;
+      const hz = Math.hypot(dL.x, dL.z), bias = hum ? 0.45 * (1 - Math.min(1, Math.max(0, (hz - 0.15) / 0.45))) : 0;
       b.rHand.rotation.set(0, Math.atan2(dL.x, dL.z + bias), 0); ch.weapon.rotation.set(wrC, TWIST, 0, 'XYZ'); };
     aim(d);
     // physics: the blade is a solid. Points along it may not enter the floor, the wielder's legs/torso, or the opponent's
