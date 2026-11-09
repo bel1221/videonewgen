@@ -12,7 +12,7 @@ import { loadSkin, buildCharacter, buildWeapon, applyPose, setTwist } from '../w
 
 const W = 1920, H = 1080, params = new URLSearchParams(location.search);
 const SCENE = params.get('scene') || 'a';
-const C = await import(SCENE === 'b' ? './choreo_b.js' : './choreo.js');
+const C = await import(SCENE === 'c' ? './choreo_c.js' : SCENE === 'b' ? './choreo_b.js' : './choreo.js');
 if (params.get('twist') !== null) setTwist(+params.get('twist'));
 const SUB = +(params.get('sub') || 5);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
@@ -27,7 +27,7 @@ scene.fog = new THREE.FogExp2(FOGC, 0.006);
 scene.background = FOGC.clone();
 
 // ------------------------------------------------------------------ cold overcast light (Marlow): cool sky, pale low sun behind, warm only from sparks
-const hemi = SCENE === 'b' ? new THREE.HemisphereLight(0xa8bce0, 0xf0b070, 1.15) : new THREE.HemisphereLight(0x9fc2ff, 0xd8b98a, 1.05); scene.add(hemi);   // b: warm sand bounce -> warm shadows (Desert)
+const hemi = SCENE !== 'a' ? new THREE.HemisphereLight(0xa8bce0, 0xf0b070, 1.15) : new THREE.HemisphereLight(0x9fc2ff, 0xd8b98a, 1.05); scene.add(hemi);   // b: warm sand bounce -> warm shadows (Desert)
 const sun = new THREE.DirectionalLight(0xffe0b0, 3.3); sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.03; sun.shadow.radius = 1.5;
 Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 260 }); scene.add(sun, sun.target);
@@ -69,7 +69,7 @@ console.log('FLOOR', FLOOR);
 // ------------------------------------------------------------------ cast
 const [s1, s2, s3, aeg, veil] = await Promise.all([
   loadSkin('/anim-test/src/skins/1.png'), loadSkin('/anim-test/src/skins/2.png'), loadSkin('/anim-test/src/skins/3.png'),
-  fetch(base + (SCENE === 'b' ? 'w/ocean%20sword.json' : 'w/aegisblade.json')).then(r => r.json()), fetch(base + (SCENE === 'b' ? 'w/thundermaul.json' : 'w/veilblade.json')).then(r => r.json())]);
+  fetch(base + (SCENE !== 'a' ? 'w/ocean%20sword.json' : 'w/aegisblade.json')).then(r => r.json()), fetch(base + (SCENE === 'b' ? 'w/thundermaul.json' : 'w/veilblade.json')).then(r => r.json())]);
 const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), 0.86), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), SCENE === 'b' ? 0.95 : 0.86), C: buildCharacter(s3, null) };
 for (const k in cast) scene.add(cast[k].root);
 for (const k in cast) cast[k].floorAt = floorAt;   // blade/ground physics in rig2
@@ -90,7 +90,7 @@ function segClosest(p1, q1, p2, q2) {
 }
 // solve clash corrections: coordinate descent on both sword arms so the blades cross (distance -> 0)
 function bladeDist(t) { const [a0, a1] = blade('A', t, [8, 26]), [b0, b1] = blade('B', t, [8, 26]); return segClosest(a0, a1, b0, b1).dist; }
-const VARS = ['ax', 'az', 'el', 'wr', 'ba', 'ch', 'fw'], LIM = { ax: 60, az: 60, el: 50, wr: 30, ba: 30, ch: 45, fw: 1.2 };
+const VARS = ['ax', 'az', 'el', 'wr', 'ba', 'ch', 'fw'], LIM = { ax: 40, az: 40, el: 40, wr: 30, ba: 30, ch: 30, fw: 0.35 };
 for (const cl of C.CLASHES) {
   if (cl.at || !(cl.kind === 'blade' || cl.kind === 'cross')) continue;
   const eA = { t: cl.t, ax: 0, az: 0, el: 0, wr: 0, ba: 0, ch: 0, fw: 0 }, eB = { ...eA }; C.CORR.A.push(eA); C.CORR.B.push(eB);
@@ -281,7 +281,7 @@ function drawState(t) {
 
 const fill = document.getElementById('fill');
 window.renderAt = function (t) {
-  const shutter = 0.5 / 30, n = C.blurOK(t) ? SUB : 1;
+  const shutter = (+(params.get('sh') || 0.5)) / 30, n = C.blurOK(t) ? SUB : 1;
   renderer.setRenderTarget(acc); renderer.setClearColor(0x000000, 0); renderer.clear();
   let label = '';
   for (let i = 0; i < n; i++) {
@@ -300,6 +300,15 @@ window.dbgPose = function (k, t) { const p = C.pose(k, t); applyPose(cast[k], p)
   const sole = n => b[n].localToWorld(new THREE.Vector3(0, -6, 0)).toArray().map(v => +v.toFixed(3));
   return { pos: p.pos.map(v => +v.toFixed(3)), y: +p.y.toFixed(3), floor: +floorAt(p.pos[0], p.pos[2]).toFixed(3), ik: p.ik, hips: w('hips'), rTh: w('rTh'), rSn: w('rSn'), rSole: sole('rSn'), lSole: sole('lSn'), rLegFK: p.rLeg, rKnee: p.rKnee }; };
 window.events = () => C.events();
+window.diagC = function (k, t0, t1) { const out = []; let pa = null, ph = null, pi = null; const v = new THREE.Vector3(), h = new THREE.Vector3();
+  for (let t = t0; t <= t1 + 1e-6; t += 1 / 30) { const P = C.pose(k, t); applyPose(cast[k], P); cast[k].root.updateMatrixWorld(true);
+    cast[k].weapon.localToWorld(v.set(0, 26, 0)); cast[k].bones.rHand.getWorldPosition(h); const act = v.clone().sub(h).normalize();
+    const q = new THREE.Quaternion(); cast[k].bones.chest2.getWorldQuaternion(q); const it = new THREE.Vector3(...P.bd).applyQuaternion(q).normalize();
+    const ang = (a, b) => b ? Math.round(Math.acos(Math.min(1, Math.max(-1, a.dot(b)))) * 180 / Math.PI) : 0;
+    const wr = Math.round(cast[k].weapon.rotation.x * 180 / Math.PI);
+    out.push(t.toFixed(3) + ' hand ' + (ph ? h.distanceTo(ph).toFixed(2) : '0') + ' blade ' + ang(act, pa) + ' intent ' + ang(it, pi) + ' gap ' + ang(act, it) + ' wrist ' + wr + ' hR ' + P.hR.map(x => x.toFixed(2)).join(','));
+    pa = act; ph = h.clone(); pi = it; }
+  return out.join(' | '); };
 window.bladeDiag = function (k, t0, t1) { const out = []; let pi = null, pa = null; const v = new THREE.Vector3(), h = new THREE.Vector3();
   for (let t = t0; t <= t1 + 1e-6; t += 1 / 30) { const P = C.pose(k, t); applyPose(cast[k], P); cast[k].root.updateMatrixWorld(true);
     cast[k].weapon.localToWorld(v.set(0, 26, 0)); cast[k].bones.rHand.getWorldPosition(h); const act = v.clone().sub(h).normalize();

@@ -11,7 +11,8 @@ from scipy.signal import butter, sosfilt
 
 SCENE = os.environ.get('SCENE', 'a')
 CFG = {'a': dict(total=20.0, mute=[6.46], big=(13.2, 13.95, 9.4), fall=19.38, cross=17.3),
-       'b': dict(total=14.0, mute=[], big=(1.5, 4.0, 7.6), fall=12.7, cross=11.3)}[SCENE]
+       'b': dict(total=14.0, mute=[], big=(1.5, 4.0, 7.6), fall=12.7, cross=11.3),
+       'c': dict(total=12.0, mute=[], big=(), fall=10.5, cross=10.02)}[SCENE]
 SR = 48000; TOTAL = CFG['total']; PK = 'sfx_pack'; MUTE_CLASH = CFG['mute']
 EV = json.load(open('fight/comp/events.json')); CUR = json.load(open(f'{PK}/curated.json'))
 MC_SAND = sorted(glob.glob(f'{PK}/mc/step_sand*.ogg')); MC_FALL = f'{PK}/mc/damage_fallsmall.ogg'
@@ -77,6 +78,7 @@ for t in CFG['big']: place(1, load(pick('swoosh_big'), rng.uniform(0.95, 1.05)),
 for t, big, kind in EV['clashes']:
     if muted(t): continue
     if kind == 'kick': place(1, load(pick('impact'), 0.85), t, -6); thump(1, t, -10, 80); continue
+    if kind == 'hit': place(1, load(pick('impact'), 0.9), t, -5); thump(1, t, -9, 75); place(1, hp(load(pick('slash'), 1.1), 900), t - 0.01, -14); continue
     if kind == 'slam': thump(1, t, -2, 55); place(1, load(pick('impact'), 0.8), t, -4); noise(2, t + 0.01, -8, 0.5, 250, 1800); continue
     place(1, load(pick('clash'), rng.uniform(0.94, 1.08)), t, -3 if big else -7)
     if big: thump(1, t, -11, 90)

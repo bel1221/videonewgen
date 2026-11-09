@@ -431,3 +431,42 @@ In those fights:
 | facing the audience | 7 front/back flips in 2.2 s | **14 flips** | 1-2 | ✖ keep the camera on one side of the line; favour faces |
 | shadow tint | cool | cool (b -7..-16) | Desert warm (b +22) | ✖ raise the warm ground bounce |
 | impacts | inked B/W frame | same | warm glow/flare (Marlow), small 2D stars (Desert) | ✖ swap to the reference styles |
+
+## 8. Root-cause analysis of test B (user review: "worse than v4"), before the rebuild
+
+Measured on `newgen_fight_test_b1`:
+1. **Spacing / clipping.**
+   - Bodies are under 0.75 blocks apart (overlapping) in **26 %** of frames, and the minimum gap is 0.34.
+   - A sword fight at 0.70× blade scale needs a gap of about 1.8-2.2 blocks (blade 1.4 plus arm 0.5).
+   - The choreography placed attacker and defender on top of each other, and the clash "step-in" pulled them closer.
+     Root collision (0.64 blocks) only stops the hips, while leaning torsos and arms pass through each other.
+2. **The weapon is not driven by the hand.**
+   - The arms were posed with free FK angles, and the blade was aimed separately by a wrist solve, so the hand and
+     the weapon move independently. That is the "weapon not following hand movement" problem.
+   - The style pass then bent the arms further after the blade aim was set.
+3. **No fight logic.** Attacks were hand-placed keys with no rule tying a defender's block or dodge to the attacker's
+   strike timing and line. There were no recovery windows, no reaction direction tied to the hit, and no reset of
+   distance between exchanges.
+4. **Legs bent in place at the start.** The style "sink" lowers the pelvis on every grounded frame, so the IK bends the
+   knees even when the character is standing still.
+5. **Camera.**
+   - Cuts every 0.45-0.6 s and orbiting moves.
+   - Shake on every contact plus a handheld drift layer.
+   - 5-sample motion blur on all frames, which smears limbs during fast moves.
+6. **Effects hide the motion.** Trails, 3 ghost copies, flares, shock rings, dust on every step, sparks on every
+   ground scrape and a full-screen flash. Most of the readable motion is covered.
+
+### Rebuild plan (fix at the source)
+- **Arm IK with a rigid grip:**
+  - Each pose gives the hand position (spherical, around the shoulder, in the chest frame) and a blade direction.
+  - A 2-bone IK places the elbow, then the wrist bends and rolls within human limits (35-145°, ±100°) toward the
+    blade direction. The blade therefore always follows the hand and forearm, and swings are hand arcs.
+- **Fight director:** a beat list (attacker, move, defender response) expands into keys.
+  - Each move has fixed phases: anticipation, then strike, then follow-through, then recovery.
+  - The defender's block, parry or dodge is timed to the strike and placed on its line.
+  - Hits push the target along the attack direction with matching torso and head reactions.
+  - Spacing is held at an engagement gap of 2.0 blocks, with step-ins of 0.3-0.5 and resets between exchanges.
+- **Calm camera:** a tracking shot from one fixed side of the fighting line, a few deliberate cuts (2-3 s), no shake,
+  no orbit, and a light 3-sample blur.
+- **Subtle effects:** a small spark at blade contact, small dust on hard landings and slides, no trails, ghosts,
+  flashes or rings.

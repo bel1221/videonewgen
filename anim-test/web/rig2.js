@@ -110,8 +110,7 @@ const _q = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v = new THREE.Vect
 function setRot(bone, r) { bone.rotation.set((r[0] || 0) * D2R, (r[1] || 0) * D2R, (r[2] || 0) * D2R, 'XYZ'); }
 
 // 2-bone IK in the hips frame. hipLocal, target: px vectors in hips space. pole: unit vector (hips space) the knee points at.
-function solveLeg(thigh, shin, hipLocal, target, pole) {
-  const a = 6, b = 6; const d = target.clone().sub(hipLocal); let L = d.length();
+function solveLeg(thigh, shin, hipLocal, target, pole, a = 6, b = 6) { const d = target.clone().sub(hipLocal); let L = d.length();
   L = Math.min(Math.max(L, 0.6), a + b - 0.02); const dh = d.normalize();
   const cosA = (a * a + L * L - b * b) / (2 * a * L), alpha = Math.acos(Math.min(1, Math.max(-1, cosA)));
   let p = pole.clone().sub(dh.clone().multiplyScalar(pole.dot(dh))); if (p.lengthSq() < 1e-6) p.set(0, 0, 1); p.normalize();
@@ -140,6 +139,25 @@ export function applyPose(ch, P) {
     const e = Math.min(1, Math.max(0, (-arm[0] - 70) / 110)) + Math.min(0.6, Math.abs(arm[2]) / 120);
     cl.rotation.set(-6 * e * D2R, 0, s * 14 * e * D2R, 'XYZ'); }
   setRot(b.rSh, P.rArm || [0, 0, 0]); setRot(b.rEl, P.rElbow || [0, 0, 0]); setRot(b.lSh, P.lArm || [0, 0, 0]); setRot(b.lEl, P.lElbow || [0, 0, 0]);
+  // ARM IK: hand target given as [azimuth, elevation, reach(blocks)] around the shoulder in the upper-chest frame
+  // (az 0 = straight ahead, + = toward the character's left, |az| > 90 = behind; el + = up). The elbow points down/back/out.
+  if (P.hR || P.hL) {
+    ch.root.updateMatrixWorld(true);
+    const qC = new THREE.Quaternion(); b.chest2.getWorldQuaternion(qC);
+    for (const [side, H, sh, el, clav, pole] of [['r', P.hR, b.rSh, b.rEl, b.rClav, [-0.55, -0.7, -0.45]], ['l', P.hL, b.lSh, b.lEl, b.lClav, [0.55, -0.7, -0.45]]]) {
+      if (!H) continue;
+      const az = H[0] * D2R, elv = H[1] * D2R, rr = Math.min(0.58, Math.max(0.12, H[2]));
+      // shoulder shrug first (scapula elevation) so the solve uses the lifted shoulder
+      const e = Math.min(1, Math.max(0, (H[1] - 25) / 70)); clav.rotation.set(-5 * e * D2R, 0, (side === 'r' ? -1 : 1) * 13 * e * D2R, 'XYZ');
+      ch.root.updateMatrixWorld(true);
+      const shW = sh.getWorldPosition(new THREE.Vector3());
+      const dirC = new THREE.Vector3(Math.sin(az) * Math.cos(elv), Math.sin(elv), Math.cos(az) * Math.cos(elv)).applyQuaternion(qC);
+      const tgW = shW.clone().addScaledVector(dirC, rr);
+      const inv = new THREE.Matrix4().copy(clav.matrixWorld).invert();
+      const tL = tgW.clone().applyMatrix4(inv), poleL = new THREE.Vector3(...pole).applyQuaternion(qC).transformDirection(inv).normalize();
+      solveLeg(sh, el, sh.position.clone(), tL, poleL, 4, 5.5);
+    }
+  }
   b.rHand.rotation.set(0, (P.roll || 0) * D2R, 0);
   if (ch.weapon) ch.weapon.rotation.set((P.wrist ?? 160) * D2R, 0, 0);
   if (ch.weapon && P.bd) {
@@ -147,10 +165,15 @@ export function applyPose(ch, P) {
     // wrist bend so Ry(roll)*Rx(wrist)*(0,1,0) == d  ->  wrist = acos(d.y), roll = atan2(d.x, d.z)
     ch.root.updateMatrixWorld(true);
     const ty = (P.yaw || 0) + 0.3 * ((w[1] || 0) + ((P.chest || [0, 0, 0])[1] || 0));   // blade aim follows the body heading, only partly the torso twist
-    const d = new THREE.Vector3(...P.bd).applyAxisAngle(new THREE.Vector3(0, 1, 0), ty * D2R).normalize();
+    let d;
+    if (P.hR) { const qC2 = new THREE.Quaternion(); b.chest2.getWorldQuaternion(qC2); d = new THREE.Vector3(...P.bd).applyQuaternion(qC2).normalize(); }
+    else d = new THREE.Vector3(...P.bd).applyAxisAngle(new THREE.Vector3(0, 1, 0), ty * D2R).normalize();
     const qEl = new THREE.Quaternion(); b.rEl.getWorldQuaternion(qEl); qEl.invert();
     const aim = dir => { const dL = dir.clone().applyQuaternion(qEl);
-      b.rHand.rotation.set(0, Math.atan2(dL.x, dL.z), 0); ch.weapon.rotation.set(Math.acos(Math.max(-1, Math.min(1, dL.y))), TWIST, 0, 'XYZ'); };
+      const wr = Math.acos(Math.max(-1, Math.min(1, dL.y))), wrC = P.hR ? Math.min(160 * D2R, Math.max(30 * D2R, wr)) : wr;   // human wrist range
+      // roll is undefined when the blade points along the forearm: bias it toward the natural forward grip there (no flips)
+      const hz = Math.hypot(dL.x, dL.z), bias = P.hR ? 0.45 * (1 - Math.min(1, Math.max(0, (hz - 0.15) / 0.45))) : 0;
+      b.rHand.rotation.set(0, Math.atan2(dL.x, dL.z + bias), 0); ch.weapon.rotation.set(wrC, TWIST, 0, 'XYZ'); };
     aim(d);
     // physics: the blade is a solid. Points along it may not enter the floor, the wielder's legs/torso, or the opponent's
     // body; on contact the aim is pushed out of the obstacle and re-solved (the hand stays the pivot).
@@ -163,7 +186,7 @@ export function applyPose(ch, P) {
       ch.root.updateMatrixWorld(true); let hit = false;
       for (const a of [4, 9, 14, 19, 24, 28]) {
         ch.weapon.localToWorld(pt.set(0, a, 0));
-        if (ch.floorAt) { const f = ch.floorAt(pt.x, pt.z) + 0.035; if (pt.y < f) { d.y += (f - pt.y) * 2.2 + 0.04; hit = true; } }
+        if (ch.floorAt) { const f = ch.floorAt(pt.x, pt.z) + 0.035; if (pt.y < f) { d.y += Math.min(0.06, (f - pt.y) * 1.2 + 0.015); hit = true; } }   // lift just enough, capped (no flip)
         for (const c of caps) { if (pt.y < c.y0 || pt.y > c.y1) continue; const dx = pt.x - c.x, dz = pt.z - c.z, r = Math.hypot(dx, dz);
           if (r < c.r) { const k = (c.r - r) * 2.2 + 0.04, ux = r > 1e-4 ? dx / r : 1, uz = r > 1e-4 ? dz / r : 0; d.x += ux * k; d.z += uz * k; hit = true; } }
       }
