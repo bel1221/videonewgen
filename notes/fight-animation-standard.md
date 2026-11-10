@@ -117,6 +117,7 @@ Each item gets a measured check where possible (tools in `anim-test/tools/`):
 - **Footwork:** no foot sliding, floating or gliding. Feet stay planted while planted, and come back under the body after
   slides and at run starts. No legs through the floor.
 - **No phasing or collisions:** `tools/phase_qa.js` (own body, limbs, opponent) + `tools/collide_qa.js`, and convincing contact (clash miss mean).
+- **No crossed legs:** `tools/cross_qa.js` = 0 crossed samples (one foot past the other's line).
 - **Weapon follows the arm,** with grip and orientation consistent throughout.
 - **Every attack has** anticipation, controlled acceleration, a believable arc, follow-through and recovery.
 - **Hit reactions:** a direction, knockback and recovery.
@@ -126,9 +127,7 @@ Each item gets a measured check where possible (tools in `anim-test/tools/`):
 - **Secondary motion:** head, torso reactions, follow-through.
 - **Held items as in vanilla Minecraft** (`notes/refs/minecraft_held_items/`), with our 3D physics on top.
 
-## Open (user, test 1 review, 2026-11-10): legs crossing on small steps
-The legs sometimes cross each other on small steps, and ANY crossing makes the movement look poorly done. Fix this next.
-The phasing check only flags legs that pass through each other. It must also flag legs that cross over each other (a foot
-stepping past the other foot's line, even without touching). Likely causes to measure first:
-- the drift gait's travel offset (FWD) places the leading foot across the other while side-stepping
-- planner steps during turns, where the midline clamp works on desired positions but not on the step path
+## Legs crossing (user, test 1 review, 2026-11-10): FIXED 2026-11-11, notes §20
+ANY crossing makes the movement look poorly done. **Measure it with `tools/cross_qa.js`** (a foot or knee past the other
+leg's line in the pelvis frame, even without touching; `phase_qa.js` only catches legs passing through each other).
+Target: 0 crossed samples. Fix: `tools/patch_nocross.pl` (shared planner, `XMIN = 0.22` minimum gap between the feet).

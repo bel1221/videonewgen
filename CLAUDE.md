@@ -134,6 +134,10 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   `PAGE=anim-test/fight_w/index.html QS="?sub=5&vid=<vid>" node render.mjs frames 0 600 out/newgen_fight_w_<vid>_video.mp4`;
   events -> `fight_w/comp/events_<vid>.json`; sound `SCENE=<vid> python fight/fight_sfx3.py`. Two-hand IK, bow draw/arrows,
   per-weapon collision and sounds: notes §17. User rule: twirls only once or twice per video (show-off).
+- **Legs crossing: fixed 2026-11-11** (notes §20). Since v8 a sign bug put the right foot on the body's left in every gait
+  step. Fixed in the shared planner with `anim-test/tools/patch_nocross.pl`, plus real opponent legs for the blade
+  collision (`patch_oppfeet.pl`); re-run both after any `assemble_w.py`. QA: `tools/cross_qa.js` must read 0 crossed;
+  `tools/qa_feet_batch.js` runs cross + stance + phase. t1-t3 and duel40 are not re-rendered yet.
 - **NewGen studio (our own animation system)**: `anim-test/studio/` + skill `.claude/skills/newgen-animate`. Prompt ->
   beat script JSON -> contact-first generated motion on rig2 -> render. Demos: `studio/scripts/demo.json` (voxel meadow),
   `demo_colosseum.json` (the user's colosseum, converted by `anim-test/tools/mca2obj.py`; `fight/assets/colosseum/` is

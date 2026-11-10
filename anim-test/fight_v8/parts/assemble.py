@@ -145,9 +145,9 @@ s = rep(s, "const rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, 
            "const rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, root, rawXZ, N, raw[c]), entry = {};")
 s = rep(s, "        con.push({ i, f, p: [root[i][0] + fx * 0.28 + fz * 0.16 * side, root[i][1] + fz * 0.28 - fx * 0.16 * side] });",
            "        const yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl);   // body LEFT in world (not travel-relative)\n"
-           "        con.push({ i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] });")
+           "        con.push({ i, f, p: [root[i][0] + fx * 0.28 + side * 0.15 * lx, root[i][1] + fz * 0.28 + side * 0.15 * lz] });")
 s = rep(s, "const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1; return { i, f, p: [root[i][0] + fx * 0.28 + fz * 0.16 * side, root[i][1] + fz * 0.28 - fx * 0.16 * side] }; };",
-           "const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1, yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl); return { i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] }; };")
+           "const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1, yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl); return { i, f, p: [root[i][0] + fx * 0.28 + side * 0.15 * lx, root[i][1] + fz * 0.28 + side * 0.15 * lz] }; };")
 s = rep(s, "Dsm[f] = Dsm[f] ? [lerp(Dsm[f][0], Dr[0], 1), lerp(Dsm[f][1], Dr[1], 1)] : Dr.slice(); const D = Dsm[f];",
            "Dsm[f] = Dsm[f] ? [lerp(Dsm[f][0], Dr[0], 1), lerp(Dsm[f][1], Dr[1], 1)] : Dr.slice(); const D = Dsm[f];\n"
            "        { const sgn = f === 'l' ? 1 : -1, lx = Math.cos(yaw), lz = -Math.sin(yaw), s_ = (D[0] - root[i][0]) * lx + (D[1] - root[i][1]) * lz;   // keep each foot on its own side\n"

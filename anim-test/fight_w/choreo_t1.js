@@ -430,6 +430,7 @@ function legFK(leg, knee, hipX, wide = 1) {   // desired sole offset in the body
 }
 function yEff(p) { if (isAir(p) || p.y >= 0) return isAir(p) ? p.y : p.y * 0.8; const a = -p.y; return -(0.25 * a + 0.75 * Math.max(0, a - 0.3)); }   // guard -0.14 -> -0.035 (light athletic bend), slam -0.62 -> -0.4
 function isAir(p) { return p.y > 0.22 || Math.abs(p.tilt[0]) > 30; }
+const XMIN = 0.22;   // min lateral gap between the feet (blocks, about 3.5 px): legs never cross over (cross_qa.js)
 function runGait(c, root, rawXZ, N, rawP) {
   // returns per-index overrides { r:[x,y,z]|undefined, l:..., yoff } inside run windows, plus contact events
   const g = { r: new Array(N), l: new Array(N), yoff: new Float32Array(N), ev: [] };
@@ -445,14 +446,18 @@ function runGait(c, root, rawXZ, N, rawP) {
         const vx = root[i][0] - root[Math.max(i0, i - 6)][0], vz = root[i][1] - root[Math.max(i0, i - 6)][1], vn = Math.hypot(vx, vz) || 1;
         const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1;            // right foot on the right of travel: right = (-fz, fx)
         const yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl);   // body LEFT in world (not travel-relative)
-        con.push({ i, f, p: [root[i][0] + fx * FWD - side * LAT * lx, root[i][1] + fz * FWD - side * LAT * lz] });
+        con.push({ i, f, p: [root[i][0] + fx * FWD + side * LAT * lx, root[i][1] + fz * FWD + side * LAT * lz] });
       }
     }
     { const mk = (i, f) => { const vx = root[i][0] - root[Math.max(i0, i - 6)][0], vz = root[i][1] - root[Math.max(i0, i - 6)][1], vn = Math.hypot(vx, vz) || 1;
-        const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1, yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl); return { i, f, p: [root[i][0] + fx * FWD - side * LAT * lx, root[i][1] + fz * FWD - side * LAT * lz] }; };
+        const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1, yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl); return { i, f, p: [root[i][0] + fx * FWD + side * LAT * lx, root[i][1] + fz * FWD + side * LAT * lz] }; };
       for (const f of ['r', 'l']) { const fc = con.find(q => q.f === f), lim = fc ? fc.i : i1; if (fc && (fc.i - i0) / HZ <= 0.2) continue;
         let ie = i0 + 1; while (ie < lim && phiAt(ie) < 0.06) ie++; ie = Math.min(ie + Math.round(0.06 * HZ), lim - Math.round(0.12 * HZ)); if (ie > i0) con.push(mk(ie, f)); }
       con.sort((a, b) => a.i - b.i); }
+    { const last = {}; for (const q of con) { const o = q.f === 'r' ? 'l' : 'r', sg = q.f === 'l' ? 1 : -1;   // no crossover: land on your own side of the other foot
+        if (last[o]) { const yl = rawP[q.i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl), s = (q.p[0] - last[o][0]) * lx + (q.p[1] - last[o][1]) * lz;
+          if (sg * s < XMIN) { const k = sg * XMIN - s; q.p = [q.p[0] + lx * k, q.p[1] + lz * k]; } }
+        last[q.f] = q.p; } }
     for (const f of ['r', 'l']) {
       const cs = con.filter(q => q.f === f);
       for (let k = 0; k < cs.length; k++) {
@@ -496,6 +501,8 @@ function simulate() {
     for (const e of G.ev) STEPS.push({ c, t: e.t, foot: e.f, p: [e.p[0], 0, e.p[1]], kind: 'step', sp: 5, run: true });
     for (let i = 0; i < N; i++) {
       const t = i / HZ, p = raw[c][i], air = isAir(p), yaw = p.yaw * Math.PI / 180, cy = Math.cos(yaw), sy = Math.sin(yaw);
+      let dyF = raw[c][Math.min(N - 1, i + Math.round(0.15 * HZ))].yaw - p.yaw; dyF -= 360 * Math.round(dyF / 360);   // no-crossover lookahead (turn capped at
+      const yawF = yaw + Math.max(-45, Math.min(45, dyF)) * Math.PI / 180, cyF = Math.cos(yawF), syF = Math.sin(yawF);   // 45 deg: in a spin both sides must stay compatible)
       const vx = i > 0 ? (root[i][0] - root[i - 1][0]) * HZ : 0, vz = i > 0 ? (root[i][1] - root[i - 1][1]) * HZ : 0, sp = Math.hypot(vx, vz);
       const skid = inWin(SLIDES[c], t);
       for (const [f, leg, knee, hx] of [['r', p.rLeg, p.rKnee, -2], ['l', p.lLeg, p.lKnee, 2]]) {
@@ -511,16 +518,22 @@ function simulate() {
         const Dr = [root[i][0] + lx * cy + lz * sy, root[i][1] - lx * sy + lz * cy];
         Dsm[f] = Dsm[f] ? [lerp(Dsm[f][0], Dr[0], 1), lerp(Dsm[f][1], Dr[1], 1)] : Dr.slice(); const D = Dsm[f];
         { const sgn = f === 'l' ? 1 : -1, lx = Math.cos(yaw), lz = -Math.sin(yaw), s_ = (D[0] - root[i][0]) * lx + (D[1] - root[i][1]) * lz;   // keep each foot on its own side
-          if (sgn * s_ < 0.07) { const kk = 0.07 * sgn - s_; D[0] += lx * kk; D[1] += lz * kk; } }   // ~0.1 s low-pass
+          if (sgn * s_ < 0.07) { const kk = 0.07 * sgn - s_; D[0] += lx * kk; D[1] += lz * kk; }   // ~0.1 s low-pass
+          const o_ = f === 'r' ? 'l' : 'r', ref = step[o_] ? step[o_].to : feet[o_]; if (ref) for (const [ax, az] of [[lx, lz], [cyF, -syF]]) {   // and of the other foot
+            const s2 = (D[0] - ref[0]) * ax + (D[1] - ref[1]) * az; if (sgn * s2 < XMIN) { const kk = XMIN * sgn - s2; D[0] += ax * kk; D[1] += az * kk; } } }
         if (fk) { if (feet[f]) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'lift' }); feet[f] = null; step[f] = null; out.push(null); continue; }
         if (!feet[f]) { feet[f] = D.slice(); STEPS.push({ c, t, foot: f, p: [D[0], 0, D[1]], kind: 'land', sp }); }
-        if (skid) { feet[f] = [lerp(feet[f][0], D[0], 0.25), lerp(feet[f][1], D[1], 0.25)]; step[f] = null; if (i % 12 === 0) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'skid' }); out.push([feet[f][0], 0, feet[f][1]]); continue; }
+        if (skid) { feet[f] = [lerp(feet[f][0], D[0], 0.25), lerp(feet[f][1], D[1], 0.25)]; step[f] = null;
+          if (f === 'l' && feet.r) for (const [ax, az] of [[cy, -sy], [cyF, -syF]]) { const s3 = (feet.l[0] - feet.r[0]) * ax + (feet.l[1] - feet.r[1]) * az;   // no crossover while sliding
+            if (s3 < XMIN) { const kk = (XMIN - s3) / 2; feet.l = [feet.l[0] + ax * kk, feet.l[1] + az * kk]; feet.r = [feet.r[0] - ax * kk, feet.r[1] - az * kk]; } } if (i % 12 === 0) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'skid' }); out.push([feet[f][0], 0, feet[f][1]]); continue; }
         if (i > 0 && inWin(SLIDES[c], (i - 1) / HZ) && feet[f] && rec[f] == null) rec[f] = t + (f === 'r' ? 0 : 0.07);   // slide just ended
         if (rec[f] != null && t >= rec[f] && !step[f]) { const sd = f === 'r' ? -1 : 1; step[f] = { from: feet[f].slice(), to: [root[i][0] + sd * 0.14 * cy + 0.05 * sy + vx * 0.12, root[i][1] - sd * 0.14 * sy + 0.05 * cy + vz * 0.12], t0: t, dur: 0.15, h: 0.16 }; rec[f] = null; }   // neutral stance under the hips
         const o = f === 'r' ? 'l' : 'r';
         if (step[f]) {
-          const s_ = step[f], u = Math.min(1, (t - s_.t0) / s_.dur), w = u * u * (3 - 2 * u);
-          s_.to = [lerp(s_.to[0], D[0] + vx * (s_.dur * (1 - u)) * 0.6, 0.15), lerp(s_.to[1], D[1] + vz * (s_.dur * (1 - u)) * 0.6, 0.15)];
+          const s_ = step[f], u = Math.min(1, (t - s_.t0) / s_.dur), uh = Math.min(1, u / 0.85), w = uh * uh * (3 - 2 * uh);
+          if (u < 0.85) s_.to = [lerp(s_.to[0], D[0] + vx * (s_.dur * (1 - u)) * 0.6, 0.15), lerp(s_.to[1], D[1] + vz * (s_.dur * (1 - u)) * 0.6, 0.15)];
+          { const o2 = f === 'r' ? 'l' : 'r', rf = feet[o2]; if (rf && !step[o2]) { const sg = f === 'l' ? 1 : -1, g = (s_.to[0] - rf[0]) * cy - (s_.to[1] - rf[1]) * sy;   // but never plant across
+            if (sg * g < XMIN) { const k = sg * XMIN - g; s_.to = [s_.to[0] + cy * k, s_.to[1] - sy * k]; } } }
           const x = lerp(s_.from[0], s_.to[0], w), z = lerp(s_.from[1], s_.to[1], w), y = s_.h * Math.sin(Math.PI * u);
           if (u >= 1) { feet[f] = s_.to.slice(); step[f] = null; lastStep[f] = t; STEPS.push({ c, t, foot: f, p: [x, 0, z], kind: 'step', sp }); out.push([x, 0, z]); }
           else out.push([x, y, z]);
@@ -531,9 +544,11 @@ function simulate() {
         const otherBusy = step[o] && reach < 0.5 && (sp < 2.5 || (t - step[o].t0) / step[o].dur < 0.4);
         const errO = feet[o] ? Math.hypot(feet[o][0] - D[0], feet[o][1] - D[1]) : 0;
         const rested = t - lastStep[f] > 0.18 && t - lastStep[o] > 0.08;
-        if ((err > 0.17 && rested && !otherBusy && !(step[o] == null && feet[o] && errO > err * 1.4 && reach < 0.5)) || (reach > Math.max(0.5, Math.hypot(D[0] - root[i][0], D[1] - root[i][1]) + 0.15) && Math.hypot(feet[f][0] - D[0], feet[f][1] - D[1]) > 0.08 && !step[f] && t - lastStep[f] > 0.06)) {
-          const run = sp > 2.5, dur = run ? Math.max(0.12, Math.min(0.18, 0.75 / sp)) : Math.min(0.26, Math.max(0.15, 0.1 + 0.12 * err));
-          step[f] = { from: feet[f].slice(), to: [D[0] + vx * dur * 0.75, D[1] + vz * dur * 0.75], t0: t, dur, h: run ? 0.28 : Math.min(0.26, 0.07 + 0.24 * err) };
+        const gapAt = (ax, az) => (f === 'l' ? 1 : -1) * ((feet[f][0] - feet[o][0]) * ax + (feet[f][1] - feet[o][1]) * az);
+        const crossed = feet[o] && !step[o] && Math.min(gapAt(cy, -sy), gapAt(cyF, -syF)) < XMIN * 0.6 && t - lastStep[f] > 0.04;
+        if (crossed || (err > 0.17 && rested && !otherBusy && !(step[o] == null && feet[o] && errO > err * 1.4 && reach < 0.5)) || (reach > Math.max(0.5, Math.hypot(D[0] - root[i][0], D[1] - root[i][1]) + 0.15) && Math.hypot(feet[f][0] - D[0], feet[f][1] - D[1]) > 0.08 && !step[f] && t - lastStep[f] > 0.06)) {
+          const run = sp > 2.5, dur = run ? Math.max(0.12, Math.min(0.18, 0.75 / sp)) : crossed ? 0.12 : Math.min(0.26, Math.max(0.15, 0.1 + 0.12 * err));   // crossed: quick side step
+          step[f] = { from: feet[f].slice(), to: [D[0] + vx * dur * 0.75, D[1] + vz * dur * 0.75], t0: t, dur, h: run ? 0.28 : crossed ? 0.14 : Math.min(0.26, 0.07 + 0.24 * err) };
         }
         out.push([feet[f][0], 0, feet[f][1]]);
       }
@@ -606,7 +621,9 @@ function poseRaw(c, t) {
   { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]];
     const ob = basePose(o, t), pitch = ((ob.waist[0] || 0) + (ob.chest[0] || 0) * 0.6) * Math.PI / 180, oy = ob.yaw * Math.PI / 180, lean = Math.sin(pitch) * 0.95;
     p.oppLean = [Math.sin(oy) * lean, 0, Math.cos(oy) * lean, yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9];   // opponent chest/head offset for the weapon collision
-    p.oppArms = oppArmPts(ob, ro, p.oppLean); }
+    p.oppArms = oppArmPts(ob, ro, p.oppLean);
+    p.oppFeet = ['r', 'l'].map(s => { const f = samp(SIM[o][s], t); return f ? [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.05, f[2]] : null; });   // opponent legs for the weapon collision
+  }
   const fr = samp(S_.r, t), fl = samp(S_.l, t);
   { const sw = f => f && f[1] > 0.004 ? Math.min(1, f[1] / 0.08) : 0, rs = sw(fr), ls = sw(fl);
     // weight shift: swinging right foot -> hips over the left (stance) foot, spine bends back to keep the head centred

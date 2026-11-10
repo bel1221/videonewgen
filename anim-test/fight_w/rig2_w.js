@@ -248,6 +248,9 @@ export function applyPose(ch, P) {
       { a: new THREE.Vector3(P.opp[0] + oL[0], P.opp[1] + 1.78 + oL[3], P.opp[2] + oL[2]), b: new THREE.Vector3(P.opp[0] + oL[0], P.opp[1] + 1.78 + oL[3], P.opp[2] + oL[2]), r: 0.42 }] : [];
     if (P.oppArms) for (const [sh, el, hd] of P.oppArms) { const S_ = new THREE.Vector3(...sh), E_ = new THREE.Vector3(...el), H_ = new THREE.Vector3(...hd);
       opp.push({ a: S_, b: E_, r: 0.16 }, { a: E_, b: H_, r: 0.16 }); }   // opponent arms (fight_w: blades were grazing forearms at clashes)
+    if (P.oppFeet && P.opp) for (const f of P.oppFeet) if (f) {   // opponent legs: pelvis -> real foot (feet stand outside the root capsule)
+      const F_ = new THREE.Vector3(...f), H_ = new THREE.Vector3(P.opp[0] + (f[0] - P.opp[0]) * 0.25, P.opp[1] + 0.72, P.opp[2] + (f[2] - P.opp[2]) * 0.25);
+      opp.push({ a: F_, b: H_, r: 0.17 }); }
     const closest = (p, a, bb) => { const ab = bb.clone().sub(a), L2 = ab.lengthSq(); const u = L2 > 1e-9 ? Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / L2)) : 0; return cl.copy(a).addScaledVector(ab, u); };
     for (let it = 0; it < 44; it++) {
       ch.root.updateMatrixWorld(true); let hit = false;

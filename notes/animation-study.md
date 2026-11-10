@@ -1034,3 +1034,54 @@ in `fight_v8/parts/assemble.py`:
 - **User on t1:** "fine". Open item: legs crossing on small steps. See the fight-animation standard.
 - **Shell note:** Python patches passed through bash here-documents mangled backslash escapes on this machine (a stray line
   break inside a string literal, several times). Write patch scripts as files instead.
+
+## 20. Legs crossing over: diagnosis and fix (2026-11-11)
+- **New check:** `anim-test/tools/cross_qa.js` (run in the page, like `phase_qa.js`). Each sample measures, in the pelvis
+  frame, the left sole/knee minus the right sole/knee. A negative gap means crossed; 0-2.5 px means narrow. Samples with
+  both feet in the air don't count.
+- **Main cause: a sign bug since v8.** The gait contacts (run, walk and DRIFT strafe) moved from a travel-right axis
+  (-fz, fx) to a body-left axis (cos yaw, -sin yaw) but kept `- side * LAT`. The right foot was therefore placed on the
+  body's LEFT in every gait window of v8, duel40, t1-t3 and anything else built from `fight_v8/choreo.js`. v6 was correct.
+- **Other causes:**
+  - Strafing: the trailing foot's half-stride (0.575) is longer than the stance width, so it landed past the lead foot.
+  - Turning over planted feet (tracking an opponent who runs past, spins): the planner only re-stepped on distance, never
+    on side.
+  - Both feet landing at the same instant (a hop), followed by a fast turn.
+  - Slides: both feet are dragged while the body turns.
+- **Fix, part 1:** `anim-test/tools/patch_nocross.pl` patches the shared planner in `fight_v8/choreo.js` (the base
+  `assemble_w.py` copies) and the assembled `fight_w/choreo_{t1,t2,t3,duel40}.js`. Re-run it after any re-assemble; it
+  skips files already patched. (There was no Python on the local PC this session, so `assemble_w.py` was not re-run.)
+  - The sign is flipped (also in `assemble_w.py` and `fight_v8/parts/assemble.py`).
+  - `XMIN = 0.22`: gait contacts never land past the other foot's line (side-step shuffle).
+  - Planner targets stay on their own side of the other foot, or of its landing spot while it steps. This is checked for
+    the current facing and for the facing 0.15 s ahead, with the lookahead turn capped at 45 deg; past that the two sides
+    contradict each other in a spin.
+  - A foot that is, or is about to be, crossed re-steps after 0.04 s with a quick 0.12 s step, lifted 0.14.
+  - Touchdown: horizontal travel ends at 85% of every planner step and the last 15% is a straight-down plant. The target
+    is no longer re-aimed during the plant, except to stop it landing across. Before, feet skimmed the sand sideways on
+    their last frame, which stance_qa counted as slides.
+  - Slides keep the two feet XMIN apart.
+- **Fix, part 2:** `anim-test/tools/patch_oppfeet.pl` (fight_w only, also in `assemble_w.py`) gives the weapon collision
+  the opponent's real legs. Each choreo passes `p.oppFeet` (the opponent's foot positions from the planner), and
+  `fight_w/rig2_w.js` adds a pelvis-to-foot capsule (r 0.17) per leg. Before, the legs were one vertical capsule at the
+  root, and with the feet now standing properly to the sides, low cuts grazed the shins (t1 2.8-3.6 s).
+- **Not patched:**
+  - `fight_v8/parts/assemble.py` builds from v7 and only got the sign flip, so re-assembling v8 drops the planner part.
+  - The v8 rig has no `oppFeet`.
+  - The old spear/hammer/bow choreo files were assembled before this code existed and are untouched.
+- **Results** (all rendered from the same local checkout; cross_qa 60 Hz, duel40 30 Hz; phase = phase_qa sample total):
+
+| test | crossed A / B before | after | bounce A / B before | after | foot slide before | after | phase before | after |
+|---|---|---|---|---|---|---|---|---|
+| t1 | 176 / 191 | 0 / 0 | 17 / 11 | 15 / 9 | 0 / 0 | 0 / 0 | 19 | 23 |
+| t2 | 160 / 160 | 0 / 0 | 14 / 9 | 10 / 11 | 0 / 0 | 0 / 0 | 3 | 0 |
+| t3 | 101 / 70 | 0 / 0 | 12 / 13 | 10 / 13 | 1 / 0 | 0 / 0 | 5 | 6 |
+| duel40 | 286 / 494 | 1 / 0 | 43 / 46 | 35 / 34 | 0 / 0 | 0 / 0 | 22 | 12 |
+
+  - Legs passing THROUGH each other (`legsCross` in phase_qa): 5 -> 0 across the four tests.
+  - duel40's one left-over sample is 2.7 px, a single frame at 18.95 s in A's 900 deg/s spin-sweep (360 deg in 0.2 s).
+    No stepping model keeps feet apart through that. If the user sees it, make the spin a pivot on one foot with the
+    other lifted.
+  - t1's phase total is 23 vs 19. The shin contacts are gone (one 0.4 px shin sample left). What remains is B's forearm
+    grazes at parries and the 5.55 s head graze, which were already there before this change.
+- **Not re-rendered.** The delivered MP4s (t1, duel40) still show the old crossed footwork.

@@ -117,16 +117,18 @@ s = rep(s, "  for (const [t0, t1, kind] of [...RUN[c].map(w => [w[0], w[1], 'run
            "  for (const [t0, t1, kind] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk']), ...DRIFT.map(w => [w[0], w[1], 'strafe'])]) {\n"
            "    const WK = kind === 'walk', SF = kind === 'strafe', STR = SF ? 1.15 : WK ? 0.95 : STRIDE, SWH = SF ? 0.2 : WK ? 0.12 : 0.5, STF = SF ? 0.4 : WK ? 0.55 : 0.22,\n"
            "      BOB = SF ? 0.012 : WK ? 0.008 : 0.025, LAT = SF ? 0.21 : 0.15, FWD = SF ? 0.12 : 0.28;")
-s = rep(s, "        con.push({ i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] });",
-           "        con.push({ i, f, p: [root[i][0] + fx * FWD - side * LAT * lx, root[i][1] + fz * FWD - side * LAT * lz] });")
-s = rep(s, "return { i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] }; };",
-           "return { i, f, p: [root[i][0] + fx * FWD - side * LAT * lx, root[i][1] + fz * FWD - side * LAT * lz] }; };")
+s = rep(s, "        con.push({ i, f, p: [root[i][0] + fx * 0.28 + side * 0.15 * lx, root[i][1] + fz * 0.28 + side * 0.15 * lz] });",
+           "        con.push({ i, f, p: [root[i][0] + fx * FWD + side * LAT * lx, root[i][1] + fz * FWD + side * LAT * lz] });")
+s = rep(s, "return { i, f, p: [root[i][0] + fx * 0.28 + side * 0.15 * lx, root[i][1] + fz * 0.28 + side * 0.15 * lz] }; };",
+           "return { i, f, p: [root[i][0] + fx * FWD + side * LAT * lx, root[i][1] + fz * FWD + side * LAT * lz] }; };")
 s = rep(s, "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) ||", "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) || inWin(DRIFT, i / HZ) ||")
 s = rep(s, "  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]]; }",
            "  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]];\n"
            "    const ob = basePose(o, t), pitch = ((ob.waist[0] || 0) + (ob.chest[0] || 0) * 0.6) * Math.PI / 180, oy = ob.yaw * Math.PI / 180, lean = Math.sin(pitch) * 0.95;\n"
            "    p.oppLean = [Math.sin(oy) * lean, 0, Math.cos(oy) * lean, yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9];   // opponent chest/head offset for the weapon collision\n"
-           "    p.oppArms = oppArmPts(ob, ro, p.oppLean); }")
+           "    p.oppArms = oppArmPts(ob, ro, p.oppLean);\n"
+           "    p.oppFeet = ['r', 'l'].map(s => { const f = samp(SIM[o][s], t); return f ? [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.05, f[2]] : null; });   // opponent legs for the weapon collision\n"
+           "  }")
 s = rep(s, "function rootXZ(c, t) {", "function oppArmPts(ob, ro, lean) {   // opponent arms (shoulder, elbow, hand) from his FK angles + torso turn - weapon collision keeps blades off them\n"
   "  const ty = (ob.yaw + (ob.waist[1] || 0) + (ob.chest[1] || 0)) * Math.PI / 180, cy = Math.cos(ty), sy = Math.sin(ty), g = W.floorAt(ro[0], ro[1]), out = [];\n"
   "  const toW = (x, y, z) => [ro[0] + x * cy + z * sy + lean[0] * 0.8, g + y + lean[3], ro[1] - x * sy + z * cy + lean[2] * 0.8];\n"
