@@ -5,7 +5,7 @@ vid = sys.argv[1]
 src = open('fight_v8/choreo.js', encoding='utf-8').read()
 poses = open('fight_w/parts/poses_w.js', encoding='utf-8').read()
 build = open(f'fight_w/parts/build_{vid}.js', encoding='utf-8').read() + '\n' + (open('fight_w/parts/common_w.js', encoding='utf-8').read() if vid != 'test' else '')
-cam = open(f'fight_w/parts/camera_{vid if vid != "test" else "test"}.js', encoding='utf-8').read()
+cam = open(f'fight_w/parts/camera_{vid}.js', encoding='utf-8').read()
 
 def region(s, start, end, new):
     a = s.index(start); b = s.index(end, a)
@@ -20,22 +20,25 @@ s = region(s, 'function buildAll() {', 'export const export_cross = {};', build 
 s = region(s, 'const INS = [', '// ------------------------------------------------------------------ effects', cam + '\n')
 s = rep(s, '// Choreography, cameras and effect timing for the 30 s fight test v8 ("blade masters").',
         f'// Choreography, cameras and effect timing for the fight_w "{vid}" duel (sword vs a different legendary weapon).')
-s = rep(s, 'export const TOTAL = 30.0;', 'export const TOTAL = 20.0;')
+s = rep(s, 'export const TOTAL = 30.0;', 'export const TOTAL = ' + ('37.55' if vid == 'duel40' else '20.0') + ';')
 # new pose channels: lh (two-hand IK), rh/draw (bowstring hand), aimK (bow arm aims)
 s = rep(s, "function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] };",
-        "function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, lh: 0, rh: 0, draw: 0, aimK: 0, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] };")
-s = rep(s, "const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff'];", "const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff', 'lh', 'rh', 'draw', 'aimK'];")
+        "function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, lh: 0, rh: 0, draw: 0, aimK: 0, wide: 1, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] };")
+s = rep(s, "const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff'];", "const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff', 'lh', 'rh', 'draw', 'aimK', 'wide'];")
 s = rep(s, "  const o = { wrist: lerp(a.wrist, b.wrist, u), roll: lerp(a.roll, b.roll, u), y: lerp(a.y, b.y, u), yawOff: lerp(a.yawOff, b.yawOff, u),",
         "  const o = { wrist: lerp(a.wrist, b.wrist, u), roll: lerp(a.roll, b.roll, u), y: lerp(a.y, b.y, u), yawOff: lerp(a.yawOff, b.yawOff, u),\n"
-        "    lh: lerp(a.lh || 0, b.lh || 0, u), rh: lerp(a.rh || 0, b.rh || 0, u), draw: lerp(a.draw || 0, b.draw || 0, u), aimK: lerp(a.aimK || 0, b.aimK || 0, u),")
+        "    lh: lerp(a.lh || 0, b.lh || 0, u), rh: lerp(a.rh || 0, b.rh || 0, u), draw: lerp(a.draw || 0, b.draw || 0, u), aimK: lerp(a.aimK || 0, b.aimK || 0, u), wide: lerp(a.wide ?? 1, b.wide ?? 1, u),")
 # weapon poses + their weapon-axis intents
 s = rep(s, "// ------------------------------------------------------------------ blade intent", poses + "\n// ------------------------------------------------------------------ blade intent")
 s = rep(s, "for (const k in BD) if (L[k]) L[k].bd = bdv(...BD[k]);",
         "for (const k in BD) if (L[k]) L[k].bd = bdv(...BD[k]);\n"
-        "const BDW = { parryLowR: [-55, -35], parryLowL: [-55, 35], spGuard: [-6, 46], spWind: [-2, 68], spThrust: [0, 16], spJab: [0, 8], spSweepW: [-28, -60], spSweep: [-30, -60], spOverW: [55, 160], spOver: [-30, 12],\n"
+        "const BDW = { gsCrouch: [60, 18], gsHop: [60, 18], gsLand: [60, 18], spIdle: [72, 8], gsIdle: [-32, 8], spCharge: [-4, 30], lieBack: [-8, -95], ready: [64, -6], sprintGo: [20, -150], spReady: [-6, 40], gsGuard: [60, 18], gsPlungeW: [-70, 4], gsPlunge: [-50, 0], gsRest: [-12, 175], slideLow: [10, -115],\n"
+        "  parryLowR: [-55, -35], parryLowL: [-55, 35], spGuard: [-6, 46], spWind: [-2, 68], spThrust: [0, 16], spJab: [0, 8], spSweepW: [-28, -60], spSweep: [-30, -60], spOverW: [40, 140], spOver: [-30, 12],\n"
         "  spBlock: [12, -80], spBlockL: [12, 70], spBlockV: [72, 10], spBlockH: [6, -88], hmGuard: [55, 20], hmRest: [-70, -10], hmWindO: [30, 180], hmSlam: [-22, 0], hmWindS: [12, -110], hmSwing: [4, -44],\n"
         "  hmUpperW: [-50, 30], hmUpper: [75, 0], hmBlock: [20, -84], hmBlockL: [20, 84], hmBlockV: [72, 0], hmSweep: [-30, -44], hmSpin: [0, -100], bwIdle: [-50, 20], bwNock: [84, 62], bwDraw: [84, 62], bwLoose: [84, 62], bwBlock: [5, 90] };\n"
-        "for (const k in BDW) if (L[k]) L[k].bd = bdv(...BDW[k]);")
+        "for (const k in BDW) if (L[k]) L[k].bd = bdv(...BDW[k]);\n"
+        "for (const n in L) if (n.startsWith('gs') && !BDW[n]) { const b = n[2].toLowerCase() + n.slice(3); if (L[b] && L[b].bd) { L[n].bd = L[b].bd.slice(); delete L[n]._flat; } }   // greatsword copies inherit the sword blade intents\n"
+        "if (L.gsWindR) L.gsWindR.bd = bdv(25, -135);   // greatsword wind-up held out to the side")
 # slides are declared by the build (slide(c, t0, t1)); twirls and arrows too
 s = region(s, 'export const SLIDES = {', '\nconst inWin', 'export const SLIDES = { A: [], B: [] };')
 s = rep(s, "if (e === 'i' && t > 2.5) out.push", "if (e === 'i' && t > 0.3) out.push")
@@ -65,5 +68,63 @@ function driftTab() {
   return tab; }
 function driftAt(t) { if (!DRIFT.length) return [0, 0]; if (!DTAB) DTAB = driftTab(); const i = Math.max(0, Math.min(DTAB.length / 2 - 1, Math.round(t * 240))); return [DTAB[i * 2], DTAB[i * 2 + 1]]; }
 function rootXZ(c, t) { const p = evalPos(P[c], t), d = driftAt(t); return [p[0] + d[0], p[1] + d[1]]; }""")
+# ---- WALK gait (walking out of the arena, calm repositioning): same planner as the run with a short stride, low foot lift,
+# long stance and an upright body; the weapon arm keeps its pose (carry), only the free arm swings.
+s = rep(s, "const T = { A: [], B: [] }, P = { A: [], B: [] }, RUN = { A: [], B: [] }, BR = { A: [], B: [] }",
+           "const WALK = { A: [], B: [] };\nconst T = { A: [], B: [] }, P = { A: [], B: [] }, RUN = { A: [], B: [] }, BR = { A: [], B: [] }")
+s = rep(s, """  for (const [t0, t1] of RUN[c]) if (t >= t0 && t <= t1) {
+    const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]); const phi = d / STRIDE;
+    const blend = clamp(Math.min((t - t0) / 0.08, (t1 - t) / 0.1));""",
+"""  for (const [t0, t1] of WALK[c]) if (t >= t0 && t <= t1) {   // walk: upright, free arm swings, weapon arm keeps its carry pose
+    const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]), sw = Math.sin(2 * Math.PI * d / 0.95), bl = clamp(Math.min((t - t0) / 0.25, (t1 - t) / 0.25));
+    p.waist = p.waist.map((v, i) => lerp(v, [4, -5 * sw, 0][i], bl)); p.chest[1] += 4 * sw * bl; p.head[1] -= 2 * sw * bl;
+    p.lArm = p.lArm.map((v, i) => lerp(v, [-22 * sw, 0, 8][i], bl)); p.lElbow = p.lElbow.map((v, i) => lerp(v, [-14 - 8 * Math.max(0, sw), 0, 0][i], bl)); p.y = lerp(p.y, 0, bl); p.wide = lerp(p.wide ?? 1, 0, bl);
+    for (const j of ['rLeg', 'lLeg', 'rKnee', 'lKnee']) p[j] = p[j].map(v => v * (1 - bl)); }   // upright walk: legs straight, gait drives the feet
+  for (const [t0, t1] of RUN[c]) if (t >= t0 && t <= t1) {
+    const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]); const phi = d / STRIDE;
+    const blend = clamp(Math.min((t - t0) / 0.18, (t1 - t) / 0.16));   // standard: idle -> run eases in (was a 0.08 s snap)""")
+s = rep(s, "  for (const [t0, t1] of RUN[c]) {\n    const i0 = Math.round(t0 * HZ), i1 = Math.min(N - 1, Math.round(t1 * HZ)), a = rawXZ[i0];",
+           "  for (const [t0, t1, kind] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk'])]) {\n"
+           "    const WK = kind === 'walk', STR = WK ? 0.95 : STRIDE, SWH = WK ? 0.12 : 0.5, STF = WK ? 0.55 : 0.22, BOB = WK ? 0.008 : 0.025;\n"
+           "    const i0 = Math.round(t0 * HZ), i1 = Math.min(N - 1, Math.round(t1 * HZ)), a = rawXZ[i0];")
+s = rep(s, "    const phiAt = i => Math.hypot(rawXZ[i][0] - a[0], rawXZ[i][1] - a[1]) / STRIDE;", "    const phiAt = i => Math.hypot(rawXZ[i][0] - a[0], rawXZ[i][1] - a[1]) / STR;")
+s = rep(s, "stance = Math.round(stepLen * 0.22);", "stance = Math.round(stepLen * STF);")
+s = rep(s, "0.42 * Math.sin(Math.PI * u) * (1 - 0.3 * u)", "SWH * Math.sin(Math.PI * u) * (1 - 0.3 * u)")
+s = rep(s, "g.yoff[i] = -0.025 * Math.cos(2 * Math.PI * (u - 0.25)) - 0.01; } }", "g.yoff[i] = -BOB * Math.cos(2 * Math.PI * (u - 0.25)) - BOB * 0.4; } }")
+s = rep(s, "const forced = i => inWin(RUN[c], i / HZ) ||", "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) ||")
+# ---- SLOW MOTION: SLOWMO = [[ta0, ta1, rate]] in animation time. Video time v -> animation time via animAt(v); VIDEO_TOTAL is
+# the rendered length. Everything (poses, effects, camera) runs on animation time; fight.js maps each frame through animAt.
+s = rep(s, "export const DRIFT = []; let DTAB = null;",
+"""export const SLOWMO = [];   // [ta0, ta1, rate] (animation seconds), e.g. [26.1, 26.9, 0.3]
+export function animAt(v) { let ta = 0, tv = 0; const segs = SLOWMO.slice().sort((a, b) => a[0] - b[0]);
+  for (const [a0, a1, r] of segs) { if (v <= tv + (a0 - ta)) return ta + (v - tv); tv += a0 - ta; ta = a0;
+    const dv = (a1 - a0) / r; if (v <= tv + dv) return a0 + (v - tv) * r; tv += dv; ta = a1; } return ta + (v - tv); }
+export function videoAt(t) { let ta = 0, tv = 0; for (const [a0, a1, r] of SLOWMO.slice().sort((a, b) => a[0] - b[0])) { if (t <= a0) break; tv += a0 - ta; ta = a0; if (t <= a1) return tv + (t - a0) / r; tv += (a1 - a0) / r; ta = a1; } return tv + (t - ta); }
+export function rateAt(t) { for (const [a0, a1, r] of SLOWMO) if (t >= a0 && t <= a1) return r; return 1; }
+export const DRIFT = []; let DTAB = null;""")
+s = rep(s, "arrows: ARROWS.map(a => [a.tn, a.t0, a.t1, a.mode]), vid: '", "arrows: ARROWS.map(a => [a.tn, a.t0, a.t1, a.mode]), slowmo: SLOWMO, video_total: videoAt(TOTAL), vid: '")
+# ---- 'charge' runs: RUN window [t0, t1, 'charge'] keeps the pose's arms (e.g. a spear levelled two-handed) and only runs the body
+# and legs - no swing-the-weapon-back-and-forth-again at the end of every sprint (measured 140 deg/frame flips with trailing arms)
+s = rep(s, "  for (const [t0, t1] of RUN[c]) if (t >= t0 && t <= t1) {\n    const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]); const phi = d / STRIDE;",
+           "  for (const [t0, t1, mode] of RUN[c]) if (t >= t0 && t <= t1) {\n    const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]); const phi = d / STRIDE;")
+s = rep(s, "    const sw = clamp((t1 - 0.12 - t) / 0.2), rb = runBody(phi, cp(p)), r = mix(runArms(phi, cp(rb), false), runArms(phi, cp(rb), true), sw);",
+           "    const sw = clamp((t1 - 0.12 - t) / 0.2), rb = runBody(phi, cp(p)), r = mode === 'charge' ? rb : mix(runArms(phi, cp(rb), false), runArms(phi, cp(rb), true), sw);")
+# ---- DRIFT FOOTWORK (user: "if leg movement exists make it wide and have fluid motion, not stiff staying in place and sliding across the
+# floor"). BAD as it was: during DRIFT the body travelled ~2 blocks/s while the planner only stepped when a foot fell 0.17 behind -> legs
+# stayed put and the body glided. Now every DRIFT window is a gait window too ('strafe': stride 1.15, wide 0.21 side stance, lift 0.2).
+s = rep(s, "  for (const [t0, t1, kind] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk'])]) {\n"
+           "    const WK = kind === 'walk', STR = WK ? 0.95 : STRIDE, SWH = WK ? 0.12 : 0.5, STF = WK ? 0.55 : 0.22, BOB = WK ? 0.008 : 0.025;",
+           "  for (const [t0, t1, kind] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk']), ...DRIFT.map(w => [w[0], w[1], 'strafe'])]) {\n"
+           "    const WK = kind === 'walk', SF = kind === 'strafe', STR = SF ? 1.15 : WK ? 0.95 : STRIDE, SWH = SF ? 0.2 : WK ? 0.12 : 0.5, STF = SF ? 0.4 : WK ? 0.55 : 0.22,\n"
+           "      BOB = SF ? 0.012 : WK ? 0.008 : 0.025, LAT = SF ? 0.21 : 0.15, FWD = SF ? 0.12 : 0.28;")
+s = rep(s, "        con.push({ i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] });",
+           "        con.push({ i, f, p: [root[i][0] + fx * FWD - side * LAT * lx, root[i][1] + fz * FWD - side * LAT * lz] });")
+s = rep(s, "return { i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] }; };",
+           "return { i, f, p: [root[i][0] + fx * FWD - side * LAT * lx, root[i][1] + fz * FWD - side * LAT * lz] }; };")
+s = rep(s, "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) ||", "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) || inWin(DRIFT, i / HZ) ||")
+s = rep(s, "  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]]; }",
+           "  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]];\n"
+           "    const ob = basePose(o, t), pitch = ((ob.waist[0] || 0) + (ob.chest[0] || 0) * 0.6) * Math.PI / 180, oy = ob.yaw * Math.PI / 180, lean = Math.sin(pitch) * 0.95;\n"
+           "    p.oppLean = [Math.sin(oy) * lean, 0, Math.cos(oy) * lean, yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9]; }   // opponent chest/head offset for the weapon collision")
 open(f'fight_w/choreo_{vid}.js', 'w', encoding='utf-8').write(s)
 print(f'fight_w/choreo_{vid}.js', len(s), 'chars')

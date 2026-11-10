@@ -957,3 +957,48 @@ in `fight_v8/parts/assemble.py`:
 - **Collisions (60 Hz QA):** no body overlap anywhere. Small items remain: the hammer head resting on the sand on slams, and
   the bow touching A by up to 0.07 at one block.
 - **v8 re-rendered** with the fixes (the flurry spacing went from 1.2 to 1.28 to clear a brief overlap).
+
+## 18. Duel 40: Boltspear vs Goldreaper (2026-11-10), built to `notes/fight-animation-standard.md`
+
+**Request:** a 40 s duel.
+- A (Boltspear) lunges first with a quick combo. B (Goldreaper) blocks, dodges and counters.
+- Both back off to rest, then show off their weapons.
+- A multi-combo with slow-motion shots of one fighter sliding across the other's attack.
+- The finish, then the winner walks out of the arena.
+- The sand slightly less bright.
+
+**Goldreaper** is a golden two-handed greatsword, not a scythe. Exported at 36 px, grip 0.13; left hand at -3.6 px.
+
+**Shared-mechanics fixes, all measured first** (apply to v8, fight_w and every later fight). The bounce counter in
+`tools/stance_qa.js` had a bug that always returned 0 (it tracked the value instead of a running max/min); fixed.
+- **Bounce** (about 5 pelvis reversals a second; 8-10 a second standing at the spear start). The pelvis drop in `poseRaw`
+  is marked BAD: it used the current foot targets, lift included, every frame. It is now computed in the planner from planted
+  feet only, smoothed (sigma 0.11 s), and run bob is halved. Result: 105 -> about 30-40 reversals per 20 s. The remaining ones
+  are authored crouches and jumps.
+- **Legs through the sand** (knee up to 0.17 below while running). The drop sank the hips to 0.42 to reach trailing feet that
+  were out of reach. Unreachable feet are now ignored, since they are about to step. Result: 0 frames below the floor.
+- **Weapon flip at every sprint start/end** (100-150° per frame). The run overlay switched the weapon arm with a hard cut
+  (`t < t1 - 0.25`). It now cross-fades over 0.2 s. Spears use `'charge'` runs: the spear stays levelled two-handed and only
+  the body and legs run. Result: A's flips over 80° went from 8 to 0.
+- **Idle -> run** now eases in over 0.18 s; it snapped in at 0.08 s.
+- **Walk gait** (`WALK[c]` windows): stride 0.95, foot lift 0.12, long stance, upright, the free arm swings and the weapon arm
+  carries. Hip bob is 0.034 (it was 0.11 at stride 1.35).
+- **Slow motion** (`SLOWMO = [[ta0, ta1, rate]]`): `fight.js` maps video time to animation time per frame, motion-blur
+  shutter scales with the rate, the progress bar uses video time, and `fight_sfx3.py` maps every event to video time.
+  This video: 21.6-22.25 (the slide) and 25.55-25.95 (the finish) at 0.3x. Animation is 37.55 s, video is 40.0 s.
+
+**New poses:**
+- `L.ready` (upright; replaces crouch-as-ready, which caused the forward lean)
+- `L.sprintGo`, `L.spReady`, `L.spCharge`
+- greatsword set `gs*` (sword poses plus left hand on the handle, blade intents inherited)
+- `gsPlungeW`/`gsPlunge` (jump plunge), `gsRest` (shoulder carry), `gsPoint`, `slideLow`, `lieBack` (knocked flat, legs straight)
+- auto-pick candidates per weapon (`CANDS`)
+
+**QA before the render:**
+- **Contacts:** 21, miss mean 0.04, none over 0.3.
+- **Collisions (60 Hz):** 0 / 0 / 0, plus one 0.03 graze at 17.45 s.
+- **Stance:** 0 below floor, 0-1 foot slides, bounce about 1.2 per second.
+- **Joint angular acceleration p95:** 9.7 / 9.2 (v8: 13.3 / 13.0).
+- **Weapon flips over 80°:** A 0, B 3 (the run-in skid and the plunge, at most 103).
+- **Camera:** 34 cuts in 40 s, median 1.0 s; one shot is 0.76 s, all others are at least 0.8 s, apart from impact inserts and the flash.
+- **Sand:** sun 3.6 for this video (4.0 elsewhere).

@@ -125,6 +125,10 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   events -> `fight_v8/comp/events.json`; sound `SCENE=v8 python fight/fight_sfx3.py`. Collision QA: `tools/collide_qa.js`.
   Includes all v7-review fixes (bright sun 4.0, standing slides, layered impact-frame hits, sword twirls and grip blend, sword
   1.15x, parry auto-pick). Details and metrics: notes §16. Waiting on the user's feedback.
+- **Duel 40** (`fight_w`, `?vid=duel40`): Boltspear vs Goldreaper, 40 s with slow motion, built to the permanent standard.
+  Build `python fight_w/parts/assemble_w.py duel40`; render `QS="?sub=5&vid=duel40" ... frames 0 1200`; sound `SCENE=duel40`.
+  Out: `out/newgen_duel40_boltspear_vs_goldreaper.mp4`. Mechanics fixes (bounce, legs through sand, run flips, walk gait, slow
+  motion) and QA numbers: notes §18.
 - **Weapon-style duels** (`anim-test/fight_w/`, 3 x 20 s): sword vs spear (Boltspear), vs heavy hammer (golem_hammer), vs bow
   (Voidbow). `?vid=spear|hammer|bow`; build `python fight_w/parts/assemble_w.py <vid>`; render
   `PAGE=anim-test/fight_w/index.html QS="?sub=5&vid=<vid>" node render.mjs frames 0 600 out/newgen_fight_w_<vid>_video.mp4`;

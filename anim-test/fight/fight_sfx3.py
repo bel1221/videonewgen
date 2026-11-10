@@ -28,12 +28,33 @@ CFG = {'a': dict(total=20.0, mute=[6.46], big=(13.2, 13.95, 9.4), fall=19.38, cr
        'hammer': dict(total=20.0, mute=[], big=(3.6, 6.4, 8.55, 16.55), fall=None, cross=16.95, bind=(0, 0), impact=True, wpn='hammer',
                       drop=['clash/desert_01.wav'], events='fight_w/comp/events_hammer.json', out='fight_w/comp/audio_hammer.m4a'),
        'bow': dict(total=20.0, mute=[], big=(5.8, 14.62), fall=None, cross=14.95, bind=(0, 0), impact=True, wpn='bow',
-                   drop=['clash/desert_01.wav'], events='fight_w/comp/events_bow.json', out='fight_w/comp/audio_bow.m4a')}[SCENE]
-BIND = CFG.get('bind', (11.7, 12.5)); EVF = CFG.get('events', 'fight/comp/events.json'); OUTF = CFG.get('out', 'fight/comp/fight_audio.m4a')
+                   drop=['clash/desert_01.wav'], events='fight_w/comp/events_bow.json', out='fight_w/comp/audio_bow.m4a'),
+       # duel40 (Boltspear vs Goldreaper, 40 s with slow motion): times below are ANIMATION seconds; all events are mapped to
+       # video time through the slow-motion segments (EV['slowmo']) before placing sounds
+       'duel40': dict(total=40.0, mute=[], big=(3.05, 15.25, 17.95, 21.6, 25.5), fall=26.8, cross=25.75, bind=(19.78, 20.4), impact=True, wpn='duel40',
+                      drop=['clash/desert_01.wav'], events='fight_w/comp/events_duel40.json', out='fight_w/comp/audio_duel40.m4a')}[SCENE]
+EVF = CFG.get('events', 'fight/comp/events.json'); OUTF = CFG.get('out', 'fight/comp/fight_audio.m4a')
 SR = 48000; TOTAL = CFG['total']; PK = 'sfx_pack'; MUTE_CLASH = CFG['mute']
 EV = json.load(open(EVF)); CUR = json.load(open(f'{PK}/curated.json'))
+# slow motion: map animation time -> video time for every event (and the config times) so sounds land on the slowed frames
+SLOW = sorted(EV.get('slowmo', []))
+def vt(t):
+    v, ta = 0.0, 0.0
+    for a0, a1, r in SLOW:
+        if t <= a0: break
+        v += a0 - ta; ta = a0
+        if t <= a1: return v + (t - a0) / r
+        v += (a1 - a0) / r; ta = a1
+    return v + (t - ta)
+if SLOW:
+    EV['swings'] = [[vt(t), c] for t, c in EV['swings']]; EV['clashes'] = [[vt(t), b, k] for t, b, k in EV['clashes']]
+    EV['steps'] = [[vt(st[0])] + st[1:] for st in EV['steps']]; EV['ghits'] = [vt(t) for t in EV['ghits']]
+    EV['slides'] = {c: [[vt(a), vt(b)] for a, b in w] for c, w in EV['slides'].items()}; EV['twirls'] = [[vt(t), c] for t, c in EV.get('twirls', [])]
+    EV['ins'] = [vt(t) for t in EV.get('ins', [])]; EV['flash'] = vt(EV['flash'])
+    CFG = dict(CFG, big=tuple(vt(t) for t in CFG['big']), fall=vt(CFG['fall']) if CFG['fall'] is not None else None, cross=vt(CFG['cross']), bind=tuple(vt(t) for t in CFG['bind']))
 for _k in CUR:
     if isinstance(CUR[_k], list): CUR[_k] = [f for f in CUR[_k] if f not in CFG.get('drop', [])]
+BIND = CFG.get('bind', (11.7, 12.5))
 INS = set(round(x, 3) for x in EV.get('ins', [])) | ({round(EV['flash'], 3)} if CFG.get('impact') and 'flash' in EV else set()) if CFG.get('impact') else set()
 MC_SAND = sorted(glob.glob(f'{PK}/mc/step_sand*.ogg')); MC_FALL = f'{PK}/mc/damage_fallsmall.ogg'
 rng = np.random.default_rng(11)
@@ -97,7 +118,9 @@ for t, c in EV['swings']:
     pan = 0.25 if c == 'A' else -0.25
     if c == 'B' and WPN == 'hammer':      # heavy: a low mace whoosh instead of a blade swish
         place(1, load(MC + f'item_mace_smash_air{1 + int(rng.integers(3))}.ogg', rng.uniform(0.78, 0.86)), t - 0.05, -6, pan=pan); continue
-    if c == 'B' and WPN == 'spear':       # thrusts: trident throw whoosh + a thin swish
+    if WPN == 'duel40' and c == 'B':     # two-handed greatsword: a heavier, lower swish with a big-swoosh layer
+        place(1, hp(load(pick('slash'), rng.uniform(0.78, 0.86)), 200), t - 0.04, -7, pan=pan); place(1, load(pick('swoosh_big'), 0.9), t - 0.02, -15, pan=pan); continue
+    if (c == 'B' and WPN == 'spear') or (c == 'A' and WPN == 'duel40'):   # spear thrusts: trident throw whoosh + a thin swish
         place(1, load(MC + f'item_trident_throw{1 + int(rng.integers(2))}.ogg', rng.uniform(1.0, 1.12)), t - 0.04, -10, pan=pan)
         place(1, hp(load(pick('slash'), rng.uniform(1.05, 1.2)), 900), t - 0.03, -15, pan=pan); continue
     place(1, hp(load(pick('slash'), rng.uniform(0.92, 1.12)), 300), t - 0.03, -9 + rng.uniform(-2, 1), pan=pan)
@@ -112,6 +135,7 @@ for tn, t0, t1, mode in EV.get('arrows', []):                     # bow: the sho
     place(1, load(MC + 'random_bow.ogg', rng.uniform(0.95, 1.05)), t0, -5, align='onset', pan=-0.2)
     noise(3, tn + 0.05, -26, max(0.15, t0 - tn - 0.1), 300, 1200)                                # string creak while drawing
     if mode == 'dodge': place(1, hp(load(pick('slash'), 1.3), 1500), t1, -12)
+for a0, a1, r in SLOW: place(1, load(f'{PK}/unsheathe/desert_22.wav', 0.55), vt(a0) + 0.05, -9, align='onset'); thump(1, vt(a0), -14, 45)   # slow-mo: deep whoosh swell
 for t, c in EV.get('twirls', []):                                   # sword twirl: a soft air swish per half turn
     place(1, hp(load(pick('slash'), rng.uniform(1.2, 1.35)), 1400), t, -21 + rng.uniform(-2, 1), pan=0.3 if c == 'A' else -0.3)
 for t, big, kind in EV['clashes']:
@@ -132,7 +156,7 @@ for t, big, kind in EV['clashes']:
     if kind == 'arrowg': place(1, load(MC + f'random_bowhit{1 + int(rng.integers(4))}.ogg', 0.95), t, -7); noise(2, t, -14, 0.18, 400, 4000); continue
     place(1, load(pick('clash'), rng.uniform(0.94, 1.08)), t, -3 if big else -7)
     if WPN == 'hammer': place(1, load(MC + f'mob_irongolem_hit{1 + int(rng.integers(4))}.ogg', 0.85), t, -9)          # steel on the stone/iron hammer
-    if WPN == 'spear': place(1, load(MC + f'item_shield_block{1 + int(rng.integers(5))}.ogg', 1.05), t, -14)             # wood/steel shaft knock
+    if WPN in ('spear', 'duel40'): place(1, load(MC + f'item_shield_block{1 + int(rng.integers(5))}.ogg', 1.05), t, -14)   # wood/steel shaft knock
     if WPN == 'bow': place(1, load(MC + f'item_shield_block{1 + int(rng.integers(5))}.ogg', 1.2), t, -12)
     if big: thump(1, t, -11, 90)
     ring(t + 0.004, -15 if big else -20, big)                       # tail = random bus

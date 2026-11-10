@@ -38,3 +38,36 @@ L.bwNock = S(G, { yawOff: -62, aimK: 1, rh: 1, draw: 0.05, waist: [6, 0, 0], che
 L.bwDraw = S(L.bwNock, { draw: 1, head: [-6, 60, 0] });
 L.bwLoose = S(L.bwNock, { draw: 0, rh: 0, rArm: [-74, 0, -84], rElbow: [-12, 0, 0] });
 L.bwBlock = S(G, { lArm: [-120, 0, 10], lElbow: [-40, 0, 0], rArm: [-110, 0, -20], rElbow: [-50, 0, 0], chest: [-6, 0, 0], y: -0.24 });
+// ---- duel40: upright ready stance (standard: no forward-leaning stance), sprint start with a light lean, two-handed
+// greatsword (Goldreaper) set built on the sword poses with the left hand on the handle, jump plunge, shoulder carry
+L.ready = S(G, { waist: [6, -14, 0], chest: [2, -8, 0], head: [-6, 18, 0], rKnee: [24, 0, 0], lKnee: [18, 0, 0], y: -0.1 });
+L.sprintGo = S(L.ready, { waist: [14, 0, 0], chest: [6, 0, 0], head: [-10, 0, 0], rLeg: [-30, 0, -6], rKnee: [40, 0, 0], lLeg: [20, 0, 6], lKnee: [30, 0, 0], y: -0.18 });
+L.spReady = S(L.spGuard, { waist: [6, -26, 0], chest: [2, -14, 0], y: -0.06, rKnee: [16, 0, 0], lKnee: [12, 0, 0], wide: 0.5 });   // alert but upright
+L.gsGuard = S(G, { rArm: [-52, 0, -8], rElbow: [-62, 0, 0], lh: 1, waist: [8, -16, 0], chest: [2, -10, 0], head: [-6, 22, 0], y: -0.14 });
+for (const n of ['windR', 'slashR', 'windL', 'slashL', 'windO', 'slashO', 'windT', 'thrust', 'parryH', 'parryR', 'parryL', 'parryLowR', 'parryLowL', 'bind'])
+  if (L[n]) L['gs' + n[0].toUpperCase() + n.slice(1)] = S(L[n], { lh: 1 });
+L.gsPlungeW = S(G, { rArm: [-176, 0, -8], rElbow: [-40, 0, 0], lh: 1, chest: [-10, 0, 0], waist: [-6, 0, 0], head: [8, 0, 0], y: 0.2 });
+L.gsPlunge = S(G, { rArm: [-66, 0, -6], rElbow: [-12, 0, 0], lh: 1, waist: [34, 0, 0], chest: [20, 0, 0], head: [-4, 0, 0], rLeg: [-56, 0, -8], rKnee: [80, 0, 0], lLeg: [28, 0, 8], lKnee: [60, 0, 0], y: -0.44 });
+L.gsRest = S(L.relaxed, { rArm: [-150, 0, -26], rElbow: [-112, 0, 0], lh: 0, head: [2, 0, 0] });
+L.gsPoint = S(L.point, { lh: 0 });
+L.slideLow = S(L.skid, { waist: [16, 0, 0], chest: [10, 0, 0], head: [-14, 0, 0], rLeg: [-60, 0, -6], rKnee: [70, 0, 0], lLeg: [40, 0, 10], lKnee: [80, 0, 0], y: -0.5 });
+// knocked flat on the back (legs straight so nothing goes through the sand; back resting on it, arms flung out)
+L.lieBack = S(N(), { tilt: [-86, 0], y: 0.14, rLeg: [-4, 0, -8], rKnee: [8, 0, 0], lLeg: [6, 0, 8], lKnee: [12, 0, 0], head: [12, 0, 0],
+  rArm: [-150, 0, -34], rElbow: [-12, 0, 0], lArm: [-160, 0, 30], lElbow: [-10, 0, 0], wrist: 160 });
+L.spCharge = S(L.spGuard, { waist: [14, -18, 0], chest: [6, -12, 0], head: [-10, 26, 0], y: -0.16 });   // running charge, spear levelled two-handed
+// idle / calm states: standing straight, natural stance width (user: legs must not be bent when idling or walking)
+L.spIdle = S(L.relaxed, { rArm: [-22, 0, -14], rElbow: [-34, 0, 0], lh: 0, wide: 0 });               // spear held upright at the side like a staff
+L.gsIdle = S(L.relaxed, { rArm: [-34, 0, -10], rElbow: [-38, 0, 0], lh: 1, wide: 0, head: [4, 0, 0] });   // greatsword held low in front, two hands
+L.gsRest.wide = 0; L.relaxed.wide = 0;
+L.lieBack.rArm = [-24, 0, -52]; L.lieBack.rElbow = [-10, 0, 0]; L.lieBack.lArm = [-30, 0, 48];   // arms out to the sides: the spear lies beside him, not across his face
+L.gsCrouch = S(L.gsGuard, { rLeg: [-36, 0, -6], rKnee: [74, 0, 0], lLeg: [22, 0, 6], lKnee: [64, 0, 0], waist: [18, -12, 0], y: -0.32 });
+L.gsHop = S(L.gsGuard, { rLeg: [-44, 0, -4], rKnee: [80, 0, 0], lLeg: [-18, 0, 4], lKnee: [86, 0, 0], waist: [4, -10, 0], y: 0.6 });   // hop: sword stays in guard (no arms-up over the head)
+L.gsLand = S(L.gsGuard, { rKnee: [60, 0, 0], lKnee: [52, 0, 0], waist: [16, -14, 0], y: -0.26 });
+L.spOverW.rArm = [-160, 0, -36];   // arm beside the head, not over it
+L.gsWindR.rArm = [-140, 0, -62]; L.gsWindR.rElbow = [-66, 0, 0];   // two-handed wind-up out to the side, not past the head
+// Minecraft proportions: a raised hand reaches 31.5 px, the head top is 32 px -> a shaft can never pass ABOVE the head.
+// High blocks are held forward-up, in front of the forehead; two-handed parries keep the hilt away from the face.
+L.spBlockH.rArm = [-140, 0, -30]; L.spBlockH.rElbow = [-20, 0, 0];
+for (const n of ['gsParryH', 'gsParryL', 'gsParryR']) { L[n].rElbow = L[n].rElbow.map(v => v * 0.55); }
+L.gsParryH.rArm = [-136, 0, -30];
+L.gsSlashR.rArm = [-60, 0, 18];   // two-handed follow-through stays in front, the right arm does not cross into the chest

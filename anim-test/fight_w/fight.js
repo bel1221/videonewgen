@@ -30,7 +30,7 @@ scene.background = FOGC.clone();
 // v7: high overhead sun (light from above, shadows pooled under the fighters), less sky fill for contrast
 // v8: the user liked the BRIGHT overhead sun of the v7 QA stills (sand lit up); v7's final render had toned it down. Restore it.
 const hemi = new THREE.HemisphereLight(0x9fc2ff, 0xd8b98a, +(params.get('hemi') ?? 1.05)); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff1dc, +(params.get('sunI') ?? 4.0)); sun.castShadow = true;
+const sun = new THREE.DirectionalLight(0xfff1dc, +(params.get('sunI') ?? (VID === 'duel40' ? 3.6 : 4.0))); sun.castShadow = true;
 renderer.toneMappingExposure = +(params.get('exp') ?? 1.0);
 sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.03; sun.shadow.radius = 1.5;
 Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 260 }); scene.add(sun, sun.target);
@@ -72,23 +72,27 @@ console.log('FLOOR', FLOOR);
 // ------------------------------------------------------------------ cast
 const [s1, s2, s3, aeg, veil] = await Promise.all([
   loadSkin('/anim-test/src/skins/1.png'), loadSkin('/anim-test/src/skins/2.png'), loadSkin('/anim-test/src/skins/3.png'),
-  fetch(base + 'w/aegisblade.json').then(r => r.json()), fetch(base + 'w/' + { spear: 'boltspear', hammer: 'golem_hammer', bow: 'voidbow' }[VID] + '.json').then(r => r.json())]);
+  fetch(base + 'w/' + (VID === 'duel40' ? 'boltspear' : 'aegisblade') + '.json').then(r => r.json()),
+  fetch(base + 'w/' + { spear: 'boltspear', hammer: 'golem_hammer', bow: 'voidbow', duel40: 'goldreaper' }[VID] + '.json').then(r => r.json())]);
 // per weapon: seg = collision samples, cseg = clash segment, tip, trail = trail segment, lh = left-hand point (two-handed),
 // bow = string anchors. Sword exports run -3..23 px; Boltspear -15.2..24.8; golem_hammer -10.9..23.1; Voidbow -13..13.
 const WC = {
-  sword: { seg: [4, 9, 14, 19, 24, 28], cseg: [8, 26], tip: 27, trail: [9, 26] },
-  spear: { seg: [-12, -4, 4, 12, 18, 24], cseg: [6, 25], tip: 24.5, trail: [10, 25], lh: -7 },
+  sword: { seg: [4, 9, 14, 19, 24, 28], cseg: [8, 26], tip: 27, trail: [9, 26], edgeUp: 'x' },
+  spear: { seg: [-12, -4, 4, 12, 18, 24], cseg: [6, 25], tip: 24.5, trail: [10, 25], lh: -7, edgeUp: 'z' },
   hammer: { seg: [-6, 4, 12, 16, 20, 23], cseg: [12, 23], tip: 22.5, trail: [14, 23], lh: -8 },
   bow: { seg: [-12, -6, 0, 6, 12], cseg: [-12, 12], tip: 12, trail: null, bow: { top: [0, 10.4, 4.0], bot: [0, -11.0, 4.0], nock: [0, -0.3, 4.0] }, hand: 'l', twist: +(params.get('btw') ?? 270) * Math.PI / 180 } };
 // Voidbow: drop the model's straight string (thin quads at x=0, z 3.6-4.4) - the animated string replaces it
 if (VID === 'bow') veil.quads = veil.quads.filter(q => { const P = q.p, ys = P.map(v => v[1]); return !(P.every(v => Math.abs(v[0]) < 0.01 && v[2] > 3.5 && v[2] < 4.5) && Math.max(...ys) - Math.min(...ys) > 5); });
-const WB = WC[VID === 'spear' ? 'spear' : VID === 'hammer' ? 'hammer' : 'bow'];
+// Goldreaper (greatsword, two-handed): exported 36 px, grip 0.13 -> -4.7..31.3 px; left hand at -3.6 (between grip and pommel)
+WC.reaper = { seg: [-3, 4, 10, 16, 22, 27, 31], cseg: [9, 30], tip: 30.5, trail: [11, 30.5], lh: -3.6, edgeUp: 'z' };
+const WA = VID === 'duel40' ? WC.spear : WC.sword;
+const WB = WC[{ spear: 'spear', hammer: 'hammer', bow: 'bow', duel40: 'reaper' }[VID]];
 const SC = 0.69 * 1.15;
-const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), SC, WC.sword), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), SC, WB), C: buildCharacter(s3, null) };
-for (const k of ['A', 'B']) { const w = k === 'A' ? WC.sword : WB; Object.assign(cast[k], { cseg: w.cseg, tip: w.tip, trail: w.trail }); }
-document.getElementById('bl').innerHTML = '<b>0' + ({ spear: 1, hammer: 2, bow: 3 }[VID]) + '</b>— ' + { spear: 'SWORD VS SPEAR', hammer: 'SWORD VS HAMMER', bow: 'SWORD VS BOW' }[VID];
+const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), SC, WA), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), SC, WB), C: buildCharacter(s3, null) };
+for (const k of ['A', 'B']) { const w = k === 'A' ? WA : WB; Object.assign(cast[k], { cseg: w.cseg, tip: w.tip, trail: w.trail }); }
+document.getElementById('bl').innerHTML = '<b>0' + ({ spear: 1, hammer: 2, bow: 3, duel40: 1 }[VID]) + '</b>— ' + { spear: 'SWORD VS SPEAR', hammer: 'SWORD VS HAMMER', bow: 'SWORD VS BOW', duel40: 'BOLTSPEAR VS GOLDREAPER' }[VID];
 // v8: sword model 1.15x (user). v7: Minecraft default grip - slide the sword back along the forearm so the fist wraps the handle under the guard
-for (const k of ['A', 'B']) if (cast[k].whand === 'r' && k === 'A') cast[k].weapon.parent.position.y += +(params.get('grip') ?? 1.6);   // sword: Minecraft grip; spear/hammer/bow are exported with their own grip point
+for (const k of ['A', 'B']) if (cast[k].whand === 'r' && k === 'A' && VID !== 'duel40') cast[k].weapon.parent.position.y += +(params.get('grip') ?? 1.6);   // sword: Minecraft grip; spear/hammer/bow are exported with their own grip point
 for (const k in cast) scene.add(cast[k].root);
 window.__probe = { cast, C, applyPose, THREE, floorAt };
 for (const k in cast) cast[k].floorAt = floorAt;   // blade/ground physics in rig2
@@ -117,10 +121,16 @@ const WIDE = +(params.get('wide') ?? 1), LIM0 = { ax: 60, az: 60, el: 50, wr: 50
 const GAP_MIN = 0.78;   // root-to-root; capsules are 0.32 each, + a little air
 function bodyGap(t) { const a = C.pose('A', t).pos, b = C.pose('B', t).pos; return Math.hypot(a[0] - b[0], a[2] - b[2]); }
 const SOL = {};
+// how deep the fighter's own weapon sits in his own head/torso at time t (blocks) - parry choices that phase are rejected
+function selfDepth(k, t) { const ch = cast[k]; applyPose(ch, C.pose(k, t)); ch.root.updateMatrixWorld(true); const b = ch.bones, hd = b.head.localToWorld(new THREE.Vector3(0, 4, 0));
+  const hp = b.hips.getWorldPosition(new THREE.Vector3()), nk = b.neck.getWorldPosition(new THREE.Vector3()); let dmax = 0;
+  for (const a of (ch.wspan || ch.seg)) { if (Math.abs(a) < 2.5 || (ch.lh != null && Math.abs(a - ch.lh) < 2.5)) continue; const p = ch.weapon.localToWorld(new THREE.Vector3(0, a, 0));
+    dmax = Math.max(dmax, 0.45 - p.distanceTo(hd)); const ab = nk.clone().sub(hp), u = Math.max(0, Math.min(1, p.clone().sub(hp).dot(ab) / ab.lengthSq())); dmax = Math.max(dmax, 0.3 - p.distanceTo(hp.clone().addScaledVector(ab, u))); }
+  return Math.max(0, dmax); }
 // v8: pick each defence's parry pose (L/R/H) from the real blade geometry before solving: the side an attack ENDS on
 // decides which parry meets it (v7's slashL-vs-parryR pairs all missed by ~1 block).
 { const pick = []; for (const r of C.PARRY) { let best = null;
-    for (const n of (r.cands || ['parryL', 'parryR', 'parryH'])) { r.apply(n); const d = bladeDist(r.t); if (!best || d < best[1] - 0.02) best = [n, d]; }
+    for (const n of (r.cands || ['parryL', 'parryR', 'parryH'])) { r.apply(n); const d = bladeDist(r.t) + 3 * selfDepth(r.def, r.t); if (!best || d < best[1] - 0.02) best = [n, d]; }
     r.apply(best[0]); pick.push([r.t, best[0], +best[1].toFixed(2)]); }
   C.resim(false); console.warn('PARRY', JSON.stringify(pick)); }
 // passes 1-2: v6 (solve, resim, re-solve on the final roots). v8 pass 3 (after the last resim): ARMS ONLY with wider limits -
@@ -388,8 +398,9 @@ function drawState(t) {
 }
 
 const fill = document.getElementById('fill');
-window.renderAt = function (t) {
-  const shutter = 0.5 / 30, n = C.blurOK(t) ? SUB : 1;
+window.renderAt = function (tv) {
+  const t = C.animAt ? C.animAt(tv) : tv, rate = C.rateAt ? C.rateAt(t) : 1;
+  const shutter = 0.5 / 30 * rate, n = C.blurOK(t) ? SUB : 1;
   renderer.setRenderTarget(acc); renderer.setClearColor(0x000000, 0); renderer.clear();
   let label = '';
   for (let i = 0; i < n; i++) {
@@ -400,7 +411,7 @@ window.renderAt = function (t) {
     renderer.setRenderTarget(acc); renderer.autoClear = false; renderer.render(accScene, quadCam); renderer.autoClear = true;
   }
   outMat.uniforms.map.value = acc.texture; renderer.setRenderTarget(null); renderer.render(outScene, quadCam);
-  fill.style.width = (300 * Math.min(1, t / C.TOTAL)) + 'px';
+  fill.style.width = (300 * Math.min(1, tv / (C.videoAt ? C.videoAt(C.TOTAL) : C.TOTAL))) + 'px';
   return label;
 };
 window.dbgPose = function (k, t) { const p = C.pose(k, t); applyPose(cast[k], p); cast[k].root.updateMatrixWorld(true);

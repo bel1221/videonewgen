@@ -105,7 +105,7 @@ export function buildCharacter(skin, weaponGroup, weaponScale = 1, opt = {}) {
   if (weaponGroup) { const s = new THREE.Group(); s.scale.setScalar(weaponScale); s.add(weaponGroup); bones[whand + 'Hand'].add(s); weaponGroup.rotation.set(Math.PI / 2, 0, 0); }
   // fight_w weapon config: seg = collision sample points (px along the weapon), lh = two-hand point for the left hand,
   // twist = blade/bow twist about its own axis, bow = { top, bot, nock } string anchors (px, weapon frame)
-  return { root, bones, weapon: weaponGroup, aw, rest: abs, whand, seg: opt.seg || [4, 9, 14, 19, 24, 28], lh: opt.lh ?? null, twist: opt.twist ?? null, bow: opt.bow || null };
+  return { root, bones, weapon: weaponGroup, aw, rest: abs, whand, seg: opt.seg || [4, 9, 14, 19, 24, 28], lh: opt.lh ?? null, twist: opt.twist ?? null, bow: opt.bow || null, edgeUp: opt.edgeUp || null };
 }
 
 // ---------------------------------------------------------------- posing
@@ -143,6 +143,25 @@ export function applyPose(ch, P) {
     const e = Math.min(1, Math.max(0, (-arm[0] - 70) / 110)) + Math.min(0.6, Math.abs(arm[2]) / 120);
     cl.rotation.set(-6 * e * D2R, 0, s * 14 * e * D2R, 'XYZ'); }
   setRot(b.rSh, P.rArm || [0, 0, 0]); setRot(b.rEl, P.rElbow || [0, 0, 0]); setRot(b.lSh, P.lArm || [0, 0, 0]); setRot(b.lEl, P.lElbow || [0, 0, 0]);
+  // fight_w: legs are solved FIRST so the weapon collision sees the real thighs and shins
+  const solveLegs = () => {
+  if (!P.ik) { setRot(b.rTh, P.rLeg || [0, 0, 0]); setRot(b.rSn, P.rKnee || [0, 0, 0]); setRot(b.lTh, P.lLeg || [0, 0, 0]); setRot(b.lSn, P.lKnee || [0, 0, 0]); return; }
+  ch.root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(b.hips.matrixWorld).invert();
+  const fwdW = new THREE.Vector3(Math.sin((P.yaw || 0) * D2R), 0, Math.cos((P.yaw || 0) * D2R));
+  for (const [side, th, sn, hx] of [['r', b.rTh, b.rSn, -2], ['l', b.lTh, b.lSn, 2]]) {
+    if (!P.ik[side]) { setRot(th, P[side + 'Leg'] || [0, 0, 0]); setRot(sn, P[side + 'Knee'] || [0, 0, 0]); continue; }   // free (FK) leg
+    const tw = new THREE.Vector3(...P.ik[side]);
+    const poleYaw = ((P.ik[side + 'Pole'] || 0) + (P.yaw || 0)) * D2R;
+    const poleW = new THREE.Vector3(Math.sin(poleYaw), 0, Math.cos(poleYaw)).add(fwdW.clone().multiplyScalar(0.0));
+    // targets are the sole centre; the IK chain ends at the bottom of the shin (sole) -> same point
+    const tLocal = tw.clone().applyMatrix4(inv);
+    const pLocal = poleW.clone().transformDirection(inv).normalize();
+    solveLeg(th, sn, new THREE.Vector3(hx, 0, 0), tLocal, pLocal);
+  }
+
+  };
+  solveLegs();
   // fight_w: arm IK (shoulder in the clavicle frame; upper arm 4 px, forearm to the hand 5.5 px), blended over the FK pose
   const armIK = (side, targetW, w, poleBody) => {
     if (!(w > 0.001)) return; ch.root.updateMatrixWorld(true);
@@ -168,7 +187,15 @@ export function applyPose(ch, P) {
     const EL = ch.whand === 'l' ? b.lEl : b.rEl, HAND = ch.whand === 'l' ? b.lHand : b.rHand, TW = ch.twist ?? TWIST;
     const qEl = new THREE.Quaternion(); EL.getWorldQuaternion(qEl); qEl.invert();
     const aim = dir => { const dL = dir.clone().applyQuaternion(qEl);
-      HAND.rotation.set(0, Math.atan2(dL.x, dL.z), 0); ch.weapon.rotation.set(Math.acos(Math.max(-1, Math.min(1, dL.y))), TW, 0, 'XYZ'); };
+      HAND.rotation.set(0, Math.atan2(dL.x, dL.z), 0); ch.weapon.rotation.set(Math.acos(Math.max(-1, Math.min(1, dL.y))), TW, 0, 'XYZ');
+      if (ch.edgeUp) {   // EDGE UP (vanilla held items): turn the weapon about its own axis so its wide side stands vertical - the edge faces up,
+        // the flat faces sideways. Near-vertical blades: edge faces forward. Twist taken modulo 180 (symmetric blade) toward the smaller turn.
+        ch.weapon.rotation.set(Math.acos(Math.max(-1, Math.min(1, dL.y))), 0, 0, 'XYZ'); ch.weapon.updateMatrixWorld(true);
+        const e = ch.weapon.matrixWorld.elements, ax = new THREE.Vector3(e[4], e[5], e[6]).normalize(), wv = (ch.edgeUp === 'x' ? new THREE.Vector3(e[0], e[1], e[2]) : new THREE.Vector3(e[8], e[9], e[10])).normalize();
+        const yw = (P.yaw || 0) * D2R, fw = new THREE.Vector3(Math.sin(yw), 0, Math.cos(yw)), up = new THREE.Vector3(0, 1, 0);
+        const T = up.clone().addScaledVector(ax, -ax.dot(up)).add(fw.clone().addScaledVector(ax, -ax.dot(fw)).multiplyScalar(0.25)); if (T.lengthSq() < 1e-8) T.copy(fw);
+        T.normalize(); let phi = Math.atan2(wv.clone().cross(T).dot(ax), wv.dot(T)); if (phi > Math.PI / 2) phi -= Math.PI; else if (phi < -Math.PI / 2) phi += Math.PI;
+        ch.weapon.rotation.set(Math.acos(Math.max(-1, Math.min(1, dL.y))), phi, 0, 'XYZ'); } };
     // v8: the sword moves WITH the arm. Blend the torso-frame intent with a rigid grip (the pose's own wrist/roll, fixed in
     // the forearm frame), so lifting/swinging the forearm carries the blade. P.gk = grip weight (0 = pure intent).
     // P.spinK/P.spin: sword twirl - the blade turns about the forearm axis (wrist 90, roll = spin), blended in by spinK.
@@ -182,22 +209,33 @@ export function applyPose(ch, P) {
     aim(d);
     // physics: the blade is a solid. Points along it may not enter the floor, the wielder's legs/torso, or the opponent's
     // body; on contact the aim is pushed out of the obstacle and re-solved (the hand stays the pivot).
-    const R = P.pos, caps = [
-      { x: R[0], z: R[2], y0: R[1] - 0.1, y1: R[1] + 0.72, r: 0.2 },                        // own legs
-      { x: R[0], z: R[2], y0: R[1] + 0.72, y1: R[1] + 1.5, r: 0.15 } ];                     // own torso
-    if (P.opp) caps.push({ x: P.opp[0], z: P.opp[2], y0: P.opp[1] - 0.1, y1: P.opp[1] + 1.95, r: 0.25 });   // opponent
-    const pt = new THREE.Vector3();
-    // v6: the push is proportional to penetration only (v4 added a flat +0.04 per touch, up to 16 times, so the blade
-    // JUMPED the moment it touched a body/the floor -> 60-130 deg single-frame flips). Continuous in d, converges in ~10 its.
-    for (let it = 0; it < 28; it++) {
+    // fight_w COLLISION v2 (permanent standard: no phasing). The weapon is sampled every 2 px along its WHOLE length (butt included)
+    // and kept out of: the wielder's torso (capsule hips->neck, leans with the spine), head (sphere), legs (one segment per leg),
+    // the opponent's legs, torso and head, and the floor. Points within 2.5 px of a holding hand skip the own-body test.
+    // (BAD before: vertical cylinders at the feet, torso r 0.15 = narrower than the 8 px chest, no head -> shafts ran through
+    // the chest and head.)
+    const pt = new THREE.Vector3(), cl = new THREE.Vector3(), W_ = n => b[n].getWorldPosition(new THREE.Vector3());
+    if (!ch.wspan) { const bb = new THREE.Box3(); ch.weapon.children.forEach(m => { m.geometry.computeBoundingBox(); bb.union(m.geometry.boundingBox); });
+      ch.wspan = []; for (let a = bb.min.y + 0.5; a <= bb.max.y - 0.3; a += 2) ch.wspan.push(a); ch.wspan.push(bb.max.y - 0.3); }
+    ch.root.updateMatrixWorld(true);
+    const yw = (P.yaw || 0) * D2R, lx = Math.cos(yw), lz = -Math.sin(yw), hipsW = W_('hips'), neckW = W_('neck'), headW = b.head.localToWorld(new THREE.Vector3(0, 4, 0));
+    const sole = n => b[n].localToWorld(new THREE.Vector3(0, -6, 0));
+    const own = [{ a: hipsW, b: neckW, r: 0.29 }, { a: headW, b: headW, r: 0.42 },
+      { a: W_('rTh'), b: W_('rSn'), r: 0.17 }, { a: W_('rSn'), b: sole('rSn'), r: 0.17 }, { a: W_('lTh'), b: W_('lSn'), r: 0.17 }, { a: W_('lSn'), b: sole('lSn'), r: 0.17 }];
+    // opponent: legs, then torso and head where they really are (P.oppLean = forward lean of the chest/head in world, from the choreography)
+    const oL = P.oppLean || [0, 0, 0, 0], opp = P.opp ? [{ a: new THREE.Vector3(P.opp[0], P.opp[1] + 0.05, P.opp[2]), b: new THREE.Vector3(P.opp[0], P.opp[1] + 0.72, P.opp[2]), r: 0.25 },
+      { a: new THREE.Vector3(P.opp[0], P.opp[1] + 0.75 + oL[3], P.opp[2]), b: new THREE.Vector3(P.opp[0] + oL[0] * 0.6, P.opp[1] + 1.48 + oL[3], P.opp[2] + oL[2] * 0.6), r: 0.29 },
+      { a: new THREE.Vector3(P.opp[0] + oL[0], P.opp[1] + 1.78 + oL[3], P.opp[2] + oL[2]), b: new THREE.Vector3(P.opp[0] + oL[0], P.opp[1] + 1.78 + oL[3], P.opp[2] + oL[2]), r: 0.42 }] : [];
+    const closest = (p, a, bb) => { const ab = bb.clone().sub(a), L2 = ab.lengthSq(); const u = L2 > 1e-9 ? Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / L2)) : 0; return cl.copy(a).addScaledVector(ab, u); };
+    for (let it = 0; it < 44; it++) {
       ch.root.updateMatrixWorld(true); let hit = false;
-      for (const a of ch.seg) {
+      for (const a of ch.wspan) {
         ch.weapon.localToWorld(pt.set(0, a, 0));
-        const sg = a < 0 ? -1 : 1;   // fight_w: points BEHIND the hand (spear butt, lower bow limb) move opposite to the aim
+        const sg = a < 0 ? -1 : 1;   // points BEHIND the hand (spear butt, lower bow limb) move opposite to the aim
         if (ch.floorAt) { const f = ch.floorAt(pt.x, pt.z) + 0.035; if (pt.y < f) { d.y += (f - pt.y) * 1.8 * sg; hit = true; } }
-        for (const c of caps) { if (pt.y < c.y0 || pt.y > c.y1) continue; const dx = pt.x - c.x, dz = pt.z - c.z, r = Math.hypot(dx, dz);
-          const vw = Math.min(1, (pt.y - c.y0) / 0.1, (c.y1 - pt.y) / 0.1);                    // fade in over 0.1 at the capsule ends (no edge)
-          if (r < c.r) { const k = (c.r - r) * 1.8 * vw * sg, ux = r > 1e-4 ? dx / r : 1, uz = r > 1e-4 ? dz / r : 0; d.x += ux * k; d.z += uz * k; hit = hit || k > 1e-4; } }
+        const nearHand = Math.abs(a) < 2.5 || (ch.lh != null && P.lh > 0.2 && Math.abs(a - ch.lh) < 2.5);
+        for (const sh of (nearHand ? opp : own.concat(opp))) { const c = closest(pt, sh.a, sh.b), dd = pt.distanceTo(c);
+          if (dd < sh.r) { const n = dd > 1e-5 ? pt.clone().sub(c).divideScalar(dd) : new THREE.Vector3(lx, 0, lz), k = (sh.r - dd) * 1.8 * sg; d.addScaledVector(n, k); hit = true; } }
       }
       if (!hit) break; d.normalize(); aim(d);
     }
@@ -205,7 +243,7 @@ export function applyPose(ch, P) {
   }
   // two-handed weapons: the left hand rides the shaft at ch.lh px along the weapon
   if (ch.weapon && ch.lh != null && ch.whand === 'r' && P.lh > 0) {
-    ch.root.updateMatrixWorld(true); armIK('l', ch.weapon.localToWorld(new THREE.Vector3(0, ch.lh, 0)), P.lh, [0.7, -0.5, -0.5]); }
+    ch.root.updateMatrixWorld(true); armIK('l', ch.weapon.localToWorld(new THREE.Vector3(0, ch.lh, 0)), P.lh, [0.9, -0.55, 0.15]); }
   // bow: the right hand nocks at the string and draws it back to the jaw (P.rh weight, P.draw 0..1)
   ch.stringPts = null;
   if (ch.weapon && ch.bow && ch.whand === 'l') {
@@ -219,20 +257,19 @@ export function applyPose(ch, P) {
       ch.stringPts = [top, (P.draw || 0) > 0.03 && P.rh > 0.5 ? hand : nock, bot]; ch.nockDir = nock.clone().sub(hand);
     } else ch.stringPts = [top, nock, bot];
   }
-  if (!P.ik) { setRot(b.rTh, P.rLeg || [0, 0, 0]); setRot(b.rSn, P.rKnee || [0, 0, 0]); setRot(b.lTh, P.lLeg || [0, 0, 0]); setRot(b.lSn, P.lKnee || [0, 0, 0]); return; }
-  ch.root.updateMatrixWorld(true);
-  const inv = new THREE.Matrix4().copy(b.hips.matrixWorld).invert();
-  const fwdW = new THREE.Vector3(Math.sin((P.yaw || 0) * D2R), 0, Math.cos((P.yaw || 0) * D2R));
-  for (const [side, th, sn, hx] of [['r', b.rTh, b.rSn, -2], ['l', b.lTh, b.lSn, 2]]) {
-    if (!P.ik[side]) { setRot(th, P[side + 'Leg'] || [0, 0, 0]); setRot(sn, P[side + 'Knee'] || [0, 0, 0]); continue; }   // free (FK) leg
-    const tw = new THREE.Vector3(...P.ik[side]);
-    const poleYaw = ((P.ik[side + 'Pole'] || 0) + (P.yaw || 0)) * D2R;
-    const poleW = new THREE.Vector3(Math.sin(poleYaw), 0, Math.cos(poleYaw)).add(fwdW.clone().multiplyScalar(0.0));
-    // targets are the sole centre; the IK chain ends at the bottom of the shin (sole) -> same point
-    const tLocal = tw.clone().applyMatrix4(inv);
-    const pLocal = poleW.clone().transformDirection(inv).normalize();
-    solveLeg(th, sn, new THREE.Vector3(hx, 0, 0), tLocal, pLocal);
-  }
+  // ARM CLEARANCE (final, both arms): test the upper arm / forearm centre line against the own torso box (spine2 frame, x +-4,
+  // z +-2, y 12..24 px, + 1.6 px limb half-thickness); while inside, swing the arm outward about the body's forward axis.
+  { const inv = new THREE.Matrix4(), q = new THREE.Vector3(), spAbs = ch.rest.spine2[1];
+    const depth = sd => { ch.root.updateMatrixWorld(true); inv.copy(b.spine2.matrixWorld).invert(); let dmax = 0;
+      const sh = b[sd + 'Sh'].getWorldPosition(new THREE.Vector3()), el = b[sd + 'El'].getWorldPosition(new THREE.Vector3()), hd = b[sd + 'Hand'].getWorldPosition(new THREE.Vector3());
+      for (const [p0, p1, u0] of [[sh, el, 0.35], [el, hd, 0]]) for (let u = u0; u <= 1.001; u += 0.2) { q.copy(p0).lerp(p1, u).applyMatrix4(inv); const y = q.y + spAbs;
+        const dx = 4 + 1.6 - Math.abs(q.x), dz = 2 + 1.6 - Math.abs(q.z), dy = Math.min(y - 12, 24 - y); if (dx > 0 && dz > 0 && dy > 0 && Math.min(dx, dz) > dmax) { dmax = Math.min(dx, dz); front = dz < dx; }
+        const hq = q.clone(); hq.y = y - 24; const hx = 4 + 1.6 - Math.abs(hq.x), hz = 4 + 1.6 - Math.abs(hq.z), hy = Math.min(hq.y + 0.2, 8.2 - hq.y);   // head box
+        if (hx > 0 && hz > 0 && hy > 0 && Math.min(hx, hz, hy) > dmax) { dmax = Math.min(hx, hz, hy); front = hz < hx; } }
+      return dmax; };
+    let front = false;
+    for (const sd of ['r', 'l']) { const sg = sd === 'l' ? 1 : -1;
+      for (let it = 0; it < 14 && depth(sd) > 0.05; it++) b[sd + 'Sh'].quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(front ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1), front ? -5 * D2R : sg * 5 * D2R)); } }
 }
 // world position of a bone-local point (px) after applyPose
 export function bonePoint(ch, bone, p = [0, 0, 0]) { ch.root.updateMatrixWorld(true); return ch.bones[bone].localToWorld(new THREE.Vector3(...p)); }

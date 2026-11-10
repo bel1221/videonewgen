@@ -432,7 +432,7 @@ function runGait(c, root, rawXZ, N) {
     }
     // body bob: lowest at mid-stance, highest in flight, phase from the step sequence
     for (let k = 0; k < con.length; k++) { const a_ = con[k].i, b_ = k + 1 < con.length ? con[k + 1].i : Math.min(i1, a_ + 60);
-      for (let i = a_; i < b_; i++) { const u = (i - a_) / Math.max(1, b_ - a_); g.yoff[i] = -0.05 * Math.cos(2 * Math.PI * (u - 0.25)) - 0.01; } }
+      for (let i = a_; i < b_; i++) { const u = (i - a_) / Math.max(1, b_ - a_); g.yoff[i] = -0.025 * Math.cos(2 * Math.PI * (u - 0.25)) - 0.01; } }
   }
   return g;
 }
@@ -512,7 +512,16 @@ function simulate() {
       for (let i = a; i <= b; i++) { const tau = a + (b - a) * (tot > 0 ? acc / tot : (i - a) / (b - a)), j = Math.floor(tau), u = tau - j, j1 = Math.min(N - 1, j + 1);
         root2[i] = [lerp(root[j][0], root[j1][0], u), lerp(root[j][1], root[j1][1], u)]; if (i < b) acc += wt[i]; }
     }
-    SIM[c] = { root: root2, raw: rawXZ, r: outs.r, l: outs.l, yoff: Array.from(G.yoff, v => [v]) };
+    // pelvis drop from planted feet only, smoothed (was per-frame in poseRaw from lifted feet too -> bounce on every step)
+    const dropRaw = new Float32Array(N);
+    for (let i = 0; i < N; i++) { const p = raw[c][i], yawR = p.yaw * Math.PI / 180, rt = root2[i];
+      const hipY = W.floorAt(rt[0], rt[1]) + (isAir(p) ? p.y : p.y * 0.8) + G.yoff[i] + 0.75; let drop = 0;
+      for (const [f, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const q = outs[f][i]; if (!q) continue;
+        const fy = W.floorAt(q[0], q[2]) + 0.035, hxw = rt[0] + hx * Math.cos(yawR), hzw = rt[1] - hx * Math.sin(yawR), dh = Math.hypot(q[0] - hxw, q[2] - hzw), reach = 0.735;
+        if (dh < reach * 0.97) { const need = hipY - fy - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } }   // out-of-reach (trailing) feet are about to step: never sink the hips for them (that folded knees through the sand)
+      dropRaw[i] = Math.min(0.42, drop); }
+    const SGd = Math.round(0.08 * HZ), dropS = []; for (let i = 0; i < N; i++) { let a = 0, w = 0; for (let j = -3 * SGd; j <= 3 * SGd; j += 4) { const q = dropRaw[Math.min(N - 1, Math.max(0, i + j))], g = Math.exp(-0.5 * (j / SGd) ** 2); a += q * g; w += g; } dropS.push([a / w]); }
+    SIM[c] = { root: root2, raw: rawXZ, r: outs.r, l: outs.l, yoff: Array.from(G.yoff, v => [v]), drop: dropS };
   }
 }
 function samp(arr, t) {
@@ -572,11 +581,7 @@ function poseRaw(c, t) {
   { const ph = c === 'A' ? 0 : 1.7, amp = inWin(BR[c], t) ? 2.4 : 1; p.chest[0] -= 1.1 * amp * Math.sin(t * 3.1 + ph); }
   if (fr || fl) { p.ik = {}; for (const [k, f] of [['r', fr], ['l', fl]]) if (f) p.ik[k] = [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.035, f[2]];
     // pelvis drop: lower the hips until every planted foot is within leg reach (wide stances sit low, nothing floats)
-    const yaw = p.yaw * Math.PI / 180, hipY = p.pos[1] + 0.75; let drop = 0;
-    for (const [k, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const tg = p.ik[k]; if (!tg) continue;
-      const hxw = p.pos[0] + hx * Math.cos(yaw), hzw = p.pos[2] - hx * Math.sin(yaw), dh = Math.hypot(tg[0] - hxw, tg[2] - hzw), reach = 0.735;
-      if (dh < reach) { const need = hipY - tg[1] - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } else drop = Math.max(drop, hipY - tg[1]); }
-    p.pos[1] -= Math.min(0.42, drop); }
+    p.pos[1] -= samp(S_.drop, t)[0]; }   // smoothed planted-foot pelvis drop from the planner (see simulate)
   return p;
 }
 

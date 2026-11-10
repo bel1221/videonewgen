@@ -65,7 +65,16 @@ What v8 still gets wrong:
 - a little player bouncing
 - skipped scenes: one action, then a sudden jump to a different action
 
-Shaking is fixed (the gait overlay is marked BAD, notes §17.1). The rest is still open.
+Shaking is fixed (the gait overlay is marked BAD, notes §17.1).
+
+**Status 2026-11-10 (notes §18):**
+- **Fixed in the shared mechanics:**
+  - bouncing (the planted-foot pelvis drop moved into the planner and smoothed)
+  - legs through the ground (unreachable feet no longer sink the hips)
+  - weapon flips at sprint start/end (arm cross-fade; spear 'charge' runs)
+  - forward-leaning ready stance (`L.ready`/`L.spReady`; crouch is no longer the ready pose)
+  - idle-to-run snap
+- **Still to watch:** v8's scene skipping. Duel 40 uses fewer, longer shots (median 1.0 s) and only 3 impact inserts.
 
 ### First guesses at causes (NOT verified; check each one with measurements before changing anything)
 - **Forward lean:** `L.crouch` (waist 34°, chest 12°, head -28°, y -0.42) is used as the "ready" pose and sprint start, and the
@@ -87,6 +96,18 @@ Shaking is fixed (the gait overlay is marked BAD, notes §17.1). The rest is sti
 
   The user wants fewer half-second camera changes, and readable transitions.
 
+## Hard rules learned from the duel-40 review (2026-11-10)
+- **Phasing is checked with `anim-test/tools/phase_qa.js`.** It tests every point along each weapon against the wielder's OWN head,
+  torso and legs and against the opponent's body parts, arms against the own torso and head, the legs against each other, and the
+  bodies against each other. `collide_qa.js` alone is NOT enough: it never tested a weapon against its own wielder or limbs against
+  the body. The user caught a spear through its own wielder's head and an arm through its own chest.
+- **Standing, idling and walking:** legs straight (knee about 10° idle), natural stance width (`pose.wide = 0`), no pelvis bob.
+  Fighting stances may be wider, with a light bend.
+- **Travelling during an exchange:** the feet must step (DRIFT gait). Never let the body slide over planted feet.
+- **Minecraft proportions:** a raised hand reaches 31.5 px and the head top is at 32 px, so a shaft can never pass ABOVE the head.
+  High blocks go forward-up, in front of the forehead.
+- **Blades are held edge-up,** as in vanilla.
+
 ## Checklist before showing any fight render
 Each item gets a measured check where possible (tools in `anim-test/tools/`):
 - **No frame jumps or snapping:** joint angular acceleration, blade step, and pose-key gaps.
@@ -95,7 +116,7 @@ Each item gets a measured check where possible (tools in `anim-test/tools/`):
   angle per second.
 - **Footwork:** no foot sliding, floating or gliding. Feet stay planted while planted, and come back under the body after
   slides and at run starts. No legs through the floor.
-- **No phasing or collisions** (`tools/collide_qa.js`), and convincing contact (clash miss mean).
+- **No phasing or collisions:** `tools/phase_qa.js` (own body, limbs, opponent) + `tools/collide_qa.js`, and convincing contact (clash miss mean).
 - **Weapon follows the arm,** with grip and orientation consistent throughout.
 - **Every attack has** anticipation, controlled acceleration, a believable arc, follow-through and recovery.
 - **Hit reactions:** a direction, knockback and recovery.

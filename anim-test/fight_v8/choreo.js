@@ -151,10 +151,10 @@ function evalPos(K, t) {
 }
 
 // ------------------------------------------------------------------ run cycle (sword arm low, blade trailing; free arm pumps)
-const STRIDE = 2.7;   // blocks per full run cycle (right + left step)
+const STRIDE = 3.1;   // blocks per full run cycle (right + left step)
 function runBody(phi, p) {
   const s = Math.sin(2 * Math.PI * phi);
-  p.waist = [18, -15 * s, 0]; p.chest = [8, p.chest[1] + 10 * s, 0]; p.y = -0.08; return p;
+  p.waist = [16, -20 * s, 0]; p.chest = [8, p.chest[1] + 15 * s, 0]; p.head = [p.head[0], p.head[1] - 6 * s, 0]; p.y = -0.06; return p;
 }
 function runLegsOld(phi, p) {
   const s = Math.sin(2 * Math.PI * phi), c = Math.cos(2 * Math.PI * phi);
@@ -366,13 +366,13 @@ function basePose(c, t) {
   for (const [t0, t1] of RUN[c]) if (t >= t0 && t <= t1) {
     const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]); const phi = d / STRIDE;
     const blend = clamp(Math.min((t - t0) / 0.08, (t1 - t) / 0.1));
-    const r = runArms(phi, runBody(phi, cp(p)), t < t1 - 0.25);
+    const sw = clamp((t1 - 0.12 - t) / 0.2), rb = runBody(phi, cp(p)), r = mix(runArms(phi, cp(rb), false), runArms(phi, cp(rb), true), sw);
     Object.assign(p, mix(p, r, blend));
   }
   // breathing (bigger after exertion)
   let amp = 1; for (const [t0, t1] of BR[c]) if (t >= t0 && t <= t1) amp = 2.6;
   const ph = c === 'A' ? 0 : 1.7;
-  p.chest[0] += 1.4 * amp * Math.sin(t * 3.1 + ph); p.head[0] -= 1.2 * amp * Math.sin(t * 3.1 + ph + 0.4); p.y += 0.008 * amp * Math.sin(t * 3.1 + ph);
+  p.chest[0] += 1.4 * amp * Math.sin(t * 3.1 + ph); p.head[0] -= 1.2 * amp * Math.sin(t * 3.1 + ph + 0.4);   // BAD removed: p.y += 0.008*amp*sin (breath bobbed the legs)
   const o = c === 'A' ? 'B' : 'A', [ox, oz] = rootXZ(o, t);
   const yaw = p.yawAbs != null ? p.yawAbs : Math.atan2(ox - x, oz - z) * 180 / Math.PI;
   let X = x, Z = z;
@@ -387,14 +387,15 @@ export const SLIDES = { A: [[4.42, 4.85], [5.85, 6.0], [8.55, 9.0], [14.5, 14.95
                         B: [[4.42, 4.85], [5.78, 6.0], [7.0, 7.35], [11.55, 11.95], [16.62, 16.95], [24.08, 24.5], [26.9, 27.3]] };
 const inWin = (L, t) => L.some(([a, b]) => t >= a && t <= b);
 const _eu = new THREE.Euler(), _v1 = new THREE.Vector3();
-function legFK(leg, knee, hipX) {   // desired sole offset in the body frame (px) from the authored FK leg angles
+function legFK(leg, knee, hipX, wide = 1) {   // desired sole offset in the body frame (px) from the authored FK leg angles
   _eu.set(leg[0] * Math.PI / 180, leg[1] * Math.PI / 180, leg[2] * Math.PI / 180, 'XYZ'); const R1 = new THREE.Quaternion().setFromEuler(_eu);
   _eu.set(knee[0] * Math.PI / 180, 0, 0, 'XYZ'); const R2 = new THREE.Quaternion().setFromEuler(_eu);
   _v1.set(0, -6, 0).applyQuaternion(R2).add(new THREE.Vector3(0, -6, 0)).applyQuaternion(R1);
-  const sx = hipX + _v1.x * 1.45; return [Math.sign(hipX) * Math.max(1.9, Math.abs(sx)), _v1.z * 1.35];
+  const sx = hipX + _v1.x * (1.2 + 0.25 * wide); return [Math.sign(hipX) * Math.max(1.5 + 0.4 * wide, Math.abs(sx)), _v1.z * (1.15 + 0.2 * wide)];
 }
+function yEff(p) { if (isAir(p) || p.y >= 0) return isAir(p) ? p.y : p.y * 0.8; const a = -p.y; return -(0.25 * a + 0.75 * Math.max(0, a - 0.3)); }   // guard -0.14 -> -0.035 (light athletic bend), slam -0.62 -> -0.4
 function isAir(p) { return p.y > 0.22 || Math.abs(p.tilt[0]) > 30; }
-function runGait(c, root, rawXZ, N) {
+function runGait(c, root, rawXZ, N, rawP) {
   // returns per-index overrides { r:[x,y,z]|undefined, l:..., yoff } inside run windows, plus contact events
   const g = { r: new Array(N), l: new Array(N), yoff: new Float32Array(N), ev: [] };
   for (const [t0, t1] of RUN[c]) {
@@ -406,11 +407,12 @@ function runGait(c, root, rawXZ, N) {
       for (const [f, off] of [['r', 0.12], ['l', 0.62]]) if (Math.floor(p0 - off) < Math.floor(p1 - off)) {
         const vx = root[i][0] - root[Math.max(i0, i - 6)][0], vz = root[i][1] - root[Math.max(i0, i - 6)][1], vn = Math.hypot(vx, vz) || 1;
         const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1;            // right foot on the right of travel: right = (-fz, fx)
-        con.push({ i, f, p: [root[i][0] + fx * 0.28 + fz * 0.16 * side, root[i][1] + fz * 0.28 - fx * 0.16 * side] });
+        const yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl);   // body LEFT in world (not travel-relative)
+        con.push({ i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] });
       }
     }
     { const mk = (i, f) => { const vx = root[i][0] - root[Math.max(i0, i - 6)][0], vz = root[i][1] - root[Math.max(i0, i - 6)][1], vn = Math.hypot(vx, vz) || 1;
-        const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1; return { i, f, p: [root[i][0] + fx * 0.28 + fz * 0.16 * side, root[i][1] + fz * 0.28 - fx * 0.16 * side] }; };
+        const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1, yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl); return { i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] }; };
       for (const f of ['r', 'l']) { const fc = con.find(q => q.f === f), lim = fc ? fc.i : i1; if (fc && (fc.i - i0) / HZ <= 0.2) continue;
         let ie = i0 + 1; while (ie < lim && phiAt(ie) < 0.06) ie++; ie = Math.min(ie + Math.round(0.06 * HZ), lim - Math.round(0.12 * HZ)); if (ie > i0) con.push(mk(ie, f)); }
       con.sort((a, b) => a.i - b.i); }
@@ -430,7 +432,7 @@ function runGait(c, root, rawXZ, N) {
     }
     // body bob: lowest at mid-stance, highest in flight, phase from the step sequence
     for (let k = 0; k < con.length; k++) { const a_ = con[k].i, b_ = k + 1 < con.length ? con[k + 1].i : Math.min(i1, a_ + 60);
-      for (let i = a_; i < b_; i++) { const u = (i - a_) / Math.max(1, b_ - a_); g.yoff[i] = -0.05 * Math.cos(2 * Math.PI * (u - 0.25)) - 0.01; } }
+      for (let i = a_; i < b_; i++) { const u = (i - a_) / Math.max(1, b_ - a_); g.yoff[i] = -0.025 * Math.cos(2 * Math.PI * (u - 0.25)) - 0.01; } }
   }
   return g;
 }
@@ -453,7 +455,7 @@ function simulate() {
     const sm = push[c].map((_, i) => { let x = 0, z = 0, w = 0; for (let j = -R; j <= R; j++) { const q = push[c][Math.min(N - 1, Math.max(0, i + j))], g = Math.exp(-(j * j) / (2 * (R / 2) ** 2)); x += q[0] * g; z += q[1] * g; w += g; } return [x / w * 1.15, z / w * 1.15]; });
     const root = raw[c].map((p, i) => [p.pos[0] + sm[i][0], p.pos[2] + sm[i][1]]);
     const feet = { r: null, l: null }, step = { r: null, l: null }, outs = { r: [], l: [] }, Dsm = { r: null, l: null }, lastStep = { r: -9, l: -9 }, rec = { r: null, l: null };
-    const rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, root, rawXZ, N), entry = {};
+    const rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, root, rawXZ, N, raw[c]), entry = {};
     for (const e of G.ev) STEPS.push({ c, t: e.t, foot: e.f, p: [e.p[0], 0, e.p[1]], kind: 'step', sp: 5, run: true });
     for (let i = 0; i < N; i++) {
       const t = i / HZ, p = raw[c][i], air = isAir(p), yaw = p.yaw * Math.PI / 180, cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -468,9 +470,11 @@ function simulate() {
           out.push([lerp(fr[0], gv.swingTo[0], w), 0.26 * Math.sin(Math.PI * u), lerp(fr[1], gv.swingTo[1], w)]); step[f] = null; continue;
         }
         const fk = air || (f === 'r' && p.fkR) || (f === 'l' && p.fkL);
-        const off = legFK(leg, knee, hx), lx = off[0] / 16, lz = off[1] / 16;
+        const off = legFK(leg, knee, hx, p.wide ?? 1), lx = off[0] / 16, lz = off[1] / 16;
         const Dr = [root[i][0] + lx * cy + lz * sy, root[i][1] - lx * sy + lz * cy];
-        Dsm[f] = Dsm[f] ? [lerp(Dsm[f][0], Dr[0], 1), lerp(Dsm[f][1], Dr[1], 1)] : Dr.slice(); const D = Dsm[f];   // ~0.1 s low-pass
+        Dsm[f] = Dsm[f] ? [lerp(Dsm[f][0], Dr[0], 1), lerp(Dsm[f][1], Dr[1], 1)] : Dr.slice(); const D = Dsm[f];
+        { const sgn = f === 'l' ? 1 : -1, lx = Math.cos(yaw), lz = -Math.sin(yaw), s_ = (D[0] - root[i][0]) * lx + (D[1] - root[i][1]) * lz;   // keep each foot on its own side
+          if (sgn * s_ < 0.07) { const kk = 0.07 * sgn - s_; D[0] += lx * kk; D[1] += lz * kk; } }   // ~0.1 s low-pass
         if (fk) { if (feet[f]) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'lift' }); feet[f] = null; step[f] = null; out.push(null); continue; }
         if (!feet[f]) { feet[f] = D.slice(); STEPS.push({ c, t, foot: f, p: [D[0], 0, D[1]], kind: 'land', sp }); }
         if (skid) { feet[f] = [lerp(feet[f][0], D[0], 0.25), lerp(feet[f][1], D[1], 0.25)]; step[f] = null; if (i % 12 === 0) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'skid' }); out.push([feet[f][0], 0, feet[f][1]]); continue; }
@@ -490,7 +494,7 @@ function simulate() {
         const otherBusy = step[o] && reach < 0.5 && (sp < 2.5 || (t - step[o].t0) / step[o].dur < 0.4);
         const errO = feet[o] ? Math.hypot(feet[o][0] - D[0], feet[o][1] - D[1]) : 0;
         const rested = t - lastStep[f] > 0.18 && t - lastStep[o] > 0.08;
-        if ((err > 0.17 && rested && !otherBusy && !(step[o] == null && feet[o] && errO > err * 1.4 && reach < 0.5)) || (reach > 0.5 && !step[f] && t - lastStep[f] > 0.06)) {
+        if ((err > 0.17 && rested && !otherBusy && !(step[o] == null && feet[o] && errO > err * 1.4 && reach < 0.5)) || (reach > Math.max(0.5, Math.hypot(D[0] - root[i][0], D[1] - root[i][1]) + 0.15) && Math.hypot(feet[f][0] - D[0], feet[f][1] - D[1]) > 0.08 && !step[f] && t - lastStep[f] > 0.06)) {
           const run = sp > 2.5, dur = run ? Math.max(0.12, Math.min(0.18, 0.75 / sp)) : Math.min(0.26, Math.max(0.15, 0.1 + 0.12 * err));
           step[f] = { from: feet[f].slice(), to: [D[0] + vx * dur * 0.75, D[1] + vz * dur * 0.75], t0: t, dur, h: run ? 0.28 : Math.min(0.26, 0.07 + 0.24 * err) };
         }
@@ -510,7 +514,16 @@ function simulate() {
       for (let i = a; i <= b; i++) { const tau = a + (b - a) * (tot > 0 ? acc / tot : (i - a) / (b - a)), j = Math.floor(tau), u = tau - j, j1 = Math.min(N - 1, j + 1);
         root2[i] = [lerp(root[j][0], root[j1][0], u), lerp(root[j][1], root[j1][1], u)]; if (i < b) acc += wt[i]; }
     }
-    SIM[c] = { root: root2, raw: rawXZ, r: outs.r, l: outs.l, yoff: Array.from(G.yoff, v => [v]) };
+    // pelvis drop from planted feet only, smoothed (was per-frame in poseRaw from lifted feet too -> bounce on every step)
+    const dropRaw = new Float32Array(N);
+    for (let i = 0; i < N; i++) { const p = raw[c][i], yawR = p.yaw * Math.PI / 180, rt = root2[i];
+      const hipY = W.floorAt(rt[0], rt[1]) + yEff(p) + 0.035 + G.yoff[i] + 0.75; let drop = 0;
+      for (const [f, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const q = outs[f][i]; if (!q) continue;
+        const fy = W.floorAt(q[0], q[2]) + 0.035, hxw = rt[0] + hx * Math.cos(yawR), hzw = rt[1] - hx * Math.sin(yawR), dh = Math.hypot(q[0] - hxw, q[2] - hzw), reach = 0.748;   // real leg length (0.735 bent idle knees ~24 deg)
+        if (dh < reach * 0.97) { const need = hipY - fy - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } }   // out-of-reach (trailing) feet are about to step: never sink the hips for them (that folded knees through the sand)
+      dropRaw[i] = Math.min(0.42, drop); }
+    const SGd = Math.round(0.11 * HZ), dropS = []; for (let i = 0; i < N; i++) { let a = 0, w = 0; for (let j = -3 * SGd; j <= 3 * SGd; j += 4) { const q = dropRaw[Math.min(N - 1, Math.max(0, i + j))], g = Math.exp(-0.5 * (j / SGd) ** 2); a += q * g; w += g; } dropS.push([a / w]); }
+    SIM[c] = { root: root2, raw: rawXZ, r: outs.r, l: outs.l, yoff: Array.from(G.yoff, v => [v]), drop: dropS };
   }
 }
 function samp(arr, t) {
@@ -552,7 +565,7 @@ function poseRaw(c, t) {
   p.spinK = 0; p.spin = 0;
   for (const [t0, t1, n] of TWIRL[c]) if (t > t0 - 0.12 && t < t1 + 0.12) { p.spin = 360 * n * E.io(clamp((t - t0) / (t1 - t0))); p.spinK = clamp(Math.min((t - t0 + 0.12) / 0.14, (t1 + 0.12 - t) / 0.14)); }
   const S_ = SIM[c], rt = samp(S_.root, t), rw = samp(S_.raw, t), X = rt[0] + p.pos[0] - rw[0], Z = rt[1] + p.pos[2] - rw[1], g = W.floorAt(X, Z);
-  p.pos = [X, g + (isAir(p) ? p.y : p.y * 0.8) + samp(S_.yoff, t)[0], Z];
+  p.pos = [X, g + yEff(p) + 0.035 + samp(S_.yoff, t)[0], Z];
   { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]]; }
   const fr = samp(S_.r, t), fl = samp(S_.l, t);
   { const sw = f => f && f[1] > 0.004 ? Math.min(1, f[1] / 0.08) : 0, rs = sw(fr), ls = sw(fl);
@@ -570,11 +583,7 @@ function poseRaw(c, t) {
   { const ph = c === 'A' ? 0 : 1.7, amp = inWin(BR[c], t) ? 2.4 : 1; p.chest[0] -= 1.1 * amp * Math.sin(t * 3.1 + ph); }
   if (fr || fl) { p.ik = {}; for (const [k, f] of [['r', fr], ['l', fl]]) if (f) p.ik[k] = [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.035, f[2]];
     // pelvis drop: lower the hips until every planted foot is within leg reach (wide stances sit low, nothing floats)
-    const yaw = p.yaw * Math.PI / 180, hipY = p.pos[1] + 0.75; let drop = 0;
-    for (const [k, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const tg = p.ik[k]; if (!tg) continue;
-      const hxw = p.pos[0] + hx * Math.cos(yaw), hzw = p.pos[2] - hx * Math.sin(yaw), dh = Math.hypot(tg[0] - hxw, tg[2] - hzw), reach = 0.735;
-      if (dh < reach) { const need = hipY - tg[1] - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } else drop = Math.max(drop, hipY - tg[1]); }
-    p.pos[1] -= Math.min(0.42, drop); }
+    p.pos[1] -= samp(S_.drop, t)[0]; }   // smoothed planted-foot pelvis drop from the planner (see simulate)
   return p;
 }
 

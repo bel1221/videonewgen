@@ -217,6 +217,7 @@ function runArms(phi, p, swordToo) {
 }
 
 // ------------------------------------------------------------------ timelines
+const WALK = { A: [], B: [] };
 const T = { A: [], B: [] }, P = { A: [], B: [] }, RUN = { A: [], B: [] }, BR = { A: [], B: [] }, TWIRL = { A: [], B: [] };   // TWIRL: [t0, t1, turns]
 export const PARRY = [];
 export const ARROWS = [];   // fight_w bow: { tn (nock), t0 (release), t1 (arrives), mode: 'deflect'|'dodge'|'ground', dx, dz }
@@ -331,7 +332,7 @@ function face(c, t, ref = 0) { const o = c === 'A' ? 'B' : 'A', a = evalPosT(c, 
 let BIND_C = [0, 0], SH = null;
 
 export const export_cross = {};
-export function events() { return { steps: STEPS.map(s => [+s.t.toFixed(3), s.kind, +(s.sp || 0).toFixed(2), s.c, s.foot, s.run ? 1 : 0]), slides: SLIDES, ghits: GHITS.map(g => +g.t.toFixed(3)), clashes: CONT.map(c => [c.t, c.big, c.kind]), swings: SWINGS(), twirls: TWIRLS(), ins: INS.slice(), flash: FLASH, arrows: ARROWS.map(a => [a.tn, a.t0, a.t1, a.mode]), vid: 'spear' }; }
+export function events() { return { steps: STEPS.map(s => [+s.t.toFixed(3), s.kind, +(s.sp || 0).toFixed(2), s.c, s.foot, s.run ? 1 : 0]), slides: SLIDES, ghits: GHITS.map(g => +g.t.toFixed(3)), clashes: CONT.map(c => [c.t, c.big, c.kind]), swings: SWINGS(), twirls: TWIRLS(), ins: INS.slice(), flash: FLASH, arrows: ARROWS.map(a => [a.tn, a.t0, a.t1, a.mode]), slowmo: SLOWMO, video_total: videoAt(TOTAL), vid: 'spear' }; }
 function TWIRLS() { const out = []; for (const c of ['A', 'B']) for (const [t0, t1, n] of TWIRL[c]) { let k = 1;
   for (let t = t0; t <= t1 && k <= 2 * n; t += 1 / 480) if (n * 2 * E.io(clamp((t - t0) / (t1 - t0))) >= k - 0.5) { out.push([+t.toFixed(3), c]); k++; } }
   return out.sort((a, b) => a[0] - b[0]); }
@@ -339,6 +340,12 @@ function TWIRLS() { const out = []; for (const c of ['A', 'B']) for (const [t0, 
 // clash corrections (IK-lite): solved in fight.js so the two blades physically cross at each clash time
 export const CORR = { A: [], B: [] };
 function corrW(d) { if (d < -0.16 || d > 0.22) return 0; return d < 0 ? E.io((d + 0.16) / 0.16) : 1 - E.io(d / 0.22); }
+export const SLOWMO = [];   // [ta0, ta1, rate] (animation seconds), e.g. [26.1, 26.9, 0.3]
+export function animAt(v) { let ta = 0, tv = 0; const segs = SLOWMO.slice().sort((a, b) => a[0] - b[0]);
+  for (const [a0, a1, r] of segs) { if (v <= tv + (a0 - ta)) return ta + (v - tv); tv += a0 - ta; ta = a0;
+    const dv = (a1 - a0) / r; if (v <= tv + dv) return a0 + (v - tv) * r; tv += dv; ta = a1; } return ta + (v - tv); }
+export function videoAt(t) { let ta = 0, tv = 0; for (const [a0, a1, r] of SLOWMO.slice().sort((a, b) => a[0] - b[0])) { if (t <= a0) break; tv += a0 - ta; ta = a0; if (t <= a1) return tv + (t - a0) / r; tv += (a1 - a0) / r; ta = a1; } return tv + (t - ta); }
+export function rateAt(t) { for (const [a0, a1, r] of SLOWMO) if (t >= a0 && t <= a1) return r; return 1; }
 export const DRIFT = []; let DTAB = null;
 function driftTab() {
   const N = Math.ceil(TOTAL * 240) + 2, tab = new Float32Array(N * 2); let x = 0, z = 0;
@@ -374,9 +381,13 @@ function basePose(c, t) {
   for (const e of CORR[c]) { const w = corrW(t - e.t); if (!w) continue;
     p.rArm[0] += e.ax * w; p.rArm[2] += e.az * w; p.rElbow[0] += e.el * w; p.chest[1] += e.ch * w;
     if (e.wr || e.ba) { const b = p.bd, el = Math.asin(Math.max(-1, Math.min(1, b[1]))) * 180 / Math.PI + e.wr * w, az = Math.atan2(b[0], b[2]) * 180 / Math.PI + (e.ba || 0) * w; p.bd = bdv(el, az); } p._fw = (p._fw || 0) + (e.fw || 0) * w; }
+  for (const [t0, t1] of WALK[c]) if (t >= t0 && t <= t1) {   // walk: upright, free arm swings, weapon arm keeps its carry pose
+    const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]), sw = Math.sin(2 * Math.PI * d / 1.35), bl = clamp(Math.min((t - t0) / 0.25, (t1 - t) / 0.25));
+    p.waist = p.waist.map((v, i) => lerp(v, [4, -5 * sw, 0][i], bl)); p.chest[1] += 4 * sw * bl; p.head[1] -= 2 * sw * bl;
+    p.lArm = p.lArm.map((v, i) => lerp(v, [-22 * sw, 0, 8][i], bl)); p.lElbow = p.lElbow.map((v, i) => lerp(v, [-14 - 8 * Math.max(0, sw), 0, 0][i], bl)); p.y = lerp(p.y, -0.03, bl); }
   for (const [t0, t1] of RUN[c]) if (t >= t0 && t <= t1) {
     const a = rootXZ(c, t0), d = Math.hypot(x - a[0], z - a[1]); const phi = d / STRIDE;
-    const blend = clamp(Math.min((t - t0) / 0.08, (t1 - t) / 0.1));
+    const blend = clamp(Math.min((t - t0) / 0.18, (t1 - t) / 0.16));   // standard: idle -> run eases in (was a 0.08 s snap)
     const r = runArms(phi, runBody(phi, cp(p)), t < t1 - 0.25);
     Object.assign(p, mix(p, r, blend));
   }
@@ -407,9 +418,10 @@ function isAir(p) { return p.y > 0.22 || Math.abs(p.tilt[0]) > 30; }
 function runGait(c, root, rawXZ, N) {
   // returns per-index overrides { r:[x,y,z]|undefined, l:..., yoff } inside run windows, plus contact events
   const g = { r: new Array(N), l: new Array(N), yoff: new Float32Array(N), ev: [] };
-  for (const [t0, t1] of RUN[c]) {
+  for (const [t0, t1, kind] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk'])]) {
+    const WK = kind === 'walk', STR = WK ? 1.35 : STRIDE, SWH = WK ? 0.12 : 0.42, STF = WK ? 0.55 : 0.22, BOB = WK ? 0.008 : 0.025;
     const i0 = Math.round(t0 * HZ), i1 = Math.min(N - 1, Math.round(t1 * HZ)), a = rawXZ[i0];
-    const phiAt = i => Math.hypot(rawXZ[i][0] - a[0], rawXZ[i][1] - a[1]) / STRIDE;
+    const phiAt = i => Math.hypot(rawXZ[i][0] - a[0], rawXZ[i][1] - a[1]) / STR;
     const con = [];                                   // contacts in time order: {i, f, p}
     for (let i = i0 + 1; i <= i1; i++) {
       const p0 = phiAt(i - 1), p1 = phiAt(i);
@@ -427,11 +439,11 @@ function runGait(c, root, rawXZ, N) {
     for (const f of ['r', 'l']) {
       const cs = con.filter(q => q.f === f);
       for (let k = 0; k < cs.length; k++) {
-        const cur = cs[k], nxt = cs[k + 1], prevAll = con.indexOf(cur), stepLen = nxt ? nxt.i - cur.i : 60, stance = Math.round(stepLen * 0.22);
+        const cur = cs[k], nxt = cs[k + 1], prevAll = con.indexOf(cur), stepLen = nxt ? nxt.i - cur.i : 60, stance = Math.round(stepLen * STF);
         for (let i = cur.i; i < (nxt ? nxt.i : Math.min(i1 + 1, cur.i + stance + 1)); i++) {
           if (i - cur.i <= stance || !nxt) g[f][i] = [cur.p[0], 0, cur.p[1]];
           else { const u = (i - cur.i - stance) / (nxt.i - cur.i - stance), w = u * u * (3 - 2 * u);
-            g[f][i] = [lerp(cur.p[0], nxt.p[0], w), 0.42 * Math.sin(Math.PI * u) * (1 - 0.3 * u), lerp(cur.p[1], nxt.p[1], w)]; }
+            g[f][i] = [lerp(cur.p[0], nxt.p[0], w), SWH * Math.sin(Math.PI * u) * (1 - 0.3 * u), lerp(cur.p[1], nxt.p[1], w)]; }
         }
         g.ev.push({ t: cur.i / HZ, f, p: cur.p });
       }
@@ -440,7 +452,7 @@ function runGait(c, root, rawXZ, N) {
     }
     // body bob: lowest at mid-stance, highest in flight, phase from the step sequence
     for (let k = 0; k < con.length; k++) { const a_ = con[k].i, b_ = k + 1 < con.length ? con[k + 1].i : Math.min(i1, a_ + 60);
-      for (let i = a_; i < b_; i++) { const u = (i - a_) / Math.max(1, b_ - a_); g.yoff[i] = -0.05 * Math.cos(2 * Math.PI * (u - 0.25)) - 0.01; } }
+      for (let i = a_; i < b_; i++) { const u = (i - a_) / Math.max(1, b_ - a_); g.yoff[i] = -BOB * Math.cos(2 * Math.PI * (u - 0.25)) - BOB * 0.4; } }
   }
   return g;
 }
@@ -507,7 +519,7 @@ function simulate() {
         out.push([feet[f][0], 0, feet[f][1]]);
       }
     }
-    const forced = i => inWin(RUN[c], i / HZ) || inWin(SLIDES[c], i / HZ) || isAir(raw[c][i]);
+    const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) || inWin(SLIDES[c], i / HZ) || isAir(raw[c][i]);
     const swing = i => (outs.r[i] && outs.r[i][1] > 0.004) || (outs.l[i] && outs.l[i][1] > 0.004);
     const wt = new Float32Array(N); for (let i = 0; i < N; i++) wt[i] = forced(i) || swing(i) ? 1 : 0.08;
     const bounds = [0];
@@ -520,7 +532,16 @@ function simulate() {
       for (let i = a; i <= b; i++) { const tau = a + (b - a) * (tot > 0 ? acc / tot : (i - a) / (b - a)), j = Math.floor(tau), u = tau - j, j1 = Math.min(N - 1, j + 1);
         root2[i] = [lerp(root[j][0], root[j1][0], u), lerp(root[j][1], root[j1][1], u)]; if (i < b) acc += wt[i]; }
     }
-    SIM[c] = { root: root2, raw: rawXZ, r: outs.r, l: outs.l, yoff: Array.from(G.yoff, v => [v]) };
+    // pelvis drop from planted feet only, smoothed (was per-frame in poseRaw from lifted feet too -> bounce on every step)
+    const dropRaw = new Float32Array(N);
+    for (let i = 0; i < N; i++) { const p = raw[c][i], yawR = p.yaw * Math.PI / 180, rt = root2[i];
+      const hipY = W.floorAt(rt[0], rt[1]) + (isAir(p) ? p.y : p.y * 0.8) + G.yoff[i] + 0.75; let drop = 0;
+      for (const [f, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const q = outs[f][i]; if (!q) continue;
+        const fy = W.floorAt(q[0], q[2]) + 0.035, hxw = rt[0] + hx * Math.cos(yawR), hzw = rt[1] - hx * Math.sin(yawR), dh = Math.hypot(q[0] - hxw, q[2] - hzw), reach = 0.735;
+        if (dh < reach * 0.97) { const need = hipY - fy - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } }   // out-of-reach (trailing) feet are about to step: never sink the hips for them (that folded knees through the sand)
+      dropRaw[i] = Math.min(0.42, drop); }
+    const SGd = Math.round(0.08 * HZ), dropS = []; for (let i = 0; i < N; i++) { let a = 0, w = 0; for (let j = -3 * SGd; j <= 3 * SGd; j += 4) { const q = dropRaw[Math.min(N - 1, Math.max(0, i + j))], g = Math.exp(-0.5 * (j / SGd) ** 2); a += q * g; w += g; } dropS.push([a / w]); }
+    SIM[c] = { root: root2, raw: rawXZ, r: outs.r, l: outs.l, yoff: Array.from(G.yoff, v => [v]), drop: dropS };
   }
 }
 function samp(arr, t) {
@@ -580,11 +601,7 @@ function poseRaw(c, t) {
   { const ph = c === 'A' ? 0 : 1.7, amp = inWin(BR[c], t) ? 2.4 : 1; p.chest[0] -= 1.1 * amp * Math.sin(t * 3.1 + ph); }
   if (fr || fl) { p.ik = {}; for (const [k, f] of [['r', fr], ['l', fl]]) if (f) p.ik[k] = [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.035, f[2]];
     // pelvis drop: lower the hips until every planted foot is within leg reach (wide stances sit low, nothing floats)
-    const yaw = p.yaw * Math.PI / 180, hipY = p.pos[1] + 0.75; let drop = 0;
-    for (const [k, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const tg = p.ik[k]; if (!tg) continue;
-      const hxw = p.pos[0] + hx * Math.cos(yaw), hzw = p.pos[2] - hx * Math.sin(yaw), dh = Math.hypot(tg[0] - hxw, tg[2] - hzw), reach = 0.735;
-      if (dh < reach) { const need = hipY - tg[1] - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } else drop = Math.max(drop, hipY - tg[1]); }
-    p.pos[1] -= Math.min(0.42, drop); }
+    p.pos[1] -= samp(S_.drop, t)[0]; }   // smoothed planted-foot pelvis drop from the planner (see simulate)
   return p;
 }
 

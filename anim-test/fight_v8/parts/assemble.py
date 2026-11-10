@@ -107,5 +107,80 @@ s = rep(s, """    for (const f of ['r', 'l']) {
     for (const f of ['r', 'l']) {
       const cs = con.filter(q => q.f === f);""")
 s = rep(s, "for (const [f, off] of [['r', 0.25], ['l', 0.75]]) if", "for (const [f, off] of [['r', 0.12], ['l', 0.62]]) if")   # first contacts sooner after a run starts
+# ---- BOUNCE fix (permanent standard: "no player bouncing"; measured ~5 pelvis reversals/s, 8-10/s standing at the spear start).
+# BAD as it was: poseRaw lowered the hips each frame from the CURRENT foot targets, lift included, so every planner step raised
+# the hips while the foot was in the air and dropped them on landing. Now the drop is computed in the planner from PLANTED feet
+# only (lifted feet count at floor height), Gaussian-smoothed (sigma 0.08 s), and sampled in poseRaw. Run bob halved.
+s = rep(s, "g.yoff[i] = -0.05 * Math.cos(2 * Math.PI * (u - 0.25)) - 0.01; } }",
+        "g.yoff[i] = -0.025 * Math.cos(2 * Math.PI * (u - 0.25)) - 0.01; } }")
+s = rep(s, "    SIM[c] = { root: root2, raw: rawXZ, r: outs.r, l: outs.l, yoff: Array.from(G.yoff, v => [v]) };",
+"""    // pelvis drop from planted feet only, smoothed (was per-frame in poseRaw from lifted feet too -> bounce on every step)
+    const dropRaw = new Float32Array(N);
+    for (let i = 0; i < N; i++) { const p = raw[c][i], yawR = p.yaw * Math.PI / 180, rt = root2[i];
+      const hipY = W.floorAt(rt[0], rt[1]) + (isAir(p) ? p.y : p.y * 0.8) + G.yoff[i] + 0.75; let drop = 0;
+      for (const [f, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const q = outs[f][i]; if (!q) continue;
+        const fy = W.floorAt(q[0], q[2]) + 0.035, hxw = rt[0] + hx * Math.cos(yawR), hzw = rt[1] - hx * Math.sin(yawR), dh = Math.hypot(q[0] - hxw, q[2] - hzw), reach = 0.748;   // real leg length (0.735 bent idle knees ~24 deg)
+        if (dh < reach * 0.97) { const need = hipY - fy - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } }   // out-of-reach (trailing) feet are about to step: never sink the hips for them (that folded knees through the sand)
+      dropRaw[i] = Math.min(0.42, drop); }
+    const SGd = Math.round(0.11 * HZ), dropS = []; for (let i = 0; i < N; i++) { let a = 0, w = 0; for (let j = -3 * SGd; j <= 3 * SGd; j += 4) { const q = dropRaw[Math.min(N - 1, Math.max(0, i + j))], g = Math.exp(-0.5 * (j / SGd) ** 2); a += q * g; w += g; } dropS.push([a / w]); }
+    SIM[c] = { root: root2, raw: rawXZ, r: outs.r, l: outs.l, yoff: Array.from(G.yoff, v => [v]), drop: dropS };""")
+s = rep(s, """    const yaw = p.yaw * Math.PI / 180, hipY = p.pos[1] + 0.75; let drop = 0;
+    for (const [k, hx] of [['r', -2 / 16], ['l', 2 / 16]]) { const tg = p.ik[k]; if (!tg) continue;
+      const hxw = p.pos[0] + hx * Math.cos(yaw), hzw = p.pos[2] - hx * Math.sin(yaw), dh = Math.hypot(tg[0] - hxw, tg[2] - hzw), reach = 0.735;
+      if (dh < reach) { const need = hipY - tg[1] - Math.sqrt(reach * reach - dh * dh); if (need > drop) drop = need; } else drop = Math.max(drop, hipY - tg[1]); }
+    p.pos[1] -= Math.min(0.42, drop); }""",
+"""    p.pos[1] -= samp(S_.drop, t)[0]; }   // smoothed planted-foot pelvis drop from the planner (see simulate)""")
+# ---- run arms: BAD as v7 had it (permanent standard: "no frame jumps"). The weapon arm switched from the trailing run pose to the
+# fighting pose with a hard cut 0.25 s before a run ended (swordToo = t < t1 - 0.25) -> 100-150 deg/frame weapon flips at every
+# sprint start/end. Now both arm states are computed and cross-faded over 0.2 s.
+s = rep(s, "    const r = runArms(phi, runBody(phi, cp(p)), t < t1 - 0.25);\n    Object.assign(p, mix(p, r, blend));",
+        "    const sw = clamp((t1 - 0.12 - t) / 0.2), rb = runBody(phi, cp(p)), r = mix(runArms(phi, cp(rb), false), runArms(phi, cp(rb), true), sw);\n"
+        "    Object.assign(p, mix(p, r, blend));")
+# ---- LEGS CROSSING (self-collision QA: shins/thighs passing through each other ~70 frames per duel, mostly when moving sideways).
+# BAD as it was: run/walk contacts put each foot to the side of the TRAVEL direction, so strafing/circling placed the feet in front of
+# each other and they crossed; the step planner could also aim a foot across the body's midline. Now contacts use the BODY's left/
+# right, and every desired foot position keeps >= 0.07 block on its own side of the body.
+s = rep(s, "function runGait(c, root, rawXZ, N) {", "function runGait(c, root, rawXZ, N, rawP) {")
+s = rep(s, "const rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, root, rawXZ, N), entry = {};",
+           "const rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, root, rawXZ, N, raw[c]), entry = {};")
+s = rep(s, "        con.push({ i, f, p: [root[i][0] + fx * 0.28 + fz * 0.16 * side, root[i][1] + fz * 0.28 - fx * 0.16 * side] });",
+           "        const yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl);   // body LEFT in world (not travel-relative)\n"
+           "        con.push({ i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] });")
+s = rep(s, "const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1; return { i, f, p: [root[i][0] + fx * 0.28 + fz * 0.16 * side, root[i][1] + fz * 0.28 - fx * 0.16 * side] }; };",
+           "const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1, yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl); return { i, f, p: [root[i][0] + fx * 0.28 - side * 0.15 * lx, root[i][1] + fz * 0.28 - side * 0.15 * lz] }; };")
+s = rep(s, "Dsm[f] = Dsm[f] ? [lerp(Dsm[f][0], Dr[0], 1), lerp(Dsm[f][1], Dr[1], 1)] : Dr.slice(); const D = Dsm[f];",
+           "Dsm[f] = Dsm[f] ? [lerp(Dsm[f][0], Dr[0], 1), lerp(Dsm[f][1], Dr[1], 1)] : Dr.slice(); const D = Dsm[f];\n"
+           "        { const sgn = f === 'l' ? 1 : -1, lx = Math.cos(yaw), lz = -Math.sin(yaw), s_ = (D[0] - root[i][0]) * lx + (D[1] - root[i][1]) * lz;   // keep each foot on its own side\n"
+           "          if (sgn * s_ < 0.07) { const kk = 0.07 * sgn - s_; D[0] += lx * kk; D[1] += lz * kk; } }")
+# ---- STANCE-LEG BOB (user, duel40 start and ~29 s: "the player's stance leg was bobbing again"). BAD as it was: breathing also
+# moved the whole body (p.y += 0.008 * amp * sin), so with planted feet the knees flexed rhythmically (+-0.02 at amp 2.6).
+# Breathing now moves only the ribcage and head; the pelvis never bobs with breath.
+s = rep(s, "p.head[0] -= 1.2 * amp * Math.sin(t * 3.1 + ph + 0.4); p.y += 0.008 * amp * Math.sin(t * 3.1 + ph);",
+           "p.head[0] -= 1.2 * amp * Math.sin(t * 3.1 + ph + 0.4);   // BAD removed: p.y += 0.008*amp*sin (breath bobbed the legs)")
+# ---- IDLE RE-STEP LOOP (user: "stance leg bobbing" at the start and after the finish). BAD as it was: a foot farther than 0.5 block from
+# the hips was forced to step every ~0.2 s, but the wide fighting stance itself puts the back foot ~0.58 away -> it stepped onto the very
+# spot it stood on, again and again (lift 0.08, same position). Now the forced step needs the foot to be clearly farther than where the
+# pose wants it AND away from that spot; a step never targets the spot the foot already occupies.
+s = rep(s, "|| (reach > 0.5 && !step[f] && t - lastStep[f] > 0.06)) {",
+           "|| (reach > Math.max(0.5, Math.hypot(D[0] - root[i][0], D[1] - root[i][1]) + 0.15) && Math.hypot(feet[f][0] - D[0], feet[f][1] - D[1]) > 0.08 && !step[f] && t - lastStep[f] > 0.06)) {")
+# ---- STANCE WIDTH per pose (user: "stop bending the players leg when they're standing ... walking/idling their legs should be normal").
+# v7 widened EVERY stance (x1.45, min 1.9 px): idle and walk poses then needed a deep pelvis drop -> bent knees. Now pose.wide (0..1,
+# default 1) scales it: fighting stances stay wide, idle/walk stances are natural width with straight legs.
+s = rep(s, "function legFK(leg, knee, hipX) {", "function legFK(leg, knee, hipX, wide = 1) {")
+s = rep(s, "const sx = hipX + _v1.x * 1.45; return [Math.sign(hipX) * Math.max(1.9, Math.abs(sx)), _v1.z * 1.35];",
+           "const sx = hipX + _v1.x * (1.2 + 0.25 * wide); return [Math.sign(hipX) * Math.max(1.5 + 0.4 * wide, Math.abs(sx)), _v1.z * (1.15 + 0.2 * wide)];")
+s = rep(s, "const off = legFK(leg, knee, hx), lx = off[0] / 16, lz = off[1] / 16;", "const off = legFK(leg, knee, hx, p.wide ?? 1), lx = off[0] / 16, lz = off[1] / 16;")
+# ---- SPRINT (user: "make their sprint wider and put more motion into it"): longer stride, more hip/shoulder rotation
+s = rep(s, "const STRIDE = 2.7;", "const STRIDE = 3.1;")
+s = rep(s, "p.waist = [18, -15 * s, 0]; p.chest = [8, p.chest[1] + 10 * s, 0]; p.y = -0.08; return p;",
+           "p.waist = [16, -20 * s, 0]; p.chest = [8, p.chest[1] + 15 * s, 0]; p.head = [p.head[0], p.head[1] - 6 * s, 0]; p.y = -0.06; return p;")
+# ---- BENT LEGS WHILE STANDING (user: "stop bending the players leg when they're standing", "legs being bent for no reason while fighting").
+# BAD as it was: the hips sat at exactly leg length (0.75) while the sole targets sat 0.035 ABOVE the sand -> a 0.035 shortfall that
+# the 2-bone IK turns into a ~35 deg knee bend (law of cosines) even in a straight standing pose; and every fighting pose's y (-0.14..-0.34)
+# lowered the hips further -> 60-70 deg crouches. Now: the body is lifted by the same 0.035 (straight legs when standing) and shallow
+# crouches are compressed (y -0.14 -> -0.06) while deep moves (slam, duck, slide) keep their depth.
+s = rep(s, "function isAir(p) {", "function yEff(p) { if (isAir(p) || p.y >= 0) return isAir(p) ? p.y : p.y * 0.8; const a = -p.y; return -(0.25 * a + 0.75 * Math.max(0, a - 0.3)); }   // guard -0.14 -> -0.035 (light athletic bend), slam -0.62 -> -0.4\nfunction isAir(p) {")
+s = rep(s, "p.pos = [X, g + (isAir(p) ? p.y : p.y * 0.8) + samp(S_.yoff, t)[0], Z];", "p.pos = [X, g + yEff(p) + 0.035 + samp(S_.yoff, t)[0], Z];")
+s = rep(s, "const hipY = W.floorAt(rt[0], rt[1]) + (isAir(p) ? p.y : p.y * 0.8) + G.yoff[i] + 0.75;", "const hipY = W.floorAt(rt[0], rt[1]) + yEff(p) + 0.035 + G.yoff[i] + 0.75;")
 open('fight_v8/choreo.js', 'w', encoding='utf-8').write(s)
 print('fight_v8/choreo.js', len(s), 'chars')
