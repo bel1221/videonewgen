@@ -1085,3 +1085,79 @@ in `fight_v8/parts/assemble.py`:
   - t1's phase total is 23 vs 19. The shin contacts are gone (one 0.4 px shin sample left). What remains is B's forearm
     grazes at parries and the 5.55 s head graze, which were already there before this change.
 - **Not re-rendered.** The delivered MP4s (t1, duel40) still show the old crossed footwork.
+
+## 21. t1 v2 re-render with the fixed footwork (2026-11-11, local PC)
+- **Out:** `anim-test/out/newgen_test_t1_v2.mp4` (10 s, video + regenerated sound; v1 kept). Higgsfield media_id
+  `8c3c4ad7-3878-40a9-9cfd-d6bac0189409`.
+- **Local tools:** portable Node 22, ffmpeg 9.0.2 and Python 3.12 (+ numpy, scipy) live in `Desktop\mcrefs\tools\`
+  (not in git, not on PATH). Prefix commands with
+  `export PATH="/c/Users/Administrator/Desktop/mcrefs/tools/node:/c/Users/Administrator/Desktop/mcrefs/tools/ffmpeg/bin:/c/Users/Administrator/Desktop/mcrefs/tools/python:$PATH"`.
+  Render speed on the RTX 2060: about 0.95 s/frame at `?sub=5`.
+- **Leg collision eased around clashes:** `p.oppFeetK` fades the opponent-leg capsules out within 0.08-0.22 s of a clash
+  (in `patch_oppfeet.pl`, `assemble_w.py`, `rig2_w.js`).
+- **Open: two clashes are looser than in v1.** Contact miss 3.02 s: 0.38 -> 0.74; 7.42 s: 0.01 -> 0.34; mean 0.137 -> 0.24
+  (2.42 s was already 1.02, now 1.07). Not caused by the leg capsules (same numbers with them off): the fighters stand
+  in slightly different places now, and the parry auto-pick chooses `parryLowL` at 3.02 s where it chose `parryL`.
+  Re-key or pin those parries in `build_t1.js`.
+
+## 22. Bolt 30: Boltspear vs Lancebolt (2026-11-11, local PC)
+- **Brief (user):** 30 s. Open on both faces up close, slowly looking up (reference: slanted three-panel anime
+  close-ups). Both lunge in and clash. Lots of movement: backing off from a swing, pushed back by a swing, kicked into a
+  slide that is braked by plunging the spear head into the ground. Finish: a forward dash, arms extended, the spear
+  through the enemy's body.
+- **Files:** `fight_w/parts/build_bolt30.js`, `camera_bolt30.js`; `?vid=bolt30`; A = Boltspear, B = Lancebolt (both use
+  the spear config and pose set). 29 s of animation + 1 s of slow motion on the pierce = 30 s of video.
+  - Build: `python fight_w/parts/assemble_w.py bolt30`
+  - Render: `PAGE=anim-test/fight_w/index.html QS="?sub=5&vid=bolt30" node render.mjs frames 0 900 out/newgen_bolt30_boltspear_vs_lancebolt_video.mp4`
+  - Events -> `fight_w/comp/events_bolt30.json`; sound: `SCENE=bolt30 python fight/fight_sfx3.py`
+- **Engine additions** (`tools/patch_bolt30_engine.py`, already applied):
+  - **Split-panel intro** (`fight.js` `renderPanels`): the choreo exports `PANELS`, `panelAt(t)`, `panelCams(t)`. Each
+    panel is the scene rendered through its own face camera, masked to a slanted panel, with a duotone tint per fighter
+    (A storm blue, B ember red), falling streaks, a wipe-in and a white flash into the fight.
+  - **`plant` pose channel:** the weapon may enter the sand (rig skips the floor push). Used by `L.spBrake`.
+  - **`pierce` pose channel:** the weapon ignores the opponent's body. Used by `L.spPierce`.
+  - **`drag` contact kind:** sand puffs and a scrape sound along the furrow.
+- **Scenes:** intro panels 0-2.9; double lunge and clash 3.55; A presses (B backs off a sweep, pushed back 5.75); B
+  answers (A hops a sweep, pushed back 8.4); B kicks A 9.68, A slides 3.5 blocks and brakes with the planted spear
+  10.0-10.8; A's one twirl 11.4; A's leap plunge 13.98 (B rolls aside); circling trade; A kicks B 17.4; A's lunge is
+  side-stepped 18.6 and he is hit in the flank 19.05; last trade, B dropped to a knee 22.5; pierce 26.32 (slow motion),
+  B falls 28.4.
+- **QA before rendering:**
+  - Blade contacts: 23 clashes, miss 0.00 on 20, max 0.08.
+  - `cross_qa`: 0 crossed for both. Foot slide 0 / 0, below floor 0 / 0, bounce 30 / 34.
+  - `phase_qa`: A's weapon in B 35 samples = the finisher (intended); B's weapon in A 0; own-body 1 sample each.
+  - `tools/pierce_qa.js`: shaft through the torso centre (0.1-0.5 px off axis), 0.6-0.8 blocks out of the back,
+    26.4-27.0 s. Needed `yawOff: 27` on the pierce pose (the right hand is 6 px off the centre line) and a level `bd`.
+  - Lean samples (> 30 deg pitch) 52 / 57: brake, sweeps, plunge and hit reactions; not checked one by one.
+  - Camera: 26 shots, 2 impact inserts; shortest normal shot 0.8 s.
+- **Shell note (again):** bash here-documents turn `\n` into `\n` on this machine. Write scripts with the Write tool.
+- **Out:** `anim-test/out/newgen_bolt30_boltspear_vs_lancebolt.mp4` (30.0 s, 1920x1080, with sound). Higgsfield media_id
+  `1fc34dc3-ffb0-4a51-8c53-c33edd3d0f66`. Stills checked; the full clip and the sound were not watched or listened to.
+
+## 23. Bolt 30 v2: grip rules from the user's review (2026-11-11)
+- **User:** at about 5 s the hands spasm, because the spear was forced two-handed all the time. Rules, for every
+  two-handed weapon and the bow's string hand:
+  - If the hands are forced apart and the weapon is too far away, stop trying to re-grip every frame.
+  - The spear is two-handed ONLY for a lunge or stab, not all the time.
+- **Measured cause** (`tools/hand_qa.js`, `grip_reach.js`): Minecraft arms are 9.5 px and the shoulders 12 px apart. With
+  a forward-pointing spear the left hand's grip point was 1.3-2.1 arm lengths away, so it was NEVER reachable and the IK
+  arm flailed after it. Left-hand jerks (direction reversals > 1.5 px/frame): A 100, B 74.
+- **Fixes:**
+  - **Grip release** (`tools/patch_grip.py`; `fight.js` builds a 60 Hz grip track, `C.setGrip`, pose channel `gripW`):
+    the support hand takes the shaft when it comes within reach, lets go when it is out of reach (ratio > 1.2), and
+    after a forced release waits until it has been reachable for 0.3 s. Also applied to the bow's string hand.
+  - **One-handed spear by default** (`build_bolt30.js`): guards, blocks, sweeps, overheads, jabs, quick exchange
+    thrusts (`spThrust1`), the run-up, hops, reactions, the brake and the leap plunge.
+  - **Two-handed only on the four committed lunges** (opener 3.55, heavy thrust 8.4, running lunge 18.62, finisher
+    26.3), using new SIDE-ON poses (`spWind`, `spThrust`, `spPierce`): body turned about 90 deg (yawOff -50 plus
+    waist/chest twist), shaft across the chest along the shoulder line (`bd` azimuth 88), left hand AHEAD of the right
+    (new pose channel `lhAt`, `tools/patch_lhat.py`). Fitted with `tools/grip_pose_fit.js`; reach 0.65-1.05.
+  - While two hands are on the shaft, its direction comes from the pose, not the forearm (`gk` x (1 - lh)).
+- **Result:** left-hand jerks A 100 -> 9, B 74 -> 5 (all inside the two-handed lunges at 3.4-3.5, 8.2, 18.5-18.6, 25.9,
+  27.6). With the spear one-handed everywhere it was 0 / 0. Clashes still all connect; crossed legs 0, foot slide 0.
+- **Open:**
+  - The remaining jerks on the two-handed lunges (hand grabbing mid-thrust).
+  - The side-on finisher reaches less far: the tip exits the back by 0.17-0.37 blocks (v1: 0.6-0.8) and the fighters
+    stand 0.68 apart, so in the pierce shot A is partly hidden behind B. v1's finisher read better.
+  - These poses live in `build_bolt30.js` only; `poses_w.js` (duel40, t2, spear) still has the old always-two-handed set.
+- **Out:** `anim-test/out/newgen_bolt30_v2.mp4` (30 s). Not uploaded to Higgsfield yet. v1 is kept.

@@ -33,6 +33,9 @@ CFG = {'a': dict(total=20.0, mute=[6.46], big=(13.2, 13.95, 9.4), fall=19.38, cr
        # video time through the slow-motion segments (EV['slowmo']) before placing sounds
        'duel40': dict(total=40.0, mute=[], big=(3.05, 15.25, 17.95, 21.6, 25.5), fall=26.8, cross=25.75, bind=(19.78, 20.4), impact=True, wpn='duel40',
                       drop=['clash/desert_01.wav'], events='fight_w/comp/events_duel40.json', out='fight_w/comp/audio_duel40.m4a'),
+       # bolt30 (Boltspear vs Lancebolt, 29 s animation + 1 s of slow motion): spear vs spear
+       'bolt30': dict(total=30.0, mute=[], big=(2.95, 13.3, 25.6), fall=28.4, cross=26.32, bind=(0, 0), impact=True, wpn='duel', kinds={'A': 'spear', 'B': 'spear'},
+                      drop=['clash/desert_01.wav'], events='fight_w/comp/events_bolt30.json', out='fight_w/comp/audio_bolt30.m4a'),
        # 10 s mechanics tests: 'kinds' picks each fighter's swing sound by weapon
        't1': dict(total=10.0, mute=[], big=(4.75,), fall=None, cross=99.0, bind=(0, 0), impact=True, wpn='duel', kinds={'A': 'sword', 'B': 'sword'},
                   drop=['clash/desert_01.wav'], events='fight_w/comp/events_t1.json', out='fight_w/comp/audio_t1.m4a'),
@@ -166,6 +169,7 @@ for t, big, kind in EV['clashes']:
         ring(t + 0.004, -19 if not big else -14, big)
         if round(t, 3) in INS or big: place(1, load(f'{PK}/unsheathe/desert_34.wav', 1.0), t - 0.07, -9); thump(1, t, -9, 85)
         continue
+    if kind == 'drag': noise(2, t, -15, 0.16, 300, 3200); continue          # spear head dragged through the sand
     if kind == 'arrowg': place(1, load(MC + f'random_bowhit{1 + int(rng.integers(4))}.ogg', 0.95), t, -7); noise(2, t, -14, 0.18, 400, 4000); continue
     place(1, load(pick('clash'), rng.uniform(0.94, 1.08)), t, -3 if big else -7)
     if WPN == 'hammer' or 'hammer' in CFG.get('kinds', {}).values(): place(1, load(MC + f'mob_irongolem_hit{1 + int(rng.integers(4))}.ogg', 0.85), t, -9)   # steel on the stone/iron hammer

@@ -20,14 +20,14 @@ s = region(s, 'function buildAll() {', 'export const export_cross = {};', build 
 s = region(s, 'const INS = [', '// ------------------------------------------------------------------ effects', cam + '\n')
 s = rep(s, '// Choreography, cameras and effect timing for the 30 s fight test v8 ("blade masters").',
         f'// Choreography, cameras and effect timing for the fight_w "{vid}" duel (sword vs a different legendary weapon).')
-s = rep(s, 'export const TOTAL = 30.0;', 'export const TOTAL = ' + ('37.55' if vid == 'duel40' else '9.45' if vid == 't3' else '10.0' if vid in ('t1', 't2') else '20.0') + ';')
+s = rep(s, 'export const TOTAL = 30.0;', 'export const TOTAL = ' + ('29.0' if vid == 'bolt30' else '37.55' if vid == 'duel40' else '9.45' if vid == 't3' else '10.0' if vid in ('t1', 't2') else '20.0') + ';')
 # new pose channels: lh (two-hand IK), rh/draw (bowstring hand), aimK (bow arm aims)
 s = rep(s, "function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] };",
-        "function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, lh: 0, rh: 0, draw: 0, aimK: 0, wide: 1, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] };")
-s = rep(s, "const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff'];", "const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff', 'lh', 'rh', 'draw', 'aimK', 'wide'];")
+        "function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, lh: 0, rh: 0, draw: 0, aimK: 0, wide: 1, plant: 0, pierce: 0, lhAt: 0, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] };")
+s = rep(s, "const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff'];", "const FLAT_KEYS = ['wrist', 'roll', 'y', 'yawOff', 'lh', 'rh', 'draw', 'aimK', 'wide', 'plant', 'pierce', 'lhAt'];")
 s = rep(s, "  const o = { wrist: lerp(a.wrist, b.wrist, u), roll: lerp(a.roll, b.roll, u), y: lerp(a.y, b.y, u), yawOff: lerp(a.yawOff, b.yawOff, u),",
         "  const o = { wrist: lerp(a.wrist, b.wrist, u), roll: lerp(a.roll, b.roll, u), y: lerp(a.y, b.y, u), yawOff: lerp(a.yawOff, b.yawOff, u),\n"
-        "    lh: lerp(a.lh || 0, b.lh || 0, u), rh: lerp(a.rh || 0, b.rh || 0, u), draw: lerp(a.draw || 0, b.draw || 0, u), aimK: lerp(a.aimK || 0, b.aimK || 0, u), wide: lerp(a.wide ?? 1, b.wide ?? 1, u),")
+        "    lh: lerp(a.lh || 0, b.lh || 0, u), rh: lerp(a.rh || 0, b.rh || 0, u), draw: lerp(a.draw || 0, b.draw || 0, u), aimK: lerp(a.aimK || 0, b.aimK || 0, u), wide: lerp(a.wide ?? 1, b.wide ?? 1, u), plant: lerp(a.plant || 0, b.plant || 0, u), pierce: lerp(a.pierce || 0, b.pierce || 0, u), lhAt: lerp(a.lhAt || 0, b.lhAt || 0, u),")
 # weapon poses + their weapon-axis intents
 s = rep(s, "// ------------------------------------------------------------------ blade intent", poses + "\n// ------------------------------------------------------------------ blade intent")
 s = rep(s, "for (const k in BD) if (L[k]) L[k].bd = bdv(...BD[k]);",
@@ -43,13 +43,14 @@ s = rep(s, "for (const k in BD) if (L[k]) L[k].bd = bdv(...BD[k]);",
 s = region(s, 'export const SLIDES = {', '\nconst inWin', 'export const SLIDES = { A: [], B: [] };')
 s = rep(s, "if (e === 'i' && t > 2.5) out.push", "if (e === 'i' && t > 0.3) out.push")
 s = rep(s, "export const PARRY = [];", "export const PARRY = [];\nexport const ARROWS = [];   // fight_w bow: { tn (nock), t0 (release), t1 (arrives), mode: 'deflect'|'dodge'|'ground', dx, dz }\nconst GKC = { A: null, B: null };   // per-fighter grip-blend override (bow: 0)")
-s = rep(s, "m *= clamp(1 - (av - 25) / 35); p.gk = GK * m; }", "m *= clamp(1 - (av - 25) / 35); p.gk = (GKC[c] ?? GK) * m; }")
+s = rep(s, "m *= clamp(1 - (av - 25) / 35); p.gk = GK * m; }", "m *= clamp(1 - (av - 25) / 35); p.gk = (GKC[c] ?? GK) * m * (1 - clamp(p.lh || 0)); }")   # two hands on the shaft: its direction comes from the pose (bd), not from the main forearm
 s = rep(s, "swings: SWINGS(), twirls: TWIRLS(), ins: INS.slice(), flash: FLASH }; }",
         "swings: SWINGS(), twirls: TWIRLS(), ins: INS.slice(), flash: FLASH, arrows: ARROWS.map(a => [a.tn, a.t0, a.t1, a.mode]), vid: '" + vid + "' }; }")
 # effects: arrow deflections (small burst + flare), arrows into the sand (puff), heavy hammer ground hits use 'slam'
 s = rep(s, "    if (c.kind === 'kick') { puff(soft, t, c.t, p, 10, 77, 0.5, 0.2); }",
         "    if (c.kind === 'kick') { puff(soft, t, c.t, p, 10, 77, 0.5, 0.2); }\n"
         "    if (c.kind === 'arrow') { burst(add, t, c.t, p, 34, Math.round(c.t * 131), 0.75); if (d >= 0 && d < 0.1) { flares.push({ p, s: 0.7 * (1 - d / 0.1), a: 1 - d / 0.1, rot: c.t * 5 }); sparkLight.i = Math.max(sparkLight.i, 4 * (1 - d / 0.1)); sparkLight.p = p; } }\n"
+        "    if (c.kind === 'drag') { const g_ = W.floorAt(p[0], p[2]); puff(soft, t, c.t, [p[0], g_, p[2]], 9, Math.round(c.t * 613), 0.4, 0.7, [0.92, 0.82, 0.62], 0.9); burst(add, t, c.t, [p[0], g_ + 0.05, p[2]], 8, Math.round(c.t * 419), 0.45); }\n"
         "    if (c.kind === 'arrowg') puff(soft, t, c.t, [p[0], W.floorAt(p[0], p[2]), p[2]], 8, Math.round(c.t * 71), 0.35, 0.4, [0.92, 0.82, 0.62], 0.8);")
 # ---- DRIFT: keep the fight travelling (user: "where did the fast paced pvp and movements go? theyre standing in place swinging").
 # Builds push [t0, t1, mode, speed]: 'strafeL'/'strafeR' = both slide sideways to the fighters' line, 'pushA' = both move from A
@@ -128,7 +129,10 @@ s = rep(s, "  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.op
            "    p.oppLean = [Math.sin(oy) * lean, 0, Math.cos(oy) * lean, yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9];   // opponent chest/head offset for the weapon collision\n"
            "    p.oppArms = oppArmPts(ob, ro, p.oppLean);\n"
            "    p.oppFeet = ['r', 'l'].map(s => { const f = samp(SIM[o][s], t); return f ? [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.05, f[2]] : null; });   // opponent legs for the weapon collision\n"
+           "    { let k = 1; for (const cl of CLASHES) k = Math.min(k, clamp((Math.abs(t - cl.t) - 0.08) / 0.14)); p.oppFeetK = k; }   // eased off around clashes so the clash solve stays exact\n"
            "  }")
+s = rep(s, "  const fr = samp(S_.r, t), fl = samp(S_.l, t);", "  if (GRIPT && GRIPT[c]) { const g = GRIPT[c], x = Math.max(0, Math.min(g.w.length - 2, t * g.hz)), i = Math.floor(x); p.gripW = g.w[i] + (g.w[i + 1] - g.w[i]) * (x - i); }   // support-hand grip (fight.js setGrip)\n  const fr = samp(S_.r, t), fl = samp(S_.l, t);")
+s = rep(s, "export const PARRY = [];\nexport const ARROWS", "let GRIPT = null; export function setGrip(g) { GRIPT = g; }\nexport const PARRY = [];\nexport const ARROWS")
 s = rep(s, "function rootXZ(c, t) {", "function oppArmPts(ob, ro, lean) {   // opponent arms (shoulder, elbow, hand) from his FK angles + torso turn - weapon collision keeps blades off them\n"
   "  const ty = (ob.yaw + (ob.waist[1] || 0) + (ob.chest[1] || 0)) * Math.PI / 180, cy = Math.cos(ty), sy = Math.sin(ty), g = W.floorAt(ro[0], ro[1]), out = [];\n"
   "  const toW = (x, y, z) => [ro[0] + x * cy + z * sy + lean[0] * 0.8, g + y + lean[3], ro[1] - x * sy + z * cy + lean[2] * 0.8];\n"

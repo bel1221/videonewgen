@@ -138,6 +138,10 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   step. Fixed in the shared planner with `anim-test/tools/patch_nocross.pl`, plus real opponent legs for the blade
   collision (`patch_oppfeet.pl`); re-run both after any `assemble_w.py`. QA: `tools/cross_qa.js` must read 0 crossed;
   `tools/qa_feet_batch.js` runs cross + stance + phase. t1-t3 and duel40 are not re-rendered yet.
+- **Bolt 30** (`fight_w`, `?vid=bolt30`): Boltspear vs Lancebolt, 30 s. Split-panel face intro, double lunge, kick into a
+  spear-braked slide, pierce finisher. v1 = two-handed spear (hands spasmed); v2 = grip rules from the user (never force a
+  grip; spear two-handed only on lunges). User on v2: "good", but the empty hand must not always be raised (open, next
+  session). Build, render, QA numbers and local tool paths: notes §21-23. v1 is on Higgsfield; v2 is not uploaded yet.
 - **NewGen studio (our own animation system)**: `anim-test/studio/` + skill `.claude/skills/newgen-animate`. Prompt ->
   beat script JSON -> contact-first generated motion on rig2 -> render. Demos: `studio/scripts/demo.json` (voxel meadow),
   `demo_colosseum.json` (the user's colosseum, converted by `anim-test/tools/mca2obj.py`; `fight/assets/colosseum/` is

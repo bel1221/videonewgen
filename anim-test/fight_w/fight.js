@@ -30,7 +30,7 @@ scene.background = FOGC.clone();
 // v7: high overhead sun (light from above, shadows pooled under the fighters), less sky fill for contrast
 // v8: the user liked the BRIGHT overhead sun of the v7 QA stills (sand lit up); v7's final render had toned it down. Restore it.
 const hemi = new THREE.HemisphereLight(0x9fc2ff, 0xd8b98a, +(params.get('hemi') ?? 1.05)); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff1dc, +(params.get('sunI') ?? (['duel40', 't1', 't2', 't3'].includes(VID) ? 3.6 : 4.0))); sun.castShadow = true;
+const sun = new THREE.DirectionalLight(0xfff1dc, +(params.get('sunI') ?? (['duel40', 't1', 't2', 't3', 'bolt30'].includes(VID) ? 3.6 : 4.0))); sun.castShadow = true;
 renderer.toneMappingExposure = +(params.get('exp') ?? 1.0);
 sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.03; sun.shadow.radius = 1.5;
 Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 260 }); scene.add(sun, sun.target);
@@ -72,8 +72,8 @@ console.log('FLOOR', FLOOR);
 // ------------------------------------------------------------------ cast
 // weapon pair per video: [A, B] -> { file, cfg } (cfg = key in WC below)
 const WP = { sword: { file: 'aegisblade', cfg: 'sword' }, sword2: { file: 'veilblade', cfg: 'sword2' }, spear: { file: 'boltspear', cfg: 'spear' },
-  reaper: { file: 'goldreaper', cfg: 'reaper' }, hammer: { file: 'golem_hammer', cfg: 'hammer' }, bow: { file: 'voidbow', cfg: 'bow' } };
-const VPAIR = { spear: [WP.sword, WP.spear], hammer: [WP.sword, WP.hammer], bow: [WP.sword, WP.bow], duel40: [WP.spear, WP.reaper],
+  reaper: { file: 'goldreaper', cfg: 'reaper' }, lance: { file: 'lancebolt', cfg: 'spear' }, hammer: { file: 'golem_hammer', cfg: 'hammer' }, bow: { file: 'voidbow', cfg: 'bow' } };
+const VPAIR = { spear: [WP.sword, WP.spear], hammer: [WP.sword, WP.hammer], bow: [WP.sword, WP.bow], duel40: [WP.spear, WP.reaper], bolt30: [WP.spear, WP.lance],
   t1: [WP.sword, WP.sword2], t2: [WP.reaper, WP.spear], t3: [WP.hammer, WP.sword] };
 const [s1, s2, s3, aeg, veil] = await Promise.all([
   loadSkin('/anim-test/src/skins/1.png'), loadSkin('/anim-test/src/skins/2.png'), loadSkin('/anim-test/src/skins/3.png'),
@@ -95,7 +95,7 @@ const WA = WC[VPAIR[VID][0].cfg], WB = WC[VPAIR[VID][1].cfg];
 const SC = 0.69 * 1.15;
 const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), SC, WA), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), SC, WB), C: buildCharacter(s3, null) };
 for (const k of ['A', 'B']) { const w = k === 'A' ? WA : WB; Object.assign(cast[k], { cseg: w.cseg, tip: w.tip, trail: w.trail }); }
-document.getElementById('bl').innerHTML = '<b>0' + ({ spear: 1, hammer: 2, bow: 3, duel40: 1, t1: 1, t2: 2, t3: 3 }[VID]) + '</b>— ' + { spear: 'SWORD VS SPEAR', hammer: 'SWORD VS HAMMER', bow: 'SWORD VS BOW', duel40: 'BOLTSPEAR VS GOLDREAPER', t1: 'BLADE DANCE', t2: 'GREATSWORD VS SPEAR', t3: 'HAMMER VS BLADE' }[VID];
+document.getElementById('bl').innerHTML = '<b>0' + ({ spear: 1, hammer: 2, bow: 3, duel40: 1, t1: 1, t2: 2, t3: 3, bolt30: 1 }[VID]) + '</b>— ' + { spear: 'SWORD VS SPEAR', hammer: 'SWORD VS HAMMER', bow: 'SWORD VS BOW', duel40: 'BOLTSPEAR VS GOLDREAPER', bolt30: 'BOLTSPEAR VS LANCEBOLT', t1: 'BLADE DANCE', t2: 'GREATSWORD VS SPEAR', t3: 'HAMMER VS BLADE' }[VID];
 // v8: sword model 1.15x (user). v7: Minecraft default grip - slide the sword back along the forearm so the fist wraps the handle under the guard
 for (const k of ['A', 'B']) if (cast[k].whand === 'r' && (VPAIR[VID][k === 'A' ? 0 : 1].cfg === 'sword' || VPAIR[VID][k === 'A' ? 0 : 1].cfg === 'sword2')) cast[k].weapon.parent.position.y += +(params.get('grip') ?? 1.6);   // sword: Minecraft grip; spear/hammer/bow are exported with their own grip point
 for (const k in cast) scene.add(cast[k].root);
@@ -162,6 +162,25 @@ const _dbgS = params.get('dbgsolve'), _dl = () => C.CLASHES.filter(c => !c.at &&
 if (_dbgS) console.warn('SOLVED-before', JSON.stringify(_dl()));
 if (NPASS === 3) C.resim(true);                    // same roots/feet; rebuilds the blade-direction tracks after the final solve
 if (_dbgS) console.warn('SOLVED-after', JSON.stringify(_dl()));
+// ---- grip release: the support hand lets go when the weapon is out of reach or moving too fast for it, and re-grips only
+// after the grip point has been comfortably reachable for REGRIP seconds (no per-frame re-grabbing = no spasming hands)
+if (C.setGrip && params.get('grip2') !== '0') {
+  const GHZ = 60, NG = Math.ceil(C.TOTAL * GHZ) + 2, REACH_OUT = +(params.get('gout') ?? 1.2), REACH_IN = +(params.get('gin') ?? 1.08), VMAX = +(params.get('gv') ?? 12), REGRIP = 0.3, tab = {}, dbg = {};
+  for (const k of ['A', 'B']) { const w = new Float32Array(NG).fill(1); let held = false, fresh = true, good = 0, prev = null; dbg[k] = [];
+    // per two-handed window: the hand first REACHES for the shaft and takes it as soon as it is within reach (fresh). If it is then
+    // forced off (out of reach / too fast), it stays off until the grip has been comfortably reachable for REGRIP seconds.
+    for (let i = 0; i < NG; i++) { const t = i / GHZ, pz = C.pose(k, t); applyPose(cast[k], pz); const r = cast[k].gripReach, q = cast[k].gripLocal;
+      if (r == null || Math.max(pz.lh || 0, pz.rh || 0) < 0.5) { held = false; fresh = true; good = 0; prev = null; w[i] = 1; continue; }   // one-handed, or blending in/out: the pose weight does the fade
+      const v = prev ? q.distanceTo(prev) / 16 * GHZ : 0; prev = q.clone();                    // grip-point speed in the chest frame (blocks/s)
+      const bad = r > REACH_OUT, ok = r < REACH_IN && v < VMAX;   // let go only when the shaft is out of reach (a fast two-handed thrust is both hands pushing together)
+      if (held && bad) { held = false; fresh = false; good = 0; dbg[k].push(+t.toFixed(2)); }
+      else if (!held) { if (fresh) { if (ok) held = true; } else { good = ok ? good + 1 / GHZ : 0; if (good >= REGRIP) held = true; } }
+      w[i] = held ? 1 : 0; }
+    const d = Math.round(0.07 * GHZ), e = w.slice(); for (let i = 0; i < NG; i++) { let m = 1; for (let j = -d; j <= d; j++) m = Math.min(m, w[Math.max(0, Math.min(NG - 1, i + j))]); e[i] = m; }   // let go a little early
+    const sg = 0.06 * GHZ, s = new Float32Array(NG); for (let i = 0; i < NG; i++) { let a = 0, ws = 0; for (let j = -12; j <= 12; j++) { const g = Math.exp(-0.5 * (j / sg) ** 2); a += e[Math.max(0, Math.min(NG - 1, i + j))] * g; ws += g; } s[i] = a / ws; }
+    tab[k] = { hz: GHZ, w: Array.from(s) }; }
+  C.setGrip(tab); console.warn('GRIP releases', JSON.stringify(dbg));
+}
 // blade-vs-ground contacts: tip scraping the sand during a fast swing -> sand spray + sparks
 { const GH = []; let last = -9;
   for (let t = 0.1; t < C.TOTAL; t += 1 / 60) for (const k of ['A', 'B']) {
@@ -351,7 +370,7 @@ const outMat = new THREE.ShaderMaterial({ depthTest: false, uniforms: { map: { v
   fragmentShader: 'uniform sampler2D map; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(map, vUv).rgb, 1.0); }' }); const outScene = new THREE.Scene(); outScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), outMat));
 
 // ------------------------------------------------------------------ one sub-frame
-function drawState(t) {
+function drawState(t, camOv) {
   for (const k in cast) applyPose(cast[k], C.pose(k, t));
   // trails sampled from past poses
   for (const k of ['A', 'B']) {
@@ -369,7 +388,7 @@ function drawState(t) {
   updatePrints(t);
   updateGhosts(t);
   for (const k in cast) applyPose(cast[k], C.pose(k, t));
-  let cam = C.camera(t, cast);
+  let cam = camOv ? camOv(cast) : C.camera(t, cast);
   if (params.get('iso')) { let mx = 0, mz = 0, n = 0; for (let d = -0.5; d <= 0.501; d += 0.125) { const a = C.pose('A', t + d).pos, b = C.pose('B', t + d).pos; mx += (a[0] + b[0]) / 2; mz += (a[2] + b[2]) / 2; n++; }
     mx /= n; mz /= n; cam = { pos: new THREE.Vector3(mx, FLOOR + 1.5, mz + 7.2), look: new THREE.Vector3(mx, FLOOR + 1.0, mz), fov: 40, roll: 0, label: 'iso' }; }
   updateBow(t);
@@ -403,8 +422,41 @@ function drawState(t) {
 }
 
 const fill = document.getElementById('fill');
+const panelMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, transparent: true, blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+  uniforms: { map: { value: null }, x0: { value: 0 }, x1: { value: 1 }, slant: { value: 0.1 }, tintD: { value: new THREE.Color() }, tintL: { value: new THREE.Color() }, time: { value: 0 }, open: { value: 1 }, dir: { value: 1 }, white: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: `uniform sampler2D map; uniform float x0, x1, slant, time, open, dir, white; uniform vec3 tintD, tintL; varying vec2 vUv;
+    float hs(float n){ return fract(sin(n * 127.1) * 43758.5453); }
+    void main(){ float xs = vUv.x + slant * (vUv.y - 0.5); if (xs < x0 || xs > x1) discard;
+      float yy = dir > 0.0 ? vUv.y : 1.0 - vUv.y; if (yy > open) discard;                     // panels wipe in from opposite ends
+      vec2 uv = vec2(vUv.x - (x0 + x1) * 0.5 + 0.5, vUv.y); vec3 c = texture2D(map, clamp(uv, 0.0, 1.0)).rgb;
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); l = smoothstep(0.04, 0.92, l);
+      vec3 duo = mix(tintD, tintL, l); c = mix(c, duo, 0.6);                                  // duotone wash per fighter
+      float col = floor(vUv.x * 520.0), ph = fract(vUv.y * (0.7 + hs(col)) + time * (0.9 + hs(col + 7.0)) + hs(col + 3.0));
+      float streak = step(0.93, hs(col + 11.0)) * smoothstep(0.0, 0.08, ph) * smoothstep(0.42, 0.08, ph);   // falling streaks (rain / ink lines)
+      c += tintL * streak * 0.22;
+      float edge = min(xs - x0, x1 - xs); c *= 0.55 + 0.45 * smoothstep(0.0, 0.07, edge);     // dark panel borders
+      c = mix(c, vec3(1.0), white);
+      gl_FragColor = vec4(c, 1.0); }` });
+const panelScene = new THREE.Scene(); panelScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), panelMat));
+function renderPanels(t, tv) {
+  const cams = C.panelCams(t), P = C.PANELS;
+  renderer.setRenderTarget(acc); renderer.setClearColor(0x000000, 0); renderer.clear();
+  cams.forEach((cf, i) => {
+    drawState(t, cf); for (const k of ['A', 'B']) { TRAIL[k].mesh.visible = false; GHOSTS[k].forEach(g => g.visible = false); }
+    grade.uniforms.flash.value = 0; grade.uniforms.black.value = 0; grade.uniforms.impact.value = 0; grade.uniforms.ca.value = 0.25;
+    composer.render();
+    const u = panelMat.uniforms, pd = P.panels[i]; u.map.value = composer.readBuffer.texture; u.x0.value = pd.x0; u.x1.value = pd.x1; u.slant.value = P.slant; u.tintD.value.setRGB(...pd.dark); u.tintL.value.setRGB(...pd.light);
+    u.time.value = t; u.dir.value = i % 2 ? -1 : 1; u.open.value = Math.min(1, Math.max(0, (t - pd.t0) / 0.3)); u.open.value = 1 - Math.pow(1 - u.open.value, 3); u.white.value = Math.max(0, 1 - (P.t1 - t) / 0.07);
+    renderer.setRenderTarget(acc); renderer.autoClear = false; renderer.render(panelScene, quadCam); renderer.autoClear = true;
+  });
+  outMat.uniforms.map.value = acc.texture; renderer.setRenderTarget(null); renderer.render(outScene, quadCam);
+  fill.style.width = (300 * Math.min(1, tv / (C.videoAt ? C.videoAt(C.TOTAL) : C.TOTAL))) + 'px';
+  return 'panel';
+}
 window.renderAt = function (tv) {
   const t = C.animAt ? C.animAt(tv) : tv, rate = C.rateAt ? C.rateAt(t) : 1;
+  if (C.panelAt && C.panelAt(t)) return renderPanels(t, tv);
   const shutter = 0.5 / 30 * rate, n = C.blurOK(t) ? SUB : 1;
   renderer.setRenderTarget(acc); renderer.setClearColor(0x000000, 0); renderer.clear();
   let label = '';

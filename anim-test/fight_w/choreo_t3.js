@@ -626,6 +626,7 @@ function poseRaw(c, t) {
     p.oppLean = [Math.sin(oy) * lean, 0, Math.cos(oy) * lean, yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9];   // opponent chest/head offset for the weapon collision
     p.oppArms = oppArmPts(ob, ro, p.oppLean);
     p.oppFeet = ['r', 'l'].map(s => { const f = samp(SIM[o][s], t); return f ? [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.05, f[2]] : null; });   // opponent legs for the weapon collision
+    { let k = 1; for (const cl of CLASHES) k = Math.min(k, clamp((Math.abs(t - cl.t) - 0.08) / 0.14)); p.oppFeetK = k; }   // eased off around clashes so the clash solve stays exact
   }
   const fr = samp(S_.r, t), fl = samp(S_.l, t);
   { const sw = f => f && f[1] > 0.004 ? Math.min(1, f[1] / 0.08) : 0, rs = sw(fr), ls = sw(fl);

@@ -5,7 +5,8 @@
 # rig2_w.js adds a pelvis->foot capsule per leg. assemble_w.py emits the same line. Idempotent.
 # Usage (from anim-test/):  perl tools/patch_oppfeet.pl fight_w/choreo_t1.js ...
 use strict; use warnings;
-my $feet = "    p.oppFeet = ['r', 'l'].map(s => { const f = samp(SIM[o][s], t); return f ? [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.05, f[2]] : null; });   // opponent legs for the weapon collision\n";
+my $feet = "    p.oppFeet = ['r', 'l'].map(s => { const f = samp(SIM[o][s], t); return f ? [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.05, f[2]] : null; });   // opponent legs for the weapon collision\n"
+  . "    { let k = 1; for (const cl of CLASHES) k = Math.min(k, clamp((Math.abs(t - cl.t) - 0.08) / 0.14)); p.oppFeetK = k; }   // eased off around clashes so the clash solve stays exact\n";
 my @anchors = (
   [ "    p.oppArms = oppArmPts(ob, ro, p.oppLean); }", "    p.oppArms = oppArmPts(ob, ro, p.oppLean);\n" . $feet . "  }" ],
   [ "yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9]; }   // opponent chest/head offset for the weapon collision",

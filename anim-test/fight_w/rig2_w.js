@@ -250,16 +250,16 @@ export function applyPose(ch, P) {
       opp.push({ a: S_, b: E_, r: 0.16 }, { a: E_, b: H_, r: 0.16 }); }   // opponent arms (fight_w: blades were grazing forearms at clashes)
     if (P.oppFeet && P.opp) for (const f of P.oppFeet) if (f) {   // opponent legs: pelvis -> real foot (feet stand outside the root capsule)
       const F_ = new THREE.Vector3(...f), H_ = new THREE.Vector3(P.opp[0] + (f[0] - P.opp[0]) * 0.25, P.opp[1] + 0.72, P.opp[2] + (f[2] - P.opp[2]) * 0.25);
-      opp.push({ a: F_, b: H_, r: 0.17 }); }
+      if ((P.oppFeetK ?? 1) > 0.02) opp.push({ a: F_, b: H_, r: 0.17 * (P.oppFeetK ?? 1) }); }
     const closest = (p, a, bb) => { const ab = bb.clone().sub(a), L2 = ab.lengthSq(); const u = L2 > 1e-9 ? Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / L2)) : 0; return cl.copy(a).addScaledVector(ab, u); };
     for (let it = 0; it < 44; it++) {
       ch.root.updateMatrixWorld(true); let hit = false;
       for (const a of ch.wspan) {
         ch.weapon.localToWorld(pt.set(0, a, 0));
         const sg = a < 0 ? -1 : 1;   // points BEHIND the hand (spear butt, lower bow limb) move opposite to the aim
-        if (ch.floorAt) { const f = ch.floorAt(pt.x, pt.z) + 0.035; if (pt.y < f) { d.y += (f - pt.y) * 1.8 * sg; hit = true; } }
-        const nearHand = Math.abs(a) < 2.5 || (ch.lh != null && P.lh > 0.2 && Math.abs(a - ch.lh) < 2.5);
-        for (const sh of (nearHand ? opp : own.concat(opp))) { const c = closest(pt, sh.a, sh.b), dd = pt.distanceTo(c);
+        if (ch.floorAt && !(P.plant > 0.5)) { const f = ch.floorAt(pt.x, pt.z) + 0.035; if (pt.y < f) { d.y += (f - pt.y) * 1.8 * sg; hit = true; } }
+        const nearHand = Math.abs(a) < 2.5 || (ch.lh != null && P.lh * (P.gripW ?? 1) > 0.2 && Math.abs(a - ch.lh - (P.lhAt || 0)) < 2.5);
+        for (const sh of (P.pierce > 0.5 ? (nearHand ? [] : own) : nearHand ? opp : own.concat(opp))) { const c = closest(pt, sh.a, sh.b), dd = pt.distanceTo(c);
           if (dd < sh.r) { const n = dd > 1e-5 ? pt.clone().sub(c).divideScalar(dd) : new THREE.Vector3(lx, 0, lz), k = (sh.r - dd) * 1.8 * sg; d.addScaledVector(n, k); hit = true; } }
       }
       if (!hit) break; d.normalize(); aim(d);
@@ -267,8 +267,11 @@ export function applyPose(ch, P) {
     ch.bladeContact = !!(ch.floorAt) && (() => { ch.weapon.localToWorld(pt.set(0, ch.seg[ch.seg.length - 1], 0)); return pt.y < ch.floorAt(pt.x, pt.z) + 0.08; })();
   }
   // two-handed weapons: the left hand rides the shaft at ch.lh px along the weapon
+  ch.gripReach = null; ch.gripLocal = null;
+  const gripInfo = (sd, tg) => { const sh = b[sd + 'Sh'].getWorldPosition(new THREE.Vector3()), el = b[sd + 'El'].getWorldPosition(new THREE.Vector3()), hd = b[sd + 'Hand'].getWorldPosition(new THREE.Vector3());
+    ch.gripReach = sh.distanceTo(tg) / (sh.distanceTo(el) + el.distanceTo(hd)); ch.gripLocal = b.chest2.worldToLocal(tg.clone()); };
   if (ch.weapon && ch.lh != null && ch.whand === 'r' && P.lh > 0) {
-    ch.root.updateMatrixWorld(true); armIK('l', ch.weapon.localToWorld(new THREE.Vector3(0, ch.lh, 0)), P.lh, [0.9, -0.55, 0.15]); }
+    ch.root.updateMatrixWorld(true); const tg_ = ch.weapon.localToWorld(new THREE.Vector3(0, ch.lh + (P.lhAt || 0), 0)); gripInfo('l', tg_); armIK('l', tg_, P.lh * (P.gripW ?? 1), [0.9, -0.55, 0.15]); }
   // bow: the right hand nocks at the string and draws it back to the jaw (P.rh weight, P.draw 0..1)
   ch.stringPts = null;
   if (ch.weapon && ch.bow && ch.whand === 'l') {
@@ -277,9 +280,9 @@ export function applyPose(ch, P) {
     if (P.rh > 0.001) {
       const jaw = b.head.localToWorld(new THREE.Vector3(-2.5, 1.0, 1.5));
       const tgt = nock.clone().lerp(jaw, Math.min(1, Math.max(0, P.draw || 0)));
-      armIK('r', tgt, P.rh, [-0.8, -0.3, -0.5]); ch.root.updateMatrixWorld(true);
+      gripInfo('r', tgt); armIK('r', tgt, P.rh * (P.gripW ?? 1), [-0.8, -0.3, -0.5]); ch.root.updateMatrixWorld(true);
       const hand = b.rHand.getWorldPosition(new THREE.Vector3());
-      ch.stringPts = [top, (P.draw || 0) > 0.03 && P.rh > 0.5 ? hand : nock, bot]; ch.nockDir = nock.clone().sub(hand);
+      ch.stringPts = [top, (P.draw || 0) > 0.03 && P.rh * (P.gripW ?? 1) > 0.5 ? hand : nock, bot]; ch.nockDir = nock.clone().sub(hand);
     } else ch.stringPts = [top, nock, bot];
   }
   clearArms(['l']);   // again after the two-handed grip IK

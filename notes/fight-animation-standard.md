@@ -131,3 +131,10 @@ Each item gets a measured check where possible (tools in `anim-test/tools/`):
 ANY crossing makes the movement look poorly done. **Measure it with `tools/cross_qa.js`** (a foot or knee past the other
 leg's line in the pelvis frame, even without touching; `phase_qa.js` only catches legs passing through each other).
 Target: 0 crossed samples. Fix: `tools/patch_nocross.pl` (shared planner, `XMIN = 0.22` minimum gap between the feet).
+
+## Grip rules (user, bolt30 review, 2026-11-11; details in notes §23)
+- **Never force a grip.** If the hands are pulled apart and the weapon is out of reach, the support hand lets go and does
+  not re-grab every frame. Applies to every two-handed weapon and to the bow's string hand. Measure with `tools/hand_qa.js`.
+- **Spear: two hands only for a lunge or stab,** never all the time.
+- **Open (user on bolt30 v2: "good", but):** the EMPTY hand must not always be raised. A free hand held up all the time
+  looks poorly done. Give the off hand a relaxed, lowered carry by default and raise it only for balance or reactions.
