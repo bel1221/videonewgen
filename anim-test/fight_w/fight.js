@@ -30,7 +30,7 @@ scene.background = FOGC.clone();
 // v7: high overhead sun (light from above, shadows pooled under the fighters), less sky fill for contrast
 // v8: the user liked the BRIGHT overhead sun of the v7 QA stills (sand lit up); v7's final render had toned it down. Restore it.
 const hemi = new THREE.HemisphereLight(0x9fc2ff, 0xd8b98a, +(params.get('hemi') ?? 1.05)); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff1dc, +(params.get('sunI') ?? (VID === 'duel40' ? 3.6 : 4.0))); sun.castShadow = true;
+const sun = new THREE.DirectionalLight(0xfff1dc, +(params.get('sunI') ?? (['duel40', 't1', 't2', 't3'].includes(VID) ? 3.6 : 4.0))); sun.castShadow = true;
 renderer.toneMappingExposure = +(params.get('exp') ?? 1.0);
 sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.03; sun.shadow.radius = 1.5;
 Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 260 }); scene.add(sun, sun.target);
@@ -70,10 +70,15 @@ const FLOOR = floorAt(0, 0);
 console.log('FLOOR', FLOOR);
 
 // ------------------------------------------------------------------ cast
+// weapon pair per video: [A, B] -> { file, cfg } (cfg = key in WC below)
+const WP = { sword: { file: 'aegisblade', cfg: 'sword' }, sword2: { file: 'veilblade', cfg: 'sword2' }, spear: { file: 'boltspear', cfg: 'spear' },
+  reaper: { file: 'goldreaper', cfg: 'reaper' }, hammer: { file: 'golem_hammer', cfg: 'hammer' }, bow: { file: 'voidbow', cfg: 'bow' } };
+const VPAIR = { spear: [WP.sword, WP.spear], hammer: [WP.sword, WP.hammer], bow: [WP.sword, WP.bow], duel40: [WP.spear, WP.reaper],
+  t1: [WP.sword, WP.sword2], t2: [WP.reaper, WP.spear], t3: [WP.hammer, WP.sword] };
 const [s1, s2, s3, aeg, veil] = await Promise.all([
   loadSkin('/anim-test/src/skins/1.png'), loadSkin('/anim-test/src/skins/2.png'), loadSkin('/anim-test/src/skins/3.png'),
-  fetch(base + 'w/' + (VID === 'duel40' ? 'boltspear' : 'aegisblade') + '.json').then(r => r.json()),
-  fetch(base + 'w/' + { spear: 'boltspear', hammer: 'golem_hammer', bow: 'voidbow', duel40: 'goldreaper' }[VID] + '.json').then(r => r.json())]);
+  fetch(base + 'w/' + VPAIR[VID][0].file + '.json').then(r => r.json()),
+  fetch(base + 'w/' + VPAIR[VID][1].file + '.json').then(r => r.json())]);
 // per weapon: seg = collision samples, cseg = clash segment, tip, trail = trail segment, lh = left-hand point (two-handed),
 // bow = string anchors. Sword exports run -3..23 px; Boltspear -15.2..24.8; golem_hammer -10.9..23.1; Voidbow -13..13.
 const WC = {
@@ -82,17 +87,17 @@ const WC = {
   hammer: { seg: [-6, 4, 12, 16, 20, 23], cseg: [12, 23], tip: 22.5, trail: [14, 23], lh: -8 },
   bow: { seg: [-12, -6, 0, 6, 12], cseg: [-12, 12], tip: 12, trail: null, bow: { top: [0, 10.4, 4.0], bot: [0, -11.0, 4.0], nock: [0, -0.3, 4.0] }, hand: 'l', twist: +(params.get('btw') ?? 270) * Math.PI / 180 } };
 // Voidbow: drop the model's straight string (thin quads at x=0, z 3.6-4.4) - the animated string replaces it
-if (VID === 'bow') veil.quads = veil.quads.filter(q => { const P = q.p, ys = P.map(v => v[1]); return !(P.every(v => Math.abs(v[0]) < 0.01 && v[2] > 3.5 && v[2] < 4.5) && Math.max(...ys) - Math.min(...ys) > 5); });
+if (VPAIR[VID][1].cfg === 'bow') veil.quads = veil.quads.filter(q => { const P = q.p, ys = P.map(v => v[1]); return !(P.every(v => Math.abs(v[0]) < 0.01 && v[2] > 3.5 && v[2] < 4.5) && Math.max(...ys) - Math.min(...ys) > 5); });
 // Goldreaper (greatsword, two-handed): exported 36 px, grip 0.13 -> -4.7..31.3 px; left hand at -3.6 (between grip and pommel)
 WC.reaper = { seg: [-3, 4, 10, 16, 22, 27, 31], cseg: [9, 30], tip: 30.5, trail: [11, 30.5], lh: -3.6, edgeUp: 'z' };
-const WA = VID === 'duel40' ? WC.spear : WC.sword;
-const WB = WC[{ spear: 'spear', hammer: 'hammer', bow: 'bow', duel40: 'reaper' }[VID]];
+WC.sword2 = { seg: [4, 9, 14, 19, 24, 28], cseg: [8, 26], tip: 27, trail: [9, 26], edgeUp: 'x' };   // Veilblade (x +-6.4 wide, z +-1.7)
+const WA = WC[VPAIR[VID][0].cfg], WB = WC[VPAIR[VID][1].cfg];
 const SC = 0.69 * 1.15;
 const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), SC, WA), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), SC, WB), C: buildCharacter(s3, null) };
 for (const k of ['A', 'B']) { const w = k === 'A' ? WA : WB; Object.assign(cast[k], { cseg: w.cseg, tip: w.tip, trail: w.trail }); }
-document.getElementById('bl').innerHTML = '<b>0' + ({ spear: 1, hammer: 2, bow: 3, duel40: 1 }[VID]) + '</b>— ' + { spear: 'SWORD VS SPEAR', hammer: 'SWORD VS HAMMER', bow: 'SWORD VS BOW', duel40: 'BOLTSPEAR VS GOLDREAPER' }[VID];
+document.getElementById('bl').innerHTML = '<b>0' + ({ spear: 1, hammer: 2, bow: 3, duel40: 1, t1: 1, t2: 2, t3: 3 }[VID]) + '</b>— ' + { spear: 'SWORD VS SPEAR', hammer: 'SWORD VS HAMMER', bow: 'SWORD VS BOW', duel40: 'BOLTSPEAR VS GOLDREAPER', t1: 'BLADE DANCE', t2: 'GREATSWORD VS SPEAR', t3: 'HAMMER VS BLADE' }[VID];
 // v8: sword model 1.15x (user). v7: Minecraft default grip - slide the sword back along the forearm so the fist wraps the handle under the guard
-for (const k of ['A', 'B']) if (cast[k].whand === 'r' && k === 'A' && VID !== 'duel40') cast[k].weapon.parent.position.y += +(params.get('grip') ?? 1.6);   // sword: Minecraft grip; spear/hammer/bow are exported with their own grip point
+for (const k of ['A', 'B']) if (cast[k].whand === 'r' && (VPAIR[VID][k === 'A' ? 0 : 1].cfg === 'sword' || VPAIR[VID][k === 'A' ? 0 : 1].cfg === 'sword2')) cast[k].weapon.parent.position.y += +(params.get('grip') ?? 1.6);   // sword: Minecraft grip; spear/hammer/bow are exported with their own grip point
 for (const k in cast) scene.add(cast[k].root);
 window.__probe = { cast, C, applyPose, THREE, floorAt };
 for (const k in cast) cast[k].floorAt = floorAt;   // blade/ground physics in rig2

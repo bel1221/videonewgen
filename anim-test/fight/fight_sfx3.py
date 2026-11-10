@@ -32,7 +32,14 @@ CFG = {'a': dict(total=20.0, mute=[6.46], big=(13.2, 13.95, 9.4), fall=19.38, cr
        # duel40 (Boltspear vs Goldreaper, 40 s with slow motion): times below are ANIMATION seconds; all events are mapped to
        # video time through the slow-motion segments (EV['slowmo']) before placing sounds
        'duel40': dict(total=40.0, mute=[], big=(3.05, 15.25, 17.95, 21.6, 25.5), fall=26.8, cross=25.75, bind=(19.78, 20.4), impact=True, wpn='duel40',
-                      drop=['clash/desert_01.wav'], events='fight_w/comp/events_duel40.json', out='fight_w/comp/audio_duel40.m4a')}[SCENE]
+                      drop=['clash/desert_01.wav'], events='fight_w/comp/events_duel40.json', out='fight_w/comp/audio_duel40.m4a'),
+       # 10 s mechanics tests: 'kinds' picks each fighter's swing sound by weapon
+       't1': dict(total=10.0, mute=[], big=(4.75,), fall=None, cross=99.0, bind=(0, 0), impact=True, wpn='duel', kinds={'A': 'sword', 'B': 'sword'},
+                  drop=['clash/desert_01.wav'], events='fight_w/comp/events_t1.json', out='fight_w/comp/audio_t1.m4a'),
+       't2': dict(total=10.0, mute=[], big=(3.1,), fall=None, cross=99.0, bind=(0, 0), impact=True, wpn='duel', kinds={'A': 'greatsword', 'B': 'spear'},
+                  drop=['clash/desert_01.wav'], events='fight_w/comp/events_t2.json', out='fight_w/comp/audio_t2.m4a'),
+       't3': dict(total=10.0, mute=[], big=(2.4, 6.35), fall=None, cross=99.0, bind=(0, 0), impact=True, wpn='duel', kinds={'A': 'hammer', 'B': 'sword'},
+                  drop=['clash/desert_01.wav'], events='fight_w/comp/events_t3.json', out='fight_w/comp/audio_t3.m4a')}[SCENE]
 EVF = CFG.get('events', 'fight/comp/events.json'); OUTF = CFG.get('out', 'fight/comp/fight_audio.m4a')
 SR = 48000; TOTAL = CFG['total']; PK = 'sfx_pack'; MUTE_CLASH = CFG['mute']
 EV = json.load(open(EVF)); CUR = json.load(open(f'{PK}/curated.json'))
@@ -118,7 +125,13 @@ for t, c in EV['swings']:
     pan = 0.25 if c == 'A' else -0.25
     if c == 'B' and WPN == 'hammer':      # heavy: a low mace whoosh instead of a blade swish
         place(1, load(MC + f'item_mace_smash_air{1 + int(rng.integers(3))}.ogg', rng.uniform(0.78, 0.86)), t - 0.05, -6, pan=pan); continue
-    if WPN == 'duel40' and c == 'B':     # two-handed greatsword: a heavier, lower swish with a big-swoosh layer
+    KD = CFG.get('kinds', {}).get(c)
+    if KD == 'hammer':
+        place(1, load(MC + f'item_mace_smash_air{1 + int(rng.integers(3))}.ogg', rng.uniform(0.78, 0.86)), t - 0.05, -6, pan=pan); continue
+    if KD == 'spear':
+        place(1, load(MC + f'item_trident_throw{1 + int(rng.integers(2))}.ogg', rng.uniform(1.0, 1.12)), t - 0.04, -10, pan=pan)
+        place(1, hp(load(pick('slash'), rng.uniform(1.05, 1.2)), 900), t - 0.03, -15, pan=pan); continue
+    if WPN == 'duel40' and c == 'B' or KD == 'greatsword':     # two-handed greatsword: a heavier, lower swish with a big-swoosh layer
         place(1, hp(load(pick('slash'), rng.uniform(0.78, 0.86)), 200), t - 0.04, -7, pan=pan); place(1, load(pick('swoosh_big'), 0.9), t - 0.02, -15, pan=pan); continue
     if (c == 'B' and WPN == 'spear') or (c == 'A' and WPN == 'duel40'):   # spear thrusts: trident throw whoosh + a thin swish
         place(1, load(MC + f'item_trident_throw{1 + int(rng.integers(2))}.ogg', rng.uniform(1.0, 1.12)), t - 0.04, -10, pan=pan)
@@ -145,7 +158,7 @@ for t, big, kind in EV['clashes']:
     if kind == 'hit': place(1, load(pick('impact'), 0.9), t, -5); thump(1, t, -9, 75); place(1, hp(load(pick('slash'), 1.1), 900), t - 0.01, -14); continue
     if kind == 'slam':
         thump(1, t, -2, 55); place(1, load(pick('impact'), 0.8), t, -4); noise(2, t + 0.01, -8, 0.5, 250, 1800)
-        if WPN == 'hammer': place(1, load(MC + 'item_mace_smash_ground_heavy.ogg', 0.92), t, -3 if big else -6)
+        if WPN == 'hammer' or 'hammer' in CFG.get('kinds', {}).values(): place(1, load(MC + 'item_mace_smash_ground_heavy.ogg', 0.92), t, -3 if big else -6)
         if round(t, 3) in INS or big: place(1, load(f'{PK}/unsheathe/desert_34.wav', 0.9), t - 0.08, -10)   # impact frame: never a lone sound
         continue
     if kind == 'arrow':                    # an arrow cut out of the air: bright tick + light clash + arrow hit
@@ -155,8 +168,8 @@ for t, big, kind in EV['clashes']:
         continue
     if kind == 'arrowg': place(1, load(MC + f'random_bowhit{1 + int(rng.integers(4))}.ogg', 0.95), t, -7); noise(2, t, -14, 0.18, 400, 4000); continue
     place(1, load(pick('clash'), rng.uniform(0.94, 1.08)), t, -3 if big else -7)
-    if WPN == 'hammer': place(1, load(MC + f'mob_irongolem_hit{1 + int(rng.integers(4))}.ogg', 0.85), t, -9)          # steel on the stone/iron hammer
-    if WPN in ('spear', 'duel40'): place(1, load(MC + f'item_shield_block{1 + int(rng.integers(5))}.ogg', 1.05), t, -14)   # wood/steel shaft knock
+    if WPN == 'hammer' or 'hammer' in CFG.get('kinds', {}).values(): place(1, load(MC + f'mob_irongolem_hit{1 + int(rng.integers(4))}.ogg', 0.85), t, -9)   # steel on the stone/iron hammer
+    if WPN in ('spear', 'duel40') or 'spear' in CFG.get('kinds', {}).values(): place(1, load(MC + f'item_shield_block{1 + int(rng.integers(5))}.ogg', 1.05), t, -14)   # wood/steel shaft knock
     if WPN == 'bow': place(1, load(MC + f'item_shield_block{1 + int(rng.integers(5))}.ogg', 1.2), t, -12)
     if big: thump(1, t, -11, 90)
     ring(t + 0.004, -15 if big else -20, big)                       # tail = random bus
@@ -180,7 +193,7 @@ SS = round(135.5 - (CFG['cross'] + 0.1), 2); os.makedirs('fight/comp', exist_ok=
 subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', str(SS), '-t', str(TOTAL), '-i', '../newgen-ranked/audio/sa.mp3', '-af',
                 f'loudnorm=I=-26:TP=-6:LRA=11,afade=t=in:d=1.5,afade=t=out:st={TOTAL - 1.4}:d=1.4', '-ar', str(SR), '-ac', '2', 'fight/comp/music.wav'], check=True)
 m = load('fight/comp/music.wav') * 0.42; y = m.copy(); zi = np.zeros((2, 2, 2)); a0, a1 = int((CFG['cross'] - 1.0) * SR), int(CFG['cross'] * SR)
-for s in range(a0, a1, 256):
+for s in range(a0, min(a1, len(m) - 256), 256):   # no sweep when the cross/flash lies past the end (10 s tests)
     u = (s - a0) / (a1 - a0); sos = butter(4, 16000 * (380 / 16000) ** (u ** 0.8), 'low', fs=SR, output='sos')
     for ch in range(2): y[s:s + 256, ch], zi[ch] = sosfilt(sos, m[s:s + 256, ch], zi=zi[ch])
     y[s:s + 256] *= 10 ** (-6 * u / 20)

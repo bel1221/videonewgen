@@ -71,3 +71,9 @@ L.spBlockH.rArm = [-140, 0, -30]; L.spBlockH.rElbow = [-20, 0, 0];
 for (const n of ['gsParryH', 'gsParryL', 'gsParryR']) { L[n].rElbow = L[n].rElbow.map(v => v * 0.55); }
 L.gsParryH.rArm = [-136, 0, -30];
 L.gsSlashR.rArm = [-60, 0, 18];   // two-handed follow-through stays in front, the right arm does not cross into the chest
+// sword wind-ups/parries kept clear of the head (phase QA: the hand sat by the ear / above the head, so the blade's base started
+// inside the head and no rotation about the hand could free it)
+L.windO.rArm = [-168, 0, -38]; L.windO.rElbow = [-70, 0, 0];   // arm up and OUT; blade cocked behind the right shoulder (bd below)
+L.windL.rArm = [-104, 0, 46]; L.windL.rElbow = [-88, 0, 0];    // hand lower and further from the face
+L.parryH.rArm = [-136, 0, -30]; L.parryH.rElbow = [-30, 0, 0];   // high parry forward-up, in front of the forehead
+L.windR.rArm = [-150, 0, -54];

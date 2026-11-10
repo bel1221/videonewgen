@@ -20,7 +20,7 @@ s = region(s, 'function buildAll() {', 'export const export_cross = {};', build 
 s = region(s, 'const INS = [', '// ------------------------------------------------------------------ effects', cam + '\n')
 s = rep(s, '// Choreography, cameras and effect timing for the 30 s fight test v8 ("blade masters").',
         f'// Choreography, cameras and effect timing for the fight_w "{vid}" duel (sword vs a different legendary weapon).')
-s = rep(s, 'export const TOTAL = 30.0;', 'export const TOTAL = ' + ('37.55' if vid == 'duel40' else '20.0') + ';')
+s = rep(s, 'export const TOTAL = 30.0;', 'export const TOTAL = ' + ('37.55' if vid == 'duel40' else '9.45' if vid == 't3' else '10.0' if vid in ('t1', 't2') else '20.0') + ';')
 # new pose channels: lh (two-hand IK), rh/draw (bowstring hand), aimK (bow arm aims)
 s = rep(s, "function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] };",
         "function N() { const p = { wrist: 160, roll: 0, y: 0, yawOff: 0, lh: 0, rh: 0, draw: 0, aimK: 0, wide: 1, tilt: [0, 0], yawAbs: null, bd: [0, 0.94, 0.34] };")
@@ -32,7 +32,7 @@ s = rep(s, "  const o = { wrist: lerp(a.wrist, b.wrist, u), roll: lerp(a.roll, b
 s = rep(s, "// ------------------------------------------------------------------ blade intent", poses + "\n// ------------------------------------------------------------------ blade intent")
 s = rep(s, "for (const k in BD) if (L[k]) L[k].bd = bdv(...BD[k]);",
         "for (const k in BD) if (L[k]) L[k].bd = bdv(...BD[k]);\n"
-        "const BDW = { gsCrouch: [60, 18], gsHop: [60, 18], gsLand: [60, 18], spIdle: [72, 8], gsIdle: [-32, 8], spCharge: [-4, 30], lieBack: [-8, -95], ready: [64, -6], sprintGo: [20, -150], spReady: [-6, 40], gsGuard: [60, 18], gsPlungeW: [-70, 4], gsPlunge: [-50, 0], gsRest: [-12, 175], slideLow: [10, -115],\n"
+        "const BDW = { windO: [42, -150], windL: [30, 130], gsCrouch: [60, 18], gsHop: [60, 18], gsLand: [60, 18], spIdle: [72, 8], gsIdle: [-32, 8], spCharge: [-4, 30], lieBack: [-8, -95], ready: [64, -6], sprintGo: [20, -150], spReady: [-6, 40], gsGuard: [60, 18], gsPlungeW: [-70, 4], gsPlunge: [-50, 0], gsRest: [-12, 175], slideLow: [10, -115],\n"
         "  parryLowR: [-55, -35], parryLowL: [-55, 35], spGuard: [-6, 46], spWind: [-2, 68], spThrust: [0, 16], spJab: [0, 8], spSweepW: [-28, -60], spSweep: [-30, -60], spOverW: [40, 140], spOver: [-30, 12],\n"
         "  spBlock: [12, -80], spBlockL: [12, 70], spBlockV: [72, 10], spBlockH: [6, -88], hmGuard: [55, 20], hmRest: [-70, -10], hmWindO: [30, 180], hmSlam: [-22, 0], hmWindS: [12, -110], hmSwing: [4, -44],\n"
         "  hmUpperW: [-50, 30], hmUpper: [75, 0], hmBlock: [20, -84], hmBlockL: [20, 84], hmBlockV: [72, 0], hmSweep: [-30, -44], hmSpin: [0, -100], bwIdle: [-50, 20], bwNock: [84, 62], bwDraw: [84, 62], bwLoose: [84, 62], bwBlock: [5, 90] };\n"
@@ -125,6 +125,17 @@ s = rep(s, "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) 
 s = rep(s, "  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]]; }",
            "  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]];\n"
            "    const ob = basePose(o, t), pitch = ((ob.waist[0] || 0) + (ob.chest[0] || 0) * 0.6) * Math.PI / 180, oy = ob.yaw * Math.PI / 180, lean = Math.sin(pitch) * 0.95;\n"
-           "    p.oppLean = [Math.sin(oy) * lean, 0, Math.cos(oy) * lean, yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9]; }   // opponent chest/head offset for the weapon collision")
+           "    p.oppLean = [Math.sin(oy) * lean, 0, Math.cos(oy) * lean, yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9];   // opponent chest/head offset for the weapon collision\n"
+           "    p.oppArms = oppArmPts(ob, ro, p.oppLean); }")
+s = rep(s, "function rootXZ(c, t) {", "function oppArmPts(ob, ro, lean) {   // opponent arms (shoulder, elbow, hand) from his FK angles + torso turn - weapon collision keeps blades off them\n"
+  "  const ty = (ob.yaw + (ob.waist[1] || 0) + (ob.chest[1] || 0)) * Math.PI / 180, cy = Math.cos(ty), sy = Math.sin(ty), g = W.floorAt(ro[0], ro[1]), out = [];\n"
+  "  const toW = (x, y, z) => [ro[0] + x * cy + z * sy + lean[0] * 0.8, g + y + lean[3], ro[1] - x * sy + z * cy + lean[2] * 0.8];\n"
+  "  for (const sd of ['r', 'l']) { const sx = (sd === 'r' ? -6 : 6) / 16, q1 = new THREE.Quaternion().setFromEuler(new THREE.Euler(...ob[sd + 'Arm'].map(v => v * Math.PI / 180), 'XYZ'));\n"
+  "    const q2 = q1.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...ob[sd + 'Elbow'].map(v => v * Math.PI / 180), 'XYZ')));\n"
+  "    const d1 = new THREE.Vector3(0, -1, 0).applyQuaternion(q1), d2 = new THREE.Vector3(0, -1, 0).applyQuaternion(q2);\n"
+  "    const sh = [sx, 22 / 16, 0], el = [sh[0] + d1.x * 4 / 16, sh[1] + d1.y * 4 / 16, sh[2] + d1.z * 4 / 16], hd = [el[0] + d2.x * 5.5 / 16, el[1] + d2.y * 5.5 / 16, el[2] + d2.z * 5.5 / 16];\n"
+  "    out.push([toW(...sh), toW(...el), toW(...hd)]); }\n  return out; }\nfunction rootXZ(c, t) {")
+
+
 open(f'fight_w/choreo_{vid}.js', 'w', encoding='utf-8').write(s)
 print(f'fight_w/choreo_{vid}.js', len(s), 'chars')

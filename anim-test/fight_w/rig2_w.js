@@ -176,6 +176,26 @@ export function applyPose(ch, P) {
   if (ch.bow && ch.whand === 'l' && P.aimK > 0 && P.opp) { ch.root.updateMatrixWorld(true);
     const shW = b.lSh.getWorldPosition(new THREE.Vector3()), tg = new THREE.Vector3(P.opp[0], P.opp[1] + (P.aimY ?? 1.3), P.opp[2]);
     armIK('l', shW.clone().add(tg.sub(shW).normalize().multiplyScalar(0.56)), P.aimK, [0.2, -0.9, -0.3]); }
+  // ARM CLEARANCE: runs BEFORE the weapon is aimed (the weapon is then solved against where the arm really is) and again for the
+  // left arm after the two-handed grip IK. (Before: the weapon was solved first, then the arm moved -> blade into the head.)
+  // Old note: test the upper arm / forearm centre line against the own torso box (spine2 frame, x +-4,
+  // z +-2, y 12..24 px, + 1.6 px limb half-thickness); while inside, swing the arm outward about the body's forward axis.
+  const clearArms = SIDES => {   // v2: push the hand out along the shortest way out of the torso/head box, re-solve the arm by IK
+    const invT = new THREE.Matrix4(), invH = new THREE.Matrix4(), spAbs = ch.rest.spine2[1], M = 1.7;
+    const worst = sd => { ch.root.updateMatrixWorld(true); invT.copy(b.spine2.matrixWorld).invert(); invH.copy(b.head.matrixWorld).invert(); let best = null;
+      const sh = b[sd + 'Sh'].getWorldPosition(new THREE.Vector3()), el = b[sd + 'El'].getWorldPosition(new THREE.Vector3()), hd = b[sd + 'Hand'].getWorldPosition(new THREE.Vector3());
+      for (const [p0, p1, u0] of [[sh, el, 0.4], [el, hd, 0]]) for (let u = u0; u <= 1.001; u += 0.2) { const w = p0.clone().lerp(p1, u);
+        const qt = w.clone().applyMatrix4(invT); qt.y += spAbs;   // torso box: x +-4, z +-2, y 12..24 (abs px)
+        const tx = 4 + M - Math.abs(qt.x), tz = 2 + M - Math.abs(qt.z), ty = Math.min(qt.y - 12, 24 - qt.y);
+        if (tx > 0 && tz > 0 && ty > 0) { const d = Math.min(tx, tz); if (!best || d > best.d) best = { d, n: tx < tz ? new THREE.Vector3(Math.sign(qt.x) || (sd === 'l' ? 1 : -1), 0, 0) : new THREE.Vector3(0, 0, Math.sign(qt.z) || 1), M: b.spine2.matrixWorld }; }
+        const qh = w.clone().applyMatrix4(invH);   // head box (head frame): x +-4, y 0..8, z +-4
+        const hx = 4 + M - Math.abs(qh.x), hz = 4 + M - Math.abs(qh.z), hy = Math.min(qh.y + M, 8 + M - qh.y);
+        if (hx > 0 && hz > 0 && hy > 0) { const d = Math.min(hx, hz, hy); if (!best || d > best.d) best = { d, n: hx <= hz && hx <= hy ? new THREE.Vector3(Math.sign(qh.x) || (sd === 'l' ? 1 : -1), 0, 0) : hz <= hy ? new THREE.Vector3(0, 0, Math.sign(qh.z) || 1) : new THREE.Vector3(0, 1, 0), M: b.head.matrixWorld }; } }
+      return best; };
+    for (const sd of SIDES) for (let it = 0; it < 4; it++) { const w = worst(sd); if (!w || w.d < 0.05) break;
+      const nW = w.n.clone().transformDirection(w.M).normalize(), hand = b[sd + 'Hand'].getWorldPosition(new THREE.Vector3());
+      armIK(sd, hand.addScaledVector(nW, (w.d + 0.8) / 16), 1, sd === 'l' ? [0.9, -0.5, 0.15] : [-0.9, -0.5, 0.15]); } };
+  clearArms(['r', 'l']);
   b.rHand.rotation.set(0, (P.roll || 0) * D2R, 0);
   if (ch.weapon) ch.weapon.rotation.set((P.wrist ?? 160) * D2R, 0, 0);
   if (ch.weapon && P.bd) {
@@ -226,6 +246,8 @@ export function applyPose(ch, P) {
     const oL = P.oppLean || [0, 0, 0, 0], opp = P.opp ? [{ a: new THREE.Vector3(P.opp[0], P.opp[1] + 0.05, P.opp[2]), b: new THREE.Vector3(P.opp[0], P.opp[1] + 0.72, P.opp[2]), r: 0.25 },
       { a: new THREE.Vector3(P.opp[0], P.opp[1] + 0.75 + oL[3], P.opp[2]), b: new THREE.Vector3(P.opp[0] + oL[0] * 0.6, P.opp[1] + 1.48 + oL[3], P.opp[2] + oL[2] * 0.6), r: 0.29 },
       { a: new THREE.Vector3(P.opp[0] + oL[0], P.opp[1] + 1.78 + oL[3], P.opp[2] + oL[2]), b: new THREE.Vector3(P.opp[0] + oL[0], P.opp[1] + 1.78 + oL[3], P.opp[2] + oL[2]), r: 0.42 }] : [];
+    if (P.oppArms) for (const [sh, el, hd] of P.oppArms) { const S_ = new THREE.Vector3(...sh), E_ = new THREE.Vector3(...el), H_ = new THREE.Vector3(...hd);
+      opp.push({ a: S_, b: E_, r: 0.16 }, { a: E_, b: H_, r: 0.16 }); }   // opponent arms (fight_w: blades were grazing forearms at clashes)
     const closest = (p, a, bb) => { const ab = bb.clone().sub(a), L2 = ab.lengthSq(); const u = L2 > 1e-9 ? Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / L2)) : 0; return cl.copy(a).addScaledVector(ab, u); };
     for (let it = 0; it < 44; it++) {
       ch.root.updateMatrixWorld(true); let hit = false;
@@ -257,19 +279,7 @@ export function applyPose(ch, P) {
       ch.stringPts = [top, (P.draw || 0) > 0.03 && P.rh > 0.5 ? hand : nock, bot]; ch.nockDir = nock.clone().sub(hand);
     } else ch.stringPts = [top, nock, bot];
   }
-  // ARM CLEARANCE (final, both arms): test the upper arm / forearm centre line against the own torso box (spine2 frame, x +-4,
-  // z +-2, y 12..24 px, + 1.6 px limb half-thickness); while inside, swing the arm outward about the body's forward axis.
-  { const inv = new THREE.Matrix4(), q = new THREE.Vector3(), spAbs = ch.rest.spine2[1];
-    const depth = sd => { ch.root.updateMatrixWorld(true); inv.copy(b.spine2.matrixWorld).invert(); let dmax = 0;
-      const sh = b[sd + 'Sh'].getWorldPosition(new THREE.Vector3()), el = b[sd + 'El'].getWorldPosition(new THREE.Vector3()), hd = b[sd + 'Hand'].getWorldPosition(new THREE.Vector3());
-      for (const [p0, p1, u0] of [[sh, el, 0.35], [el, hd, 0]]) for (let u = u0; u <= 1.001; u += 0.2) { q.copy(p0).lerp(p1, u).applyMatrix4(inv); const y = q.y + spAbs;
-        const dx = 4 + 1.6 - Math.abs(q.x), dz = 2 + 1.6 - Math.abs(q.z), dy = Math.min(y - 12, 24 - y); if (dx > 0 && dz > 0 && dy > 0 && Math.min(dx, dz) > dmax) { dmax = Math.min(dx, dz); front = dz < dx; }
-        const hq = q.clone(); hq.y = y - 24; const hx = 4 + 1.6 - Math.abs(hq.x), hz = 4 + 1.6 - Math.abs(hq.z), hy = Math.min(hq.y + 0.2, 8.2 - hq.y);   // head box
-        if (hx > 0 && hz > 0 && hy > 0 && Math.min(hx, hz, hy) > dmax) { dmax = Math.min(hx, hz, hy); front = hz < hx; } }
-      return dmax; };
-    let front = false;
-    for (const sd of ['r', 'l']) { const sg = sd === 'l' ? 1 : -1;
-      for (let it = 0; it < 14 && depth(sd) > 0.05; it++) b[sd + 'Sh'].quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(front ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1), front ? -5 * D2R : sg * 5 * D2R)); } }
+  clearArms(['l']);   // again after the two-handed grip IK
 }
 // world position of a bone-local point (px) after applyPose
 export function bonePoint(ch, bone, p = [0, 0, 0]) { ch.root.updateMatrixWorld(true); return ch.bones[bone].localToWorld(new THREE.Vector3(...p)); }

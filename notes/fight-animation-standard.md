@@ -125,3 +125,10 @@ Each item gets a measured check where possible (tools in `anim-test/tools/`):
 - **Readable transitions** between actions: idle to movement, attack to recovery, recovery to repositioning.
 - **Secondary motion:** head, torso reactions, follow-through.
 - **Held items as in vanilla Minecraft** (`notes/refs/minecraft_held_items/`), with our 3D physics on top.
+
+## Open (user, test 1 review, 2026-11-10): legs crossing on small steps
+The legs sometimes cross each other on small steps, and ANY crossing makes the movement look poorly done. Fix this next.
+The phasing check only flags legs that pass through each other. It must also flag legs that cross over each other (a foot
+stepping past the other foot's line, even without touching). Likely causes to measure first:
+- the drift gait's travel offset (FWD) places the leading foot across the other while side-stepping
+- planner steps during turns, where the midline clamp works on desired positions but not on the step path

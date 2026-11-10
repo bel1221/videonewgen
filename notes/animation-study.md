@@ -1002,3 +1002,35 @@ in `fight_v8/parts/assemble.py`:
 - **Weapon flips over 80°:** A 0, B 3 (the run-in skid and the plunge, at most 103).
 - **Camera:** 34 cuts in 40 s, median 1.0 s; one shot is 0.76 s, all others are at least 0.8 s, apart from impact inserts and the flash.
 - **Sand:** sun 3.6 for this video (4.0 elsewhere).
+
+## 19. Mechanics tests (10 s each) and the duel-40 fix round (2026-11-10)
+- **Phasing:** `tools/phase_qa.js` is the full check. Fixes:
+  - skeleton-based weapon collision: leaning torso, head, real thighs and shins, the opponent's chest, head and arms
+  - arm clearance v2: IK pushes the hand out of the torso/head box, run BEFORE the weapon solve
+  - parries that phase through the own head are rejected
+  - edge-up blades
+  - high blocks in front of the forehead (Minecraft arms cannot lift a shaft above the head)
+- **Legs:**
+  - no idle re-step loop
+  - breathing no longer bobs the pelvis
+  - correct leg length (idle knees about 9°)
+  - crouch compression
+  - per-pose stance width
+  - body-side foot placement
+  - stepping gait during DRIFT
+  - wider sprint
+- **Tests** (`fight_w`, `?vid=t1|t2|t3`; build `parts/build_tN.js`, `camera_tN.js`; sound `SCENE=tN`):
+  - t1 Blade Dance (Aegisblade vs Veilblade): rendered, `out/newgen_test_t1.mp4`
+  - t2 Greatsword vs Spear: QA'd but not rendered
+  - t3 Hammer vs Blade (with slow motion): QA'd but not rendered
+- **Pre-render QA:**
+
+| test | phasing samples | contact miss mean | below floor / foot slide |
+|---|---|---|---|
+| t1 | 19 (shallow, blade near the opponent's arm) | 0.137 | 0 / 0 |
+| t2 | 3 | 0.024 | 0 / 0 |
+| t3 | 5 | 0.044 | 0 / 0 |
+
+- **User on t1:** "fine". Open item: legs crossing on small steps. See the fight-animation standard.
+- **Shell note:** Python patches passed through bash here-documents mangled backslash escapes on this machine (a stray line
+  break inside a string literal, several times). Write patch scripts as files instead.
