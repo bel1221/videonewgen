@@ -1,0 +1,32 @@
+{
+  "_help": "One entry per card of the grip/scale sheet. name = outliner group in the .bbmodel; len = exported length in px (before the 0.79 rig scale); grip = centre of the main fist as a fraction of the length from the bottom (read off out/gripref/models_N.png); mode = 1h | 2h | bow; lh = centre of the second fist in px along the weapon (2h, negative = below the main hand); hold = gs (hands together, blade up) | pole (diagonal across the chest); dir / at = override the hold's weapon direction / main-fist position (rig px); face = -1 turns the head or edge the other way; twist = bow twist (deg); shift = [x, z] native px when the handle is off the centre line (bow riser); status = fight | exported | new. Rebuild: node gripref/render.mjs (models sheet: node gripref/models.mjs)",
+  "scale": 0.7935,
+  "weightClasses": {
+    "_help": "A weapon's class comes from its heft = volume in % of the player's body x (1 + distance of its centre of mass from the fist in blocks), measured from the model at its in-hand size (node gripref/render.mjs prints it). light: heft < light.maxHeft; medium: < medium.maxHeft; heavy: the rest. The other numbers are how the class changes the player in an animation: windup/recover in seconds, strikeFrames at 30 fps, move = run speed factor, combo = most hits in a row, knockback = blocks the defender is pushed, drivenBy = which body parts lead the swing, twirl = show-off spins allowed.",
+    "light":  { "maxHeft": 6,  "windup": 0.20, "strikeFrames": 3, "recover": 0.20, "move": 1.00, "combo": 5, "knockback": 0.3, "hands": "one", "drivenBy": "wrist and elbow, torso stays upright", "twirl": true,  "carry": "held up in guard, tip high" },
+    "medium": { "maxHeft": 15, "windup": 0.32, "strikeFrames": 4, "recover": 0.30, "move": 0.90, "combo": 3, "knockback": 0.6, "hands": "one, two for power hits", "drivenBy": "shoulder and torso turn, short step in", "twirl": true,  "carry": "held at chest height, tip forward" },
+    "heavy":  { "windup": 0.50, "strikeFrames": 5, "recover": 0.48, "move": 0.75, "combo": 2, "knockback": 1.2, "hands": "two", "drivenBy": "hips and legs, pelvis drops, the follow-through pulls the player 0.25 block", "twirl": false, "carry": "resting on the shoulder or head down near the ground, drags behind in a run" }
+  },
+  "weapons": [
+    {"name":"Aegisblade","kind":"Sword","mode":"1h","len":26,"grip":0.22,"status":"fight"},
+    {"name":"Veilblade","kind":"Sword","mode":"1h","len":26,"grip":0.17,"status":"fight"},
+    {"name":"Ocean Sword","kind":"Sword","mode":"1h","len":26,"grip":0.1,"status":"exported"},
+    {"name":"Blinkblade","face":-1,"kind":"Sword","mode":"1h","len":26,"grip":0.15,"status":"new"},
+    {"name":"Jade Edge","kind":"Sword","mode":"1h","len":26,"grip":0.21,"status":"new"},
+    {"name":"Skystrider","face":-1,"kind":"Sword","mode":"1h","len":26,"grip":0.2,"status":"new"},
+    {"name":"Bloodchain","kind":"Chain blade","mode":"1h","len":30,"grip":0.19,"status":"new"},
+    {"name":"Goldreaper","kind":"Greatsword","mode":"2h","len":36,"grip":0.23,"lh":-4.9,"status":"fight","hold":"gs"},
+    {"name":"Creaking Scythe","face":-1,"shift":[0,2.0],"kind":"Scythe","mode":"2h","len":38,"grip":0.42,"lh":-9,"status":"new","hold":"pole"},
+    {"name":"Boltspear","kind":"Spear","mode":"2h","len":40,"grip":0.45,"lh":-5.6,"status":"fight","hold":"pole"},
+    {"name":"Lancebolt","kind":"Spear","mode":"2h","len":40,"grip":0.45,"lh":-9,"status":"exported","hold":"pole"},
+    {"name":"Tidepiercer","kind":"Trident","mode":"2h","len":40,"grip":0.46,"lh":-5,"status":"new","hold":"pole"},
+    {"name":"Jingu Bang (jingubang)","label":"Jingu Bang","kind":"Staff","mode":"2h","len":40,"grip":0.58,"lh":-7.5,"status":"new","hold":"pole"},
+    {"name":"golem_hammer","label":"Golem Hammer","kind":"War hammer","mode":"2h","len":34,"grip":0.42,"lh":-7,"status":"fight","hold":"pole"},
+    {"name":"Thundermaul","kind":"Hammer","mode":"2h","len":26,"grip":0.48,"status":"exported","lh":-5,"hold":"pole"},
+    {"name":"Magma Club","kind":"Club","mode":"1h","len":28,"grip":0.19,"status":"new"},
+    {"name":"Rendpick","kind":"Pickaxe","mode":"1h","len":32,"grip":0.4,"status":"new"},
+    {"name":"Froststaff","kind":"Staff","mode":"1h","len":34,"grip":0.4,"status":"new"},
+    {"name":"Voidbow","kind":"Bow","mode":"bow","len":26,"grip":0.5,"twist":180,"status":"fight"},
+    {"name":"Seekerbow","kind":"Bow","mode":"bow","len":26,"grip":0.5,"status":"new","twist":90,"shift":[-2.5,0]}
+  ]
+}

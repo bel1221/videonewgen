@@ -152,6 +152,21 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   clips/poses/joints in our videos.** We generate every motion with our own system (§12, `anim-test/studio/`), designed to
   the studied numbers (yaw lead 100 ms, foot plant -130 ms, step-in 0.16, pelvis drop 0.25 at +200 ms, follow-through
   0.27 s; reference timing: anticipation 0.2-0.6 s, strike 3-5 frames, blade 15-35°/frame).
+- **Weapon grip + scale reference** (`anim-test/gripref/`, 2026-11-12): 20 weapons in the fight rig's hand (rig2_w, scale 0.79),
+  side + front view over a block grid, read straight from the `.bbmodel`. Numbers per weapon (length, grip, second hand, sword
+  offset, bow twist) in `gripref/weapons.json`; rebuild with `node gripref/render.mjs` from `anim-test/` ->
+  `out/gripref/NN_name.png` + `weapon_grip_sheet.png`. 11 of the 20 are first guesses (marked NEW).
+  **User review 1 (grip first, scale later):** two-handed weapons are held in the MIDDLE, in front of the chest, both fists on the
+  handle; the fist must sit ON the handle (a grip off the handle looks loose and weak); no backwards/upside-down models. Fixed in the
+  sheet: grips read off each model (`node gripref/models.mjs` -> `out/gripref/models_N.png`, % ruler), weapon axis through the fist
+  centre (1.5 px up from the hand bone), own 2-bone arm IK to the fist centres with a reach check (`twoHand()` in `gripref.js`;
+  arms reach only 8 px, so both hands meet at chest height on a diagonal), Seekerbow turned round. NOT yet carried into the fight
+  code (`fight_w` still uses the old export grips and `lh` IK to the hand bone). Scale is the user's next pass.
+  **Weight classes (user, 2026-11-12):** every weapon is light / medium / heavy from its size and width against the player
+  model, and the class must change how the player moves. Measured as heft = voxelised volume in % of the body x (1 + centre-of-mass
+  distance from the fist in blocks); thresholds and the per-class player numbers (wind-up, strike frames, recovery, run speed,
+  combo length, knockback, which body parts drive the swing, twirls, carry pose) are in `weightClasses` in `gripref/weapons.json`.
+  Classes change with scale, so re-run after rescaling. Not wired into any fight choreography yet: use the table for new fights.
 - Ranked 2vs2 v4 still awaiting feedback (MR numbers and armor trim are placeholders).
 
 ## Layout

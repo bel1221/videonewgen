@@ -1,0 +1,30 @@
+// Renders the weapon grip + scale reference cards (gripref/index.html) in headless Chrome.
+//   node gripref/render.mjs            (run from anim-test/)  -> out/gripref/NN_name.png x20, weapon_grip_sheet.png, info.json
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import { chromium } from 'playwright-core';
+const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '../..');
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.ttf': 'font/ttf', '.bbmodel': 'application/json' };
+const server = http.createServer((req, res) => {
+  const p = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]));
+  if (!p.startsWith(ROOT) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) { res.writeHead(404); return res.end(); }
+  res.writeHead(200, { 'Content-Type': TYPES[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(res);
+});
+await new Promise(r => server.listen(0, '127.0.0.1', r));
+const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox'] });
+const page = await browser.newPage({ viewport: { width: 960, height: 950 } });
+page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.error('[page]', m.text()); });
+page.on('pageerror', e => console.error('[pageerror]', e.message));
+await page.goto(`http://127.0.0.1:${server.address().port}/anim-test/gripref/index.html${process.env.QS || ''}`);
+await page.waitForFunction('window.ready === true', null, { timeout: 120000 });
+await page.evaluate(() => document.fonts.ready);
+const OUT = path.join(ROOT, 'anim-test/out/gripref'); fs.mkdirSync(OUT, { recursive: true });
+const save = (file, url) => fs.writeFileSync(path.join(OUT, file), Buffer.from(url.split(',')[1], 'base64'));
+const info = await page.evaluate(() => window.info());
+const only = process.env.ONLY ? process.env.ONLY.split(',').map(Number) : null;
+for (let i = 0; i < info.length; i++) { if (only && !only.includes(i + 1)) continue;
+  const fn = String(i + 1).padStart(2, '0') + '_' + info[i].name.replace(/[^A-Za-z0-9]+/g, '_').replace(/_+$/, '').toLowerCase() + '.png';
+  save(fn, await page.evaluate(i => window.cell(i), i)); console.log(fn, JSON.stringify(info[i])); }
+if (!only) { save('weapon_grip_sheet.png', await page.evaluate(() => window.sheet(5))); fs.writeFileSync(path.join(OUT, 'info.json'), JSON.stringify(info, null, 1)); }
+for (const c of ['light', 'medium', 'heavy']) console.log(c.toUpperCase() + ': ' + info.filter(w => w.weight === c).sort((a, b) => a.heft - b.heft).map(w => w.name + ' ' + w.heft).join(', '));
+await browser.close(); server.close();

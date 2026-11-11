@@ -1,0 +1,294 @@
+[
+ {
+  "name": "Aegisblade",
+  "lengthBlocks": 1.289,
+  "pctOfPlayer": 64,
+  "top": 2.02,
+  "low": 0.97,
+  "widthBlocks": 0.77,
+  "nativePx": 35.2,
+  "weight": "light",
+  "pctOfBody": 4.1,
+  "balanceBlocks": 0.29,
+  "heft": 5.3
+ },
+ {
+  "name": "Veilblade",
+  "lengthBlocks": 1.289,
+  "pctOfPlayer": 64,
+  "top": 2.08,
+  "low": 1.05,
+  "widthBlocks": 0.63,
+  "nativePx": 37.4,
+  "weight": "light",
+  "pctOfBody": 3.9,
+  "balanceBlocks": 0.29,
+  "heft": 5
+ },
+ {
+  "name": "Ocean Sword",
+  "lengthBlocks": 1.289,
+  "pctOfPlayer": 64,
+  "top": 2.16,
+  "low": 1.09,
+  "widthBlocks": 0.51,
+  "nativePx": 25.5,
+  "weight": "light",
+  "pctOfBody": 1.9,
+  "balanceBlocks": 0.36,
+  "heft": 2.6
+ },
+ {
+  "name": "Blinkblade",
+  "lengthBlocks": 1.289,
+  "pctOfPlayer": 64,
+  "top": 2.13,
+  "low": 1.05,
+  "widthBlocks": 0.56,
+  "nativePx": 38.8,
+  "weight": "light",
+  "pctOfBody": 3.3,
+  "balanceBlocks": 0.34,
+  "heft": 4.4
+ },
+ {
+  "name": "Jade Edge",
+  "lengthBlocks": 1.289,
+  "pctOfPlayer": 64,
+  "top": 2.08,
+  "low": 0.99,
+  "widthBlocks": 0.63,
+  "nativePx": 33.2,
+  "weight": "medium",
+  "pctOfBody": 5.1,
+  "balanceBlocks": 0.32,
+  "heft": 6.7
+ },
+ {
+  "name": "Skystrider",
+  "lengthBlocks": 1.289,
+  "pctOfPlayer": 64,
+  "top": 2.11,
+  "low": 1.01,
+  "widthBlocks": 0.62,
+  "nativePx": 33.3,
+  "weight": "light",
+  "pctOfBody": 3.9,
+  "balanceBlocks": 0.22,
+  "heft": 4.8
+ },
+ {
+  "name": "Bloodchain",
+  "lengthBlocks": 1.488,
+  "pctOfPlayer": 74,
+  "top": 2.22,
+  "low": 0.99,
+  "widthBlocks": 0.62,
+  "nativePx": 38,
+  "weight": "medium",
+  "pctOfBody": 5.4,
+  "balanceBlocks": 0.36,
+  "heft": 7.3
+ },
+ {
+  "name": "Goldreaper",
+  "lengthBlocks": 1.785,
+  "pctOfPlayer": 89,
+  "top": 2.44,
+  "low": 0.98,
+  "widthBlocks": 0.98,
+  "nativePx": 29.2,
+  "weight": "heavy",
+  "pctOfBody": 15.6,
+  "balanceBlocks": 0.28,
+  "heft": 20,
+  "fistMissPx": [
+   0,
+   0
+  ]
+ },
+ {
+  "name": "Creaking Scythe",
+  "lengthBlocks": 1.885,
+  "pctOfPlayer": 94,
+  "top": 2.15,
+  "low": 0.71,
+  "widthBlocks": 1.38,
+  "nativePx": 25.2,
+  "weight": "heavy",
+  "pctOfBody": 11.3,
+  "balanceBlocks": 0.58,
+  "heft": 17.9,
+  "fistMissPx": [
+   0,
+   0
+  ]
+ },
+ {
+  "name": "Boltspear",
+  "lengthBlocks": 1.984,
+  "pctOfPlayer": 99,
+  "top": 2.07,
+  "low": 0.69,
+  "widthBlocks": 0.51,
+  "nativePx": 46.6,
+  "weight": "medium",
+  "pctOfBody": 5.3,
+  "balanceBlocks": 0.19,
+  "heft": 6.3,
+  "fistMissPx": [
+   0,
+   0
+  ]
+ },
+ {
+  "name": "Lancebolt",
+  "lengthBlocks": 1.984,
+  "pctOfPlayer": 99,
+  "top": 2.07,
+  "low": 0.62,
+  "widthBlocks": 0.67,
+  "nativePx": 26.6,
+  "weight": "medium",
+  "pctOfBody": 8.9,
+  "balanceBlocks": 0.09,
+  "heft": 9.7,
+  "fistMissPx": [
+   0,
+   0
+  ]
+ },
+ {
+  "name": "Tidepiercer",
+  "lengthBlocks": 1.984,
+  "pctOfPlayer": 99,
+  "top": 2.06,
+  "low": 0.67,
+  "widthBlocks": 0.75,
+  "nativePx": 42.4,
+  "weight": "medium",
+  "pctOfBody": 7.6,
+  "balanceBlocks": 0.16,
+  "heft": 8.8,
+  "fistMissPx": [
+   0,
+   0
+  ]
+ },
+ {
+  "name": "Jingu Bang (jingubang)",
+  "lengthBlocks": 1.984,
+  "pctOfPlayer": 99,
+  "top": 1.93,
+  "low": 0.44,
+  "widthBlocks": 0.37,
+  "nativePx": 48,
+  "weight": "heavy",
+  "pctOfBody": 17,
+  "balanceBlocks": -0.16,
+  "heft": 19.7,
+  "fistMissPx": [
+   0,
+   0
+  ]
+ },
+ {
+  "name": "golem_hammer",
+  "lengthBlocks": 1.686,
+  "pctOfPlayer": 84,
+  "top": 2.16,
+  "low": 0.73,
+  "widthBlocks": 1.37,
+  "nativePx": 34.5,
+  "weight": "heavy",
+  "pctOfBody": 102.5,
+  "balanceBlocks": 0.37,
+  "heft": 140.4,
+  "fistMissPx": [
+   0,
+   0
+  ]
+ },
+ {
+  "name": "Thundermaul",
+  "lengthBlocks": 1.289,
+  "pctOfPlayer": 64,
+  "top": 1.87,
+  "low": 0.87,
+  "widthBlocks": 0.93,
+  "nativePx": 32,
+  "weight": "heavy",
+  "pctOfBody": 13.7,
+  "balanceBlocks": 0.31,
+  "heft": 17.9,
+  "fistMissPx": [
+   0,
+   0
+  ]
+ },
+ {
+  "name": "Magma Club",
+  "lengthBlocks": 1.389,
+  "pctOfPlayer": 69,
+  "top": 2.12,
+  "low": 0.98,
+  "widthBlocks": 0.42,
+  "nativePx": 35.6,
+  "weight": "medium",
+  "pctOfBody": 7.5,
+  "balanceBlocks": 0.57,
+  "heft": 11.8
+ },
+ {
+  "name": "Rendpick",
+  "lengthBlocks": 1.587,
+  "pctOfPlayer": 79,
+  "top": 2.06,
+  "low": 0.71,
+  "widthBlocks": 1.42,
+  "nativePx": 34.4,
+  "weight": "heavy",
+  "pctOfBody": 13,
+  "balanceBlocks": 0.48,
+  "heft": 19.2
+ },
+ {
+  "name": "Froststaff",
+  "lengthBlocks": 1.686,
+  "pctOfPlayer": 84,
+  "top": 2.07,
+  "low": 0.65,
+  "widthBlocks": 0.67,
+  "nativePx": 32.2,
+  "weight": "heavy",
+  "pctOfBody": 13.6,
+  "balanceBlocks": 0.37,
+  "heft": 18.6
+ },
+ {
+  "name": "Voidbow",
+  "lengthBlocks": 1.289,
+  "pctOfPlayer": 64,
+  "top": 1.96,
+  "low": 0.68,
+  "widthBlocks": 0.56,
+  "nativePx": 36.7,
+  "weight": "light",
+  "pctOfBody": 4.8,
+  "balanceBlocks": 0,
+  "heft": 4.8
+ },
+ {
+  "name": "Seekerbow",
+  "lengthBlocks": 1.289,
+  "pctOfPlayer": 64,
+  "top": 1.96,
+  "low": 0.68,
+  "widthBlocks": 0.62,
+  "nativePx": 39.2,
+  "weight": "light",
+  "pctOfBody": 2.7,
+  "balanceBlocks": 0,
+  "heft": 2.7
+ }
+]
