@@ -127,10 +127,40 @@ Each item gets a measured check where possible (tools in `anim-test/tools/`):
 - **Secondary motion:** head, torso reactions, follow-through.
 - **Held items as in vanilla Minecraft** (`notes/refs/minecraft_held_items/`), with our 3D physics on top.
 
+## Weapon weight (user, 2026-11-12)
+The user: weapons are grouped light / medium / heavy by their size and width against the player model, "and it will affects the
+player"; then "link the weight + physics to animation making".
+- The class of every weapon and what it does to the wielder (wind-up, recovery, run speed, combo length, knockback given and
+  taken, twirls) live in `anim-test/gripref/weapons.json` (`weightClasses`) and reach the builds as `fight_w/weapon_data.json`.
+- **Every new fight build declares its weapons (`weapons(a, b)`) and takes its timings from the w-helpers** (`whit`, `wsprint`,
+  `wknock`, `wtw` in `fight_w/parts/common_w.js`). Hand-keyed moves must stay inside the same class numbers.
+- **Measure it with `tools/weight_qa.js`:** 0 fails before showing a render. A heavy weapon never twirls and never runs or chains
+  hits like a sword.
+
 ## Legs crossing (user, test 1 review, 2026-11-10): FIXED 2026-11-11, notes §20
 ANY crossing makes the movement look poorly done. **Measure it with `tools/cross_qa.js`** (a foot or knee past the other
 leg's line in the pelvis frame, even without touching; `phase_qa.js` only catches legs passing through each other).
 Target: 0 crossed samples. Fix: `tools/patch_nocross.pl` (shared planner, `XMIN = 0.22` minimum gap between the feet).
+
+## Duo 40 v1 review (user, 2026-11-12): "its very bad, the physics are all messed up"
+The user's words, in full: "its very bad, the physics are all messed up i saw arrow gliding on the floor even though it already
+hit the floor, from now on 2handed weapons attacks are fixed to using 2 hand grip only letting go due to an enemy's attack or have
+to use the weapon for something else like throwing it or running motion ( running should be 1 hand so it doesnt look awkward )
+also the problem about 1 hand always raising up when using a 2 handed weapon is still there it has no free motion and stays raised
+up for too long, the bow's grip is still wrong it's supposed to be holding the handle with the string facing the player like in
+the grid image, make hand have more free motion and flows smoothly with each attack DO NOT RE RENDER THE VIDEO OR MAKE CHANGES
+RIGHT NOW only fix the hand with 2 handed weapons and flowness".
+- **PERMANENT RULE, replaces "spear: two hands only for a lunge or stab" below: a two-handed weapon ATTACKS with a two-handed
+  grip.** The second hand lets go only (a) because of an enemy's attack (hit reactions, being knocked back), (b) when the weapon is
+  used for something else (throwing it), (c) while RUNNING, which is one-handed so it does not look awkward.
+- **The free hand must never sit raised.** It needs free motion that flows with each attack (counter-swing, follow-through), and
+  it must not stay up for long.
+- **Open, NOT fixed yet (the user asked for the hands only):**
+  - an arrow glides along the floor after it has already hit the floor;
+  - the bow grip is still wrong: the fist must hold the HANDLE with the STRING FACING THE PLAYER, as on the grid sheet;
+  - "physics are all messed up" in general: ask what else, or go through the video shot by shot, before the next render.
+- **Measured causes** (see CLAUDE.md, Duo 40): the spear and staff were two-handed 0-3 % of the time; `L.guard` holds the left arm
+  at [-38, 0, 24] / elbow -64 and the engine multiplied it by 1.25, so every guard-derived pose kept the free hand up at the chest.
 
 ## Grip rules (user, bolt30 review, 2026-11-11; details in notes §23)
 - **Never force a grip.** If the hands are pulled apart and the weapon is out of reach, the support hand lets go and does

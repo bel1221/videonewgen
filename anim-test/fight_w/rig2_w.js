@@ -195,6 +195,25 @@ export function applyPose(ch, P) {
     for (const sd of SIDES) for (let it = 0; it < 4; it++) { const w = worst(sd); if (!w || w.d < 0.05) break;
       const nW = w.n.clone().transformDirection(w.M).normalize(), hand = b[sd + 'Hand'].getWorldPosition(new THREE.Vector3());
       armIK(sd, hand.addScaledVector(nW, (w.d + 0.8) / 16), 1, sd === 'l' ? [0.9, -0.5, 0.15] : [-0.9, -0.5, 0.15]); } };
+  // TRUE TWO-HANDED GRIP (user, 2026-11-12: "2handed weapons attacks are fixed to using 2 hand grip"). For a character flagged ch.th, with the
+  // pose's lh > 0: BOTH fists are put where the shaft can really be held. Minecraft arms reach 9.5 px, so for the wanted weapon direction (the
+  // pose's bd) the main hand is moved to the nearest point from which the second hand's point on the shaft (ch.lh + lhAt px along the weapon) is
+  // also within reach of its own shoulder, both in front of the chest. Then the main arm is solved by IK to that point; the left arm follows the
+  // shaft below (the existing lh IK), now always reachable - no hand chasing a shaft it cannot reach, no forced grip.
+  if (ch.th && ch.lh != null && ch.whand === 'r' && P.bd && ch.weapon && (P.lh || 0) * (P.gripW ?? 1) > 0.001) {
+    ch.root.updateMatrixWorld(true);
+    const wgt = Math.min(1, P.lh * (P.gripW ?? 1)), ty = ((P.yaw || 0) + (w[1] || 0) + (cst[1] || 0)) * D2R;
+    const d = new THREE.Vector3(...P.bd).applyAxisAngle(new THREE.Vector3(0, 1, 0), ty).normalize();
+    const g = (ch.lh + (P.lhAt || 0)) * ch.weapon.parent.scale.x / 16, RR = 0.545;                         // fist-to-fist along the shaft (blocks); arm reach with a little slack
+    const Sr = b.rSh.getWorldPosition(new THREE.Vector3()), Sl = b.lSh.getWorldPosition(new THREE.Vector3()), R = b.rHand.getWorldPosition(new THREE.Vector3());
+    const cm = b.chest2.matrixWorld.elements, fwd = new THREE.Vector3(cm[8], cm[9], cm[10]).normalize(), cp = b.chest2.getWorldPosition(new THREE.Vector3()), Lp = new THREE.Vector3();
+    const front = X => { const dep = X.clone().sub(cp).dot(fwd); if (dep < 0.26) X.addScaledVector(fwd, 0.26 - dep); };   // fists stay in front of the chest
+    for (let it = 0; it < 24; it++) {
+      front(R); if (R.distanceTo(Sr) > RR) R.sub(Sr).setLength(RR).add(Sr);
+      Lp.copy(R).addScaledVector(d, g); front(Lp); if (Lp.distanceTo(Sl) > RR) Lp.sub(Sl).setLength(RR).add(Sl);
+      R.lerp(Lp.clone().addScaledVector(d, -g), 0.5); }
+    armIK('r', R, wgt, [-0.9, -0.5, 0.15]);
+  }
   clearArms(['r', 'l']);
   b.rHand.rotation.set(0, (P.roll || 0) * D2R, 0);
   if (ch.weapon) ch.weapon.rotation.set((P.wrist ?? 160) * D2R, 0, 0);

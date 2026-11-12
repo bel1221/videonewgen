@@ -22,7 +22,7 @@ page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning' || 
 page.on('pageerror', e => console.error('[pageerror]', e.message));
 const PAGE = '/' + (process.env.PAGE || 'anim-test/web/index.html').replace(/^\/+/, '');
 await page.goto(`http://127.0.0.1:${port}${PAGE}${process.env.QS || ''}`);
-await page.waitForFunction('window.ready === true', null, { timeout: 300000 });
+await page.waitForFunction('window.ready === true', null, { timeout: +(process.env.READY_MS || 300000) });
 await page.evaluate(() => document.fonts.ready);
 const info = await page.evaluate(() => { const gl = document.querySelector('canvas').getContext('webgl2'); const d = gl.getExtension('WEBGL_debug_renderer_info'); return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : 'unknown'; });
 console.error('renderer:', info);

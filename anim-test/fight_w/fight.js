@@ -30,7 +30,7 @@ scene.background = FOGC.clone();
 // v7: high overhead sun (light from above, shadows pooled under the fighters), less sky fill for contrast
 // v8: the user liked the BRIGHT overhead sun of the v7 QA stills (sand lit up); v7's final render had toned it down. Restore it.
 const hemi = new THREE.HemisphereLight(0x9fc2ff, 0xd8b98a, +(params.get('hemi') ?? 1.05)); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff1dc, +(params.get('sunI') ?? (['duel40', 't1', 't2', 't3', 'bolt30'].includes(VID) ? 3.6 : 4.0))); sun.castShadow = true;
+const sun = new THREE.DirectionalLight(0xfff1dc, +(params.get('sunI') ?? (['duel40', 't1', 't2', 't3', 'bolt30', 'wt'].includes(VID) ? 3.6 : 4.0))); sun.castShadow = true;
 renderer.toneMappingExposure = +(params.get('exp') ?? 1.0);
 sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.03; sun.shadow.radius = 1.5;
 Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 260 }); scene.add(sun, sun.target);
@@ -74,11 +74,12 @@ console.log('FLOOR', FLOOR);
 const WP = { sword: { file: 'aegisblade', cfg: 'sword' }, sword2: { file: 'veilblade', cfg: 'sword2' }, spear: { file: 'boltspear', cfg: 'spear' },
   reaper: { file: 'goldreaper', cfg: 'reaper' }, lance: { file: 'lancebolt', cfg: 'spear' }, hammer: { file: 'golem_hammer', cfg: 'hammer' }, bow: { file: 'voidbow', cfg: 'bow' } };
 const VPAIR = { spear: [WP.sword, WP.spear], hammer: [WP.sword, WP.hammer], bow: [WP.sword, WP.bow], duel40: [WP.spear, WP.reaper], bolt30: [WP.spear, WP.lance],
-  t1: [WP.sword, WP.sword2], t2: [WP.reaper, WP.spear], t3: [WP.hammer, WP.sword] };
+  v8x: [{ file: 'aegisblade', cfg: 'swordx', dir: 'w2/' }, { file: 'veilblade', cfg: 'swordx2', dir: 'w2/' }],   // v8 remake: swords at the reference sheet's size and grip
+  t1: [WP.sword, WP.sword2], t2: [WP.reaper, WP.spear], t3: [WP.hammer, WP.sword], wt: [WP.hammer, WP.sword] };
 const [s1, s2, s3, aeg, veil] = await Promise.all([
   loadSkin('/anim-test/src/skins/1.png'), loadSkin('/anim-test/src/skins/2.png'), loadSkin('/anim-test/src/skins/3.png'),
-  fetch(base + 'w/' + VPAIR[VID][0].file + '.json').then(r => r.json()),
-  fetch(base + 'w/' + VPAIR[VID][1].file + '.json').then(r => r.json())]);
+  fetch(base + (VPAIR[VID][0].dir || 'w/') + VPAIR[VID][0].file + '.json').then(r => r.json()),
+  fetch(base + (VPAIR[VID][1].dir || 'w/') + VPAIR[VID][1].file + '.json').then(r => r.json())]);
 // per weapon: seg = collision samples, cseg = clash segment, tip, trail = trail segment, lh = left-hand point (two-handed),
 // bow = string anchors. Sword exports run -3..23 px; Boltspear -15.2..24.8; golem_hammer -10.9..23.1; Voidbow -13..13.
 const WC = {
@@ -91,13 +92,16 @@ if (VPAIR[VID][1].cfg === 'bow') veil.quads = veil.quads.filter(q => { const P =
 // Goldreaper (greatsword, two-handed): exported 36 px, grip 0.13 -> -4.7..31.3 px; left hand at -3.6 (between grip and pommel)
 WC.reaper = { seg: [-3, 4, 10, 16, 22, 27, 31], cseg: [9, 30], tip: 30.5, trail: [11, 30.5], lh: -3.6, edgeUp: 'z' };
 WC.sword2 = { seg: [4, 9, 14, 19, 24, 28], cseg: [8, 26], tip: 27, trail: [9, 26], edgeUp: 'x' };   // Veilblade (x +-6.4 wide, z +-1.7)
+// sheet-size swords (33.8 px): Aegisblade grip 0.22 -> -7.4..26.4 px, Veilblade grip 0.17 -> -5.7..28.1 px
+WC.swordx = { seg: [4, 9, 14, 19, 23, 26], cseg: [8, 25], tip: 25.8, trail: [9, 25.5], edgeUp: 'x' }; WC.swordx2 = { seg: [4, 9, 14, 19, 24, 27.5], cseg: [8, 26.5], tip: 27.4, trail: [9, 27], edgeUp: 'x' };
 const WA = WC[VPAIR[VID][0].cfg], WB = WC[VPAIR[VID][1].cfg];
 const SC = 0.69 * 1.15;
-const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + 'w/'), SC, WA), B: buildCharacter(s2, buildWeapon(veil, base + 'w/'), SC, WB), C: buildCharacter(s3, null) };
+const cast = { A: buildCharacter(s1, buildWeapon(aeg, base + (VPAIR[VID][0].dir || 'w/')), SC, WA), B: buildCharacter(s2, buildWeapon(veil, base + (VPAIR[VID][1].dir || 'w/')), SC, WB), C: buildCharacter(s3, null) };
 for (const k of ['A', 'B']) { const w = k === 'A' ? WA : WB; Object.assign(cast[k], { cseg: w.cseg, tip: w.tip, trail: w.trail }); }
-document.getElementById('bl').innerHTML = '<b>0' + ({ spear: 1, hammer: 2, bow: 3, duel40: 1, t1: 1, t2: 2, t3: 3, bolt30: 1 }[VID]) + '</b>— ' + { spear: 'SWORD VS SPEAR', hammer: 'SWORD VS HAMMER', bow: 'SWORD VS BOW', duel40: 'BOLTSPEAR VS GOLDREAPER', bolt30: 'BOLTSPEAR VS LANCEBOLT', t1: 'BLADE DANCE', t2: 'GREATSWORD VS SPEAR', t3: 'HAMMER VS BLADE' }[VID];
+if (document.getElementById('bl')) document.getElementById('bl').innerHTML = '<b>0' + ({ spear: 1, hammer: 2, bow: 3, duel40: 1, t1: 1, t2: 2, t3: 3, bolt30: 1, wt: 4 }[VID]) + '</b>— ' + { spear: 'SWORD VS SPEAR', hammer: 'SWORD VS HAMMER', bow: 'SWORD VS BOW', duel40: 'BOLTSPEAR VS GOLDREAPER', bolt30: 'BOLTSPEAR VS LANCEBOLT', t1: 'BLADE DANCE', t2: 'GREATSWORD VS SPEAR', t3: 'HAMMER VS BLADE', wt: 'WEIGHT TEST' }[VID];
 // v8: sword model 1.15x (user). v7: Minecraft default grip - slide the sword back along the forearm so the fist wraps the handle under the guard
 for (const k of ['A', 'B']) if (cast[k].whand === 'r' && (VPAIR[VID][k === 'A' ? 0 : 1].cfg === 'sword' || VPAIR[VID][k === 'A' ? 0 : 1].cfg === 'sword2')) cast[k].weapon.parent.position.y += +(params.get('grip') ?? 1.6);   // sword: Minecraft grip; spear/hammer/bow are exported with their own grip point
+for (const k of ['A', 'B']) if (VPAIR[VID][k === 'A' ? 0 : 1].dir) cast[k].weapon.parent.position.y += 1.5;   // sheet exports: the weapon axis runs through the centre of the fist
 for (const k in cast) scene.add(cast[k].root);
 window.__probe = { cast, C, applyPose, THREE, floorAt };
 for (const k in cast) cast[k].floorAt = floorAt;   // blade/ground physics in rig2
@@ -421,7 +425,7 @@ function drawState(t, camOv) {
   return cam;
 }
 
-const fill = document.getElementById('fill');
+const fill = document.getElementById('fill') || { style: {} };   // pages without the corner HUD
 const panelMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, transparent: true, blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
   uniforms: { map: { value: null }, x0: { value: 0 }, x1: { value: 1 }, slant: { value: 0.1 }, tintD: { value: new THREE.Color() }, tintL: { value: new THREE.Color() }, time: { value: 0 }, open: { value: 1 }, dir: { value: 1 }, white: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
@@ -469,6 +473,7 @@ window.renderAt = function (tv) {
   }
   outMat.uniforms.map.value = acc.texture; renderer.setRenderTarget(null); renderer.render(outScene, quadCam);
   fill.style.width = (300 * Math.min(1, tv / (C.videoAt ? C.videoAt(C.TOTAL) : C.TOTAL))) + 'px';
+  if (C.overlay) C.overlay(tv, t, document);   // logo outro
   return label;
 };
 window.dbgPose = function (k, t) { const p = C.pose(k, t); applyPose(cast[k], p); cast[k].root.updateMatrixWorld(true);

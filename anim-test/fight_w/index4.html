@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>NewGenMC 2v2 fight</title>
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  /* no corner text in this video (user). The only overlay is the logo outro. */
+  #outro { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; opacity: 0; pointer-events: none; }
+  #glow { position: absolute; left: 360px; top: 80px; width: 1200px; height: 700px; background: radial-gradient(closest-side, rgba(255,255,255,.55), rgba(255,255,255,0)); }
+  #ls { position: absolute; left: 460px; top: 307px; width: 1000px; height: 246px; filter: drop-shadow(0 10px 26px rgba(8,6,12,.55)); }
+  /* the wrapper is masked by the logo itself, so the shine only shows ON the logo */
+  #lw { position: absolute; left: 0; top: 0; width: 1000px; height: 246px; overflow: hidden; -webkit-mask-image: url('/newgen-show/src/img3.png'); -webkit-mask-size: 100% 100%; mask-image: url('/newgen-show/src/img3.png'); mask-size: 100% 100%; }
+  #logo { position: absolute; left: 0; top: 0; width: 1000px; height: 246px; }
+  #shine { position: absolute; top: -20%; left: -30%; width: 16%; height: 140%; transform: skewX(-18deg); opacity: 0;
+    background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.75), rgba(255,255,255,0)); }
+  #fade { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; background: #000; opacity: 0; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/anim-test/node_modules/three/build/three.module.js",
+               "three/addons/": "/anim-test/node_modules/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="outro"><div id="glow"></div><div id="ls"><div id="lw"><img id="logo" src="/newgen-show/src/img3.png"><div id="shine"></div></div></div></div>
+<div id="fade"></div>
+<script type="module" src="./fight4.js"></script>
+</body>
+</html>

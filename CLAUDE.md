@@ -142,6 +142,56 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   spear-braked slide, pierce finisher. v1 = two-handed spear (hands spasmed); v2 = grip rules from the user (never force a
   grip; spear two-handed only on lunges). User on v2: "good", but the empty hand must not always be raised (open, next
   session). Build, render, QA numbers and local tool paths: notes §21-23. v1 is on Higgsfield; v2 is not uploaded yet.
+- **Duo 40, the first 2 v 2** (`fight_w/fight4.js` + `index4.html`, 2026-11-12; user brief: 4th skin, 40 s, intro with teammates
+  looking at each other, Jingu Bang / Boltspear / Blinkblade / Seekerbow, team work, dodges, weapons braking in the sand, slow-motion
+  close calls with a slow-mo sound, NO corner texts, logo outro). Blue = Blinkblade (skin 1) + Seekerbow (skin 2); red = Boltspear
+  (skin 3) + Jingu Bang (skin 4, `src/skins/4.png`); the bow's team wins. Jingu Bang is a wooden kung-fu staff, pinned to medium.
+  - **How it works:** two normal duels run side by side (`choreo_duo1.js` Blinkblade vs Boltspear, `choreo_duo2.js` Jingu Bang vs
+    Seekerbow; parts `build_duo1/2.js`, `duo_shared.js` = shared timeline + world coordinates + spear pose set). `duo_director.js`
+    owns what crosses them: camera shot list, slow motion (14.86 and 28.02, 0.45 s at 1/4), the archer aiming at the other duel
+    (pose hook), the cross-duel arrow (mode `'x'`), the spear knocked out of the hand (`DISARM`), the logo outro (`newgen-show/src/img3.png`).
+  - **Gotcha:** `DRIFT` moves both fighters of a duel on top of their keys, so shared world points must go through `W_(p, t)`.
+  - **Weapons:** `node tools/export_weapon.mjs <names>` exports at the SHEET size and grip to `fight/assets/w2/` (no Python/PIL);
+    the weapon axis runs through the fist centre (+1.5 px) for every weapon here.
+  - **Bow hold (user review):** "bow gripping looks wrong, not what it looked like in the grid". Rule: fist on the riser, bow
+    UPRIGHT on a half-raised arm, string toward the archer, standing straight when idle; never let a sword blade direction reach
+    the bow hand (`build_duo2.js` fixes every archer key).
+  - **Run:** `python fight_w/parts/assemble_w.py duo1` and `duo2`, then `node tools/duo_run.mjs` (one page load, about 5 min to solve;
+    env `EVALS`, `STILLS`, `TOPS`, `FRAMES="0 1200 out/x.mp4"`, `EVENTS`, `PROBE=1|2`, `QS="?sub=1&fast=1"` for layout passes).
+    Sound: `python fight_w/duo_sfx.py` (no `desert_*` clips; slow motion = the user's pick, sample 5 "sub drop"; samples in
+    `out/sfx_samples/`). QA: per-duel tools with `PROBE`, plus `tools/duo_qa.js` (cross-duel distance, speed spikes).
+  - **USER REVIEW of v1: "its very bad, the physics are all messed up"** (full text and the new permanent grip rule in
+    `notes/fight-animation-standard.md`). Do NOT re-render Duo 40 until these are fixed:
+    - arrows glide along the floor after landing (not diagnosed yet; `arrowAt` in `fight4.js`);
+    - the bow grip is still wrong: fist on the HANDLE, STRING FACING THE PLAYER, as on the grid sheet;
+    - **two-handed grip (UNFINISHED, in the tree):** rig flag `ch.th` + a reach solver in `rig2_w.js` (before `clearArms`),
+      `spearSetup()` puts `lh: 1` on every spear/staff guard, block and attack, `fight4.js` sets `th` and `lh` +6 / +8 (second fist
+      AHEAD). Measured with `tools/freehand_qa.js` / `grip2_dbg.js`: two-handed only 37 % (spear) and 15 % (staff) of the time,
+      8 forced releases each, second fist up to 13 px off the shaft, clash misses up from 0.01 to 0.09-0.10. Causes seen: the staff
+      has 23 px of shaft BEHIND the main hand, so sweeps and wind-ups run it into the wielder and the collision pass turns the
+      weapon up to 97 deg away from the pose; the head box pushes the second hand off when the grip sits above the shoulders; the
+      clash solver loses the arm angles the IK now overrides. Next: main hand at the REAR quarter of the staff (export grip),
+      poses designed around a shaft that crosses the chest, keep fists below the neck.
+    - **free hand (DONE, measured):** `freeArm()` in `assemble_w.py` (duo and v8x builds) replaces the raised guard arm
+      (`L.guard` lArm [-38, 0, 24] x 1.25) with a low arm that swings against the weapon arm and torso twist, a beat late.
+      Blinkblade's free hand raised 87 % -> 18 % of the time, longest stretch 5.0 s -> 1.9 s (`?nofree=1` = old behaviour).
+  - **QA at render time:** cross_qa 0 crossed on all four; clash miss mean about 0.01; duo_qa clean; weight_qa passes except the
+    spear's run (10.2 vs 8.1 blocks/s); phase_qa leaves about 12 grazes of 2 px or less. Sound not ear-checked.
+- **v8 remake "v8x" (UNFINISHED, stopped by the user at the end of 2026-11-12; pick up here).** User brief: "remake v8 with the 2
+  player faces up close like bolt30 intro 40 seconds (change up the fighting just a little bit but keep most of the scenes) fight
+  with all the new fixes and changes, at 17 second of v8 theres a dupe scene of the player doing a jump attack so remove that and
+  at 20 second the players are hugging eachother for some reason so remove that too, remake the ending of v8 into the enemy gets
+  stabbed in the chest and pulls sword out after and rolls the ending with the newgen logo".
+  - **Built, never seen:** `fight_w/parts/build_v8x.js` (v8's body, time-warped by `W8()`, generated by `tools/gen/gen_v8x.cjs`),
+    `camera_v8x.js` (bolt30's face panels + a calmer shot list + the logo `overlay`), `fight_w/index_x.html` (no corner texts),
+    `fight.js` entry `v8x` (Aegisblade vs Veilblade from `fight/assets/w2/`, sheet size and grip). 37.75 s of animation + two
+    slow-motion moments (27.0 close call, the stab at 30.73) = 40.0 s. It assembles and passes a syntax check; the first page loads
+    failed on my own slips (now fixed) and the last one was stopped before it finished, so NOT ONE FRAME has been looked at.
+  - **Next:** `python fight_w/parts/assemble_w.py v8x`; stills with
+    `QADIR=qa/v8x READY_MS=900000 PAGE=anim-test/fight_w/index_x.html QS="?sub=1&vid=v8x" node render.mjs still 1.5,3.6,7.3,17.3,27.4,29.9,31.6,32.4,34.5,38.5`;
+    then phase/cross/weight/freehand QA (`window.__qa_w=['aegisblade','veilblade']`), render `frames 0 1200`, sound with
+    `EVF=fight_w/comp/events_v8x.json OUTF=fight_w/comp/audio_v8x.m4a KINDS=sword,sword EXTRA='[{"t":30.73,"kind":"stab"},{"t":31.5,"kind":"pull"},{"t":32.95,"kind":"fall"},{"t":34.0,"kind":"outro"}]' python fight_w/duo_sfx.py`.
+  - Local tools on this PC (not on PATH): `Desktop\mcrefs\tools\node`, `tools\python` (numpy + scipy, no PIL), `tools\ffmpeg\bin`.
 - **NewGen studio (our own animation system)**: `anim-test/studio/` + skill `.claude/skills/newgen-animate`. Prompt ->
   beat script JSON -> contact-first generated motion on rig2 -> render. Demos: `studio/scripts/demo.json` (voxel meadow),
   `demo_colosseum.json` (the user's colosseum, converted by `anim-test/tools/mca2obj.py`; `fight/assets/colosseum/` is
@@ -166,7 +216,18 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
   model, and the class must change how the player moves. Measured as heft = voxelised volume in % of the body x (1 + centre-of-mass
   distance from the fist in blocks); thresholds and the per-class player numbers (wind-up, strike frames, recovery, run speed,
   combo length, knockback, which body parts drive the swing, twirls, carry pose) are in `weightClasses` in `gripref/weapons.json`.
-  Classes change with scale, so re-run after rescaling. Not wired into any fight choreography yet: use the table for new fights.
+  Classes change with scale, so re-run after rescaling.
+  **Link to fight builds (2026-11-12, user: "link the weight + physics to animation making"). EVERY NEW FIGHT USES IT:**
+  `node gripref/render.mjs` writes `fight_w/weapon_data.json`; `assemble_w.py` injects it as `WEAPON_DATA`. A build calls
+  `weapons('<A file>', '<B file>')` first, then the w-helpers in `parts/common_w.js`: `wsprint` (run speed = runBase 9 x class
+  move), `whit` (wind-up, follow-through, recovery; medium/heavy hits knock the defender back), `wknock` (distance x the
+  defender's brace), `wtw` (twirl refused for heavy), plus a console warning when a combo is longer than the class allows.
+  QA: `tools/weight_qa.js` (same eval pattern as the other QA tools; `window.__qa_w = [A, B]` for builds without `weapons()`).
+  Class numbers are calibrated on the approved fights (swords: wind-up 0.16 s, run 9 blocks/s, blade up to 100 deg/frame).
+  Proof build: `?vid=wt` (`parts/build_wt.js`, golem_hammer vs aegisblade, 8 s, mechanics only, not for publishing): weight QA
+  0 fails (run 6.75 / 8.1 blocks/s exactly on class), phase_qa clean, cross_qa 0; stills in `qa/wt/`, no video rendered.
+  NOT done: fights still load the old weapon exports (the sheet's sizes and grips are not in `fight/assets/w/`; the exporter
+  needs PIL, which the local `tools/python` lacks). Old fights fail the weight QA in places; they predate it and were not changed.
 - Ranked 2vs2 v4 still awaiting feedback (MR numbers and armor trim are placeholders).
 
 ## Layout
