@@ -9,3 +9,7 @@ __pycache__/
 */qa/
 anim-test/studio/comp/
 node_modules/
+# Minecraft textures: copy them from the installed game with newgen-br/tools/prep_mc.py
+newgen-br/src/mc/
+# Battle Royale render (not on Higgsfield yet; kept on the PC)
+newgen-br/out/

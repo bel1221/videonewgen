@@ -36,18 +36,23 @@ function buildAll() {
   tw('B', 0.97, 1.63, 2);
   BR.A.push([0, 2.1]); BR.B.push([0, 2.1]);
   // ================= S2 2.15-5.0  sprint in, exchange while strafing sideways, big clash, both skid apart ==========
-  sprint('A', 2.15, 2.72, [-3.4, 0], [-0.62, 0.2]); sprint('B', 2.2, 2.72, [3.4, 0], [0.62, -0.1]);
+  // user, part-1 review 2026-11-13: "fighters on first exchanges are too close ... sword have no space", "skid apart also too short",
+  // swords too quick to read -> a 1.6-block gap held at every hit (was 1.2 keyed, about 0.9 after the solver stepped them in; 2.0 was measured too far for the blades to meet), 3 cuts 0.42 s apart with 0.3 s wind-ups (was 4 at 0.35 s), a longer skid with sand spray
+  sprint('A', 2.15, 2.72, [-3.4, 0], [-0.95, 0.2]); sprint('B', 2.2, 2.72, [3.4, 0], [0.94, -0.1]);
   K('A', 2.15, L.crouch, 'io', SW); K('A', 2.55, L.guard, 'lin', SW); K('B', 2.22, L.crouch, 'io', SW); K('B', 2.5, L.guard, 'lin', SW);
-  const S2 = [[2.95, -0.62, 0.6, 0.66, 0.42], [3.3, -0.7, 1.2, 0.58, 1.0], [3.65, -0.55, 1.8, 0.7, 1.62], [4.0, -0.48, 2.4, 0.8, 2.3], [4.35, -0.56, 2.9, 0.6, 2.85]];
+  // per-hit distances are the ones measured to let the blades meet (clash distance 0-0.13 blocks): 1.9 for a cut from range, 1.5 for the close reply
+  const S2 = [[2.95, -0.95, 0.6, 0.94, 0.5], [3.38, -0.75, 1.3, 0.72, 1.2], [3.8, -0.94, 2.0, 0.95, 1.9], [4.2, -0.94, 2.7, 0.94, 2.62]];
   for (const [t, ax, az, bx, bz] of S2) { at('A', t, ax, az, 'io'); at('B', t, bx, bz, 'io'); }
-  ex('B', 'A', 2.95, 'R', false, 0.3); ex('A', 'B', 3.3, 'R'); ex('B', 'A', 3.65, 'O', false, 0.2); ex('A', 'B', 4.0, 'T', false, 0.18);
-  K('A', 4.15, L.windR, 'o'); K('A', 4.35, L.slashR, 'i'); K('B', 4.17, L.windL, 'o'); K('B', 4.35, L.slashL, 'i'); clash(4.35, true);
-  at('A', 4.9, -2.6, 3.2, 'o'); at('B', 4.9, 2.5, 2.9, 'o');
-  K('A', 4.5, L.skid, 'o'); K('A', 4.85, L.skid, 'lin'); K('A', 5.0, G, 'io'); K('B', 4.5, L.skid, 'o'); K('B', 4.85, L.skid, 'lin'); K('B', 5.0, G, 'io');
+  const far = () => Object.assign(CLASHES[CLASHES.length - 1], { gap: 1.4, fwMax: 0.08 });   // keep the bodies apart at the hit: the blades meet between them
+  ex('B', 'A', 2.95, 'R', false, 0.32); far(); ex('A', 'B', 3.38, 'R', false, 0.3); far(); ex('B', 'A', 3.8, 'R', false, 0.3); far();
+  ex('A', 'B', 4.2, 'R', true, 0.3); far();   // the big one (impact insert): a full cut into a parry, both thrown back
+  at('A', 4.95, -3.2, 3.1, 'o'); at('B', 4.95, 3.1, 2.8, 'o');
+  K('A', 4.34, L.skid, 'o'); K('A', 4.86, L.skid, 'lin'); K('A', 5.0, G, 'io'); K('B', 4.34, L.skid, 'o'); K('B', 4.86, L.skid, 'lin'); K('B', 5.0, G, 'io');
+  slide('A', W8(4.36), W8(4.9)); slide('B', W8(4.36), W8(4.9));
   // ================= S3 5.0-7.4  B rushes with a flat cut, A ducks and slips past, spins twice, rising cut =========
-  RUN.B.push([5.05, 5.45]); at('B', 5.05, 2.5, 2.9); at('B', 5.5, 0.55, 2.6, 'lin'); at('B', 5.8, 0.15, 2.65, 'o');
+  RUN.B.push([5.05, 5.45]); at('B', 5.05, 3.1, 2.8); at('B', 5.5, 0.55, 2.6, 'lin'); at('B', 5.8, 0.15, 2.65, 'o');
   K('B', 5.05, L.crouch, 'io', SW); K('B', 5.35, L.guard, 'lin', SW); K('B', 5.45, L.windL, 'o'); K('B', 5.62, L.slashL, 'i'); K('B', 5.85, L.skid, 'o'); K('B', 6.0, G, 'io');
-  at('A', 5.2, -2.6, 3.2); at('A', 5.62, -0.25, 3.62, 'lin'); at('A', 5.95, 1.6, 2.45, 'o');
+  at('A', 5.05, -3.2, 3.1); at('A', 5.62, -0.25, 3.62, 'lin'); at('A', 5.95, 1.6, 2.45, 'o');
   K('A', 5.25, G); K('A', 5.45, L.duck, 'o'); K('A', 5.75, L.duck, 'lin'); K('A', 5.92, L.skid, 'o');
   K('A', 6.03, L.spin, 'lin', { yawOff: -200 }); K('A', 6.15, L.slashR, 'i', { yawOff: -360 }); D.A = { yawOff: -360 };
   blk('B', 6.0, 6.15, 'parryL'); clash(6.15);

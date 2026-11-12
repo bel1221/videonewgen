@@ -75,6 +75,11 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
 
 ## Current work (update this when it changes)
 
+- **Battle Royale video** (`newgen-br/`, 2026-11-13): **v1 rendered**, `out/newgen_battle_royale_v1.mp4`, 43.3 s, Ranked 2vs2
+  typography style, Thắm VO (7 lines), recipes shown as items popping into the crafting grid (never spoken), kill feed with the
+  user's 11 player names (Bunn9 wins), logo glint + "JOIN NOW" + "IP: newgenmc.net". Script, build commands and QA in
+  `newgen-br/SCRIPT.md`. Local build works now: Pillow is in `Desktop\mcrefs\mcrefs	ools\python`. Waiting on feedback; not on Higgsfield.
+- **Heart bar rule (user, 2026-11-13):** a killed player's bar must show 0 hearts. Fixed table in `rk_scenes.py`; Ranked v4 not re-rendered.
 - **Ban-system video** (`newgen-ban/`): script v3 in `SCRIPT.md` (real numbers, ~45 s). Encounter animation v1 done
   (`tools/encounter.py`, `bash tools/build_encounter.sh`, output `out/newgen_ban_encounter_v1.mp4`): player vs kill-aura
   hacker, admin drops in, /ban, Minecraft death, BANNED stamp. Waiting on the user's feedback, real skins

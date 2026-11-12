@@ -130,6 +130,10 @@ const WIDE = +(params.get('wide') ?? 1), LIM0 = { ax: 60, az: 60, el: 50, wr: 50
 const GAP_MIN = 0.78;   // root-to-root; capsules are 0.32 each, + a little air
 function bodyGap(t) { const a = C.pose('A', t).pos, b = C.pose('B', t).pos; return Math.hypot(a[0] - b[0], a[2] - b[2]); }
 const SOL = {};
+// user, v8x part-1 review 2026-11-13 ("too close to eachother ... sword have no space"): a clash may carry its own spacing,
+// clash(t, big, kind, { gap, fwMax }) = the closest the two roots may come at that hit and how far each may step in for it.
+// ?solve=t0,t1 solves only the clashes inside that window (part-by-part work; every other clash stays as keyed, unsolved).
+const SOLVE_WIN = (params.get('solve') || '').split(',').map(Number), inSolve = t => SOLVE_WIN.length !== 2 || (t >= SOLVE_WIN[0] && t <= SOLVE_WIN[1]);
 // how deep the fighter's own weapon sits in his own head/torso at time t (blocks) - parry choices that phase are rejected
 function selfDepth(k, t) { const ch = cast[k]; applyPose(ch, C.pose(k, t)); ch.root.updateMatrixWorld(true); const b = ch.bones, hd = b.head.localToWorld(new THREE.Vector3(0, 4, 0));
   const hp = b.hips.getWorldPosition(new THREE.Vector3()), nk = b.neck.getWorldPosition(new THREE.Vector3()); let dmax = 0;
@@ -138,7 +142,7 @@ function selfDepth(k, t) { const ch = cast[k]; applyPose(ch, C.pose(k, t)); ch.r
   return Math.max(0, dmax); }
 // v8: pick each defence's parry pose (L/R/H) from the real blade geometry before solving: the side an attack ENDS on
 // decides which parry meets it (v7's slashL-vs-parryR pairs all missed by ~1 block).
-{ const pick = []; for (const r of C.PARRY) { let best = null;
+{ const pick = []; for (const r of C.PARRY) { let best = null; if (!inSolve(r.t)) continue;
     for (const n of (r.cands || ['parryL', 'parryR', 'parryH'])) { r.apply(n); const d = bladeDist(r.t) + 3 * selfDepth(r.def, r.t); if (!best || d < best[1] - 0.02) best = [n, d]; }
     r.apply(best[0]); pick.push([r.t, best[0], +best[1].toFixed(2)]); }
   C.resim(false); console.warn('PARRY', JSON.stringify(pick)); }
@@ -148,15 +152,17 @@ const NPASS = WIDE ? 3 : 2;
 for (let passN = 0; passN < NPASS; passN++) {
   const LIM = passN === 2 ? LIM3 : LIM0, V = passN === 2 ? VARS.filter(v => v !== 'fw') : VARS;
   for (const cl of C.CLASHES) {
-    if (cl.at || !(cl.kind === 'blade' || cl.kind === 'cross')) continue;
+    if (cl.at || !(cl.kind === 'blade' || cl.kind === 'cross') || !inSolve(cl.t)) continue;
     if (!SOL[cl.t]) { const eA = { t: cl.t, ax: 0, az: 0, el: 0, wr: 0, ba: 0, ch: 0, fw: 0 }, eB = { ...eA }; C.CORR.A.push(eA); C.CORR.B.push(eB); SOL[cl.t] = [eA, eB]; }
     const [eA, eB] = SOL[cl.t];
-    const f = () => bladeDist(cl.t) + 0.0003 * VARS.reduce((s, v) => s + (v === 'fw' ? 400 : 1) * (eA[v] * eA[v] + eB[v] * eB[v]), 0) + 6 * Math.max(0, GAP_MIN - bodyGap(cl.t));
+    // a spaced clash reaches with the ARMS (the wide limits from the first pass on) instead of stepping the bodies together
+    const LIMc = cl.gap ? { ...LIM3, fw: passN === 2 ? 0 : (cl.fwMax ?? 0.3) } : LIM;
+    const f = () => bladeDist(cl.t) + 0.0003 * VARS.reduce((s, v) => s + (v === 'fw' ? 400 : 1) * (eA[v] * eA[v] + eB[v] * eB[v]), 0) + 6 * Math.max(0, (cl.gap ?? GAP_MIN) - bodyGap(cl.t));
     let best = f();
     if (passN === 2 && bladeDist(cl.t) < 0.12) continue;            // already touching
-    for (const step of passN ? [4, 2, 1, 0.5] : [16, 8, 4, 2, 1]) for (let pass = 0; pass < 8; pass++) { let imp = false;
+    for (const step of passN && !cl.gap ? [4, 2, 1, 0.5] : [16, 8, 4, 2, 1, 0.5]) for (let pass = 0; pass < 8; pass++) { let imp = false;
       for (const e of [eA, eB]) for (const v of V) for (const sgn of [1, -1]) {
-        const old = e[v], nv = THREE.MathUtils.clamp(old + sgn * (v === 'fw' ? step / 20 : step), v === 'fw' ? 0 : -LIM[v], LIM[v]); if (nv === old) continue; e[v] = nv; const fv = f();
+        const old = e[v], nv = THREE.MathUtils.clamp(old + sgn * (v === 'fw' ? step / 20 : step), v === 'fw' ? 0 : -LIMc[v], LIMc[v]); if (nv === old) continue; e[v] = nv; const fv = f();
         if (fv < best - 1e-4) { best = fv; imp = true; } else e[v] = old; }
       if (!imp) break; }
   }

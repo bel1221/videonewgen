@@ -309,18 +309,23 @@ function buildAll() {
   tw('B', 0.97, 1.63, 2);
   BR.A.push([0, 2.1]); BR.B.push([0, 2.1]);
   // ================= S2 2.15-5.0  sprint in, exchange while strafing sideways, big clash, both skid apart ==========
-  sprint('A', 2.15, 2.72, [-3.4, 0], [-0.62, 0.2]); sprint('B', 2.2, 2.72, [3.4, 0], [0.62, -0.1]);
+  // user, part-1 review 2026-11-13: "fighters on first exchanges are too close ... sword have no space", "skid apart also too short",
+  // swords too quick to read -> a 1.6-block gap held at every hit (was 1.2 keyed, about 0.9 after the solver stepped them in; 2.0 was measured too far for the blades to meet), 3 cuts 0.42 s apart with 0.3 s wind-ups (was 4 at 0.35 s), a longer skid with sand spray
+  sprint('A', 2.15, 2.72, [-3.4, 0], [-0.95, 0.2]); sprint('B', 2.2, 2.72, [3.4, 0], [0.94, -0.1]);
   K('A', 2.15, L.crouch, 'io', SW); K('A', 2.55, L.guard, 'lin', SW); K('B', 2.22, L.crouch, 'io', SW); K('B', 2.5, L.guard, 'lin', SW);
-  const S2 = [[2.95, -0.62, 0.6, 0.66, 0.42], [3.3, -0.7, 1.2, 0.58, 1.0], [3.65, -0.55, 1.8, 0.7, 1.62], [4.0, -0.48, 2.4, 0.8, 2.3], [4.35, -0.56, 2.9, 0.6, 2.85]];
+  // per-hit distances are the ones measured to let the blades meet (clash distance 0-0.13 blocks): 1.9 for a cut from range, 1.5 for the close reply
+  const S2 = [[2.95, -0.95, 0.6, 0.94, 0.5], [3.38, -0.75, 1.3, 0.72, 1.2], [3.8, -0.94, 2.0, 0.95, 1.9], [4.2, -0.94, 2.7, 0.94, 2.62]];
   for (const [t, ax, az, bx, bz] of S2) { at('A', t, ax, az, 'io'); at('B', t, bx, bz, 'io'); }
-  ex('B', 'A', 2.95, 'R', false, 0.3); ex('A', 'B', 3.3, 'R'); ex('B', 'A', 3.65, 'O', false, 0.2); ex('A', 'B', 4.0, 'T', false, 0.18);
-  K('A', 4.15, L.windR, 'o'); K('A', 4.35, L.slashR, 'i'); K('B', 4.17, L.windL, 'o'); K('B', 4.35, L.slashL, 'i'); clash(4.35, true);
-  at('A', 4.9, -2.6, 3.2, 'o'); at('B', 4.9, 2.5, 2.9, 'o');
-  K('A', 4.5, L.skid, 'o'); K('A', 4.85, L.skid, 'lin'); K('A', 5.0, G, 'io'); K('B', 4.5, L.skid, 'o'); K('B', 4.85, L.skid, 'lin'); K('B', 5.0, G, 'io');
+  const far = () => Object.assign(CLASHES[CLASHES.length - 1], { gap: 1.4, fwMax: 0.08 });   // keep the bodies apart at the hit: the blades meet between them
+  ex('B', 'A', 2.95, 'R', false, 0.32); far(); ex('A', 'B', 3.38, 'R', false, 0.3); far(); ex('B', 'A', 3.8, 'R', false, 0.3); far();
+  ex('A', 'B', 4.2, 'R', true, 0.3); far();   // the big one (impact insert): a full cut into a parry, both thrown back
+  at('A', 4.95, -3.2, 3.1, 'o'); at('B', 4.95, 3.1, 2.8, 'o');
+  K('A', 4.34, L.skid, 'o'); K('A', 4.86, L.skid, 'lin'); K('A', 5.0, G, 'io'); K('B', 4.34, L.skid, 'o'); K('B', 4.86, L.skid, 'lin'); K('B', 5.0, G, 'io');
+  slide('A', W8(4.36), W8(4.9)); slide('B', W8(4.36), W8(4.9));
   // ================= S3 5.0-7.4  B rushes with a flat cut, A ducks and slips past, spins twice, rising cut =========
-  RUN.B.push([5.05, 5.45]); at('B', 5.05, 2.5, 2.9); at('B', 5.5, 0.55, 2.6, 'lin'); at('B', 5.8, 0.15, 2.65, 'o');
+  RUN.B.push([5.05, 5.45]); at('B', 5.05, 3.1, 2.8); at('B', 5.5, 0.55, 2.6, 'lin'); at('B', 5.8, 0.15, 2.65, 'o');
   K('B', 5.05, L.crouch, 'io', SW); K('B', 5.35, L.guard, 'lin', SW); K('B', 5.45, L.windL, 'o'); K('B', 5.62, L.slashL, 'i'); K('B', 5.85, L.skid, 'o'); K('B', 6.0, G, 'io');
-  at('A', 5.2, -2.6, 3.2); at('A', 5.62, -0.25, 3.62, 'lin'); at('A', 5.95, 1.6, 2.45, 'o');
+  at('A', 5.05, -3.2, 3.1); at('A', 5.62, -0.25, 3.62, 'lin'); at('A', 5.95, 1.6, 2.45, 'o');
   K('A', 5.25, G); K('A', 5.45, L.duck, 'o'); K('A', 5.75, L.duck, 'lin'); K('A', 5.92, L.skid, 'o');
   K('A', 6.03, L.spin, 'lin', { yawOff: -200 }); K('A', 6.15, L.slashR, 'i', { yawOff: -360 }); D.A = { yawOff: -360 };
   blk('B', 6.0, 6.15, 'parryL'); clash(6.15);
@@ -1114,11 +1119,12 @@ const BIG = () => CONT.filter(c => c.big && c.kind === 'blade');
 
 // ------------------------------------------------------------------ shots
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
-const INS = [7.25, 17.2];   // two impact inserts only (standard: fewer jumps)
+const INS = [7.1, 17.2];   // two impact inserts only (standard: fewer jumps). 7.1 = the big clash that ends the first exchange
 const FLASH = 30.73, BIND_T = -9, BIND_END = -8, FALL_T = 32.95, FALL_C = 'B', INTRO_END = 2.9, T_OUTRO = 34.0;
 // calmer than v8 (its shots averaged 0.5 s; the user: "fewer half-second camera changes", "scenes being skipped"): about 1 s per shot
 const SHOTS = [
-  [0.0, 'est'], [INTRO_END, 'three4'], [4.0, 'side', { d: 5.0, h: 1.3 }], [5.05, 'trackA', { d: 3.8 }], [5.75, 'side', { d: 4.6, h: 1.3 }], [7.25, 'ins'], [7.35, 'wide', { d: 7 }],
+  // part 1 (user, 2026-11-13): the twirl shot pulled back so both players are in frame; the insert sits on the real contact; the skid gets a side shot wide enough for both
+  [0.0, 'est'], [INTRO_END, 'three4'], [4.0, 'side', { d: 7.8, h: 1.3 }], [5.05, 'trackA', { d: 3.8 }], [5.75, 'side', { d: 5.0, h: 1.3 }], [7.1, 'ins'], [7.2, 'side', { d: 7.6, h: 1.4 }],
   [7.95, 'trackB'], [8.65, 'three4'], [9.85, 'wide', { d: 6.5 }], [10.5, 'trackB', { d: 4 }], [11.0, 'low', { d: 4.6, look: 2.2, roll: 0.05 }], [11.5, 'side', { d: 5.0, h: 1.4 }],
   [12.9, 'three4'], [14.5, 'wide', { d: 6.8 }], [15.1, 'otsA'], [16.0, 'orbit', { a0: 0.1, a1: 0.8 }], [16.85, 'low', { d: 3.8, look: 1.0, roll: -0.04 }], [17.2, 'ins'], [17.3, 'three4'],
   [18.0, 'wide', { d: 7.5 }], [18.9, 'trackB', { d: 4.2 }], [19.55, 'low', { d: 4.4, look: 2.0, roll: 0.05 }], [20.4, 'side', { d: 4.6, h: 1.3 }], [21.45, 'wide', { d: 6.5 }],
@@ -1192,7 +1198,7 @@ export function camera(t, cast) {
     case 'hero': { const m = v3(export_cross.mid[0], gy, export_cross.mid[1]), uu = v3(export_cross.u[0], 0, export_cross.u[1]), pp = v3(export_cross.p[0], 0, export_cross.p[1]);
       pos = m.clone().add(pp.clone().multiplyScalar(-6.8 + 0.6 * E.io(u))).add(uu.clone().multiplyScalar(-1.0)).setY(gy + 1.0); look = m.clone().add(uu.clone().multiplyScalar(0.6)).setY(gy + 1.7); fov = 38; break; }
     case 'ins': { const ii = INS.findIndex(t0 => Math.abs(S.t0 - t0) < 1e-6); const c = CONT.find(x => Math.abs(x.t - INS[ii]) < 0.02) || { p: mid.toArray() };
-      const cp_ = v3(...c.p); pos = cp_.clone().add(side.clone().multiplyScalar(ii % 2 ? -2.3 : 2.3)).add(ab.clone().multiplyScalar(0.5)).add(up(0.15)); look = cp_.clone().add(up(-0.25)); fov = 36 + 30 * lt; roll = ii % 2 ? 0.12 : -0.1; break; }
+      const cp_ = v3(...c.p); pos = cp_.clone().add(side.clone().multiplyScalar(ii % 2 ? -3.4 : 3.4)).add(up(-0.2)); /* square on to the contact, far enough to see both blades and both fighters' arms (user: the impact frame must show the hit) */ look = cp_.clone().add(up(-0.5)); fov = 36 + 30 * lt; roll = ii % 2 ? 0.12 : -0.1; break; }
     case 'slideA': { const g_ = v3(0, 0, 0).copy(A).setY(gy);   // low, ahead of the sliding fighter: the spear head ploughs the sand toward the lens
       pos = g_.clone().add(side.clone().multiplyScalar(2.5)).add(ab.clone().multiplyScalar(-1.5 + 0.5 * u)).setY(gy + 0.4); look = g_.clone().add(ab.clone().multiplyScalar(0.5)).setY(gy + 0.75); fov = 44; roll = 0.05; break; }
     case 'pierce': pos = mid.clone().add(side.clone().multiplyScalar(-(4.3 - 0.5 * E.io(u)))).add(ab.clone().multiplyScalar(0.9)).setY(gy + 1.15); look = mid.clone().add(ab.clone().multiplyScalar(0.2)).setY(gy + 1.1); fov = 38; roll = -0.03; break;

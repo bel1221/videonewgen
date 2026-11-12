@@ -47,7 +47,9 @@ def put(fr, im, cx, cy, cw=0.0, a=1.0, tint=0.0, sc=1.0):
     fr.paste(im, cx - im.width / 2, cy - im.height / 2, a)
 HP = np.load('src/hp_keyed.npy'); HP = [Image.fromarray(f).resize((448, int(448 * f.shape[0] / f.shape[1])), Image.NEAREST) for f in HP]
 DEATH = np.load('src/death_keyed.npy'); DS = 1.7
-_HT = {10: 0, 9: 1, 8: 2, 7: 3, 6: 4, 5: 5.4, 4: 7, 3: 8, 2: 9, 1: 10, 0: 11}
+# Clip time (s) at which exactly k hearts are left, measured by counting red pixels in the keyed clip (2026-11-13).
+# The old table (0: 11) stopped on a frame that still shows 1 heart, so the loser's bar never reached 0 in v4.
+_HT = {10: 0, 9: 1.37, 8: 2.37, 7: 3.37, 6: 4.37, 5: 6.37, 4: 7.4, 3: 8.37, 2: 9.37, 1: 10.37, 0: 11.47}
 def hp_ct(t, ev):
     ct = 0.0
     for tt, h0, h1 in ev:
