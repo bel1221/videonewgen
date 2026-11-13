@@ -162,6 +162,56 @@ RIGHT NOW only fix the hand with 2 handed weapons and flowness".
 - **Measured causes** (see CLAUDE.md, Duo 40): the spear and staff were two-handed 0-3 % of the time; `L.guard` holds the left arm
   at [-38, 0, 24] / elbow -64 and the engine multiplied it by 1.25, so every guard-derived pose kept the free hand up at the chest.
 
+## v8x part-by-part review (user, 2026-11-13)
+The user's words on the first full v8x render: "the swords are moving too quickly making it hard for viewer to actually see whats going
+on in the fight, it looks like theyre just swinging their sword around and not clashing with eachother". Then, building it in parts of
+5-8 s: "the fighters on first exchanges are too close to eachother, it makes the sword have no space to actually attack them and sword
+can overlap with player easily", "skid apart also too short", "impact frame should show the actual frame of the sword hitting", and on
+part 1 v2: "the swords are like jittering when theyre raising their sword up for clashing ... i want to see more motions where swords
+are clashing below their head, most of the videos so far all of the fighting are done when the sword is above the players head, re
+position the sword and the player for fightings when the swords are at head level or chest level".
+- **Clashes belong at head or chest level, not above the heads.** Measure the contact height (third number of each `CLASHES` entry;
+  head top = 1.6 blocks, chest about 0.8-1.2). `clash(t, big, kind, { hmin, hmax })` makes the solver keep it in that band.
+- **Space at the hit:** about 2.1 blocks root to root, so the blades meet mid-blade (`{ gap, fwMax }` on the clash). Closer than about
+  1.9 the attacker's forearm reaches the defender's blade.
+- **Measured causes of the jitter** (`anim-test/qa/v8x/jitter_probe.js`, blade direction change per 1/60 s):
+  - the blade-is-solid push-out in `rig2_w.js` is not smoothed in time: a blade near the wielder's own head (the overhead `windR`), the
+    floor or legs (the low sprint carry `SW`), or in the path of the opponent's sword arm gets thrown 60-128 degrees in one frame;
+  - a cut keyed with the `'i'` ease lands in 2 frames, and a parry keyed `'o'` 0.14 s after the defender's own cut whips up in 2 frames.
+- **What worked in part 1:** chest-level poses (wind-back out to the side, a cut that stops in front of the chest, a guard hand at chest
+  height), an even-speed 0.3 s cut, the defender's sword travelling to the guard over the whole gap, hits 0.55 s apart.
+- **Part 2 (same day):** "the fighter gets knocked back only a little and they takes too long to get back into the fight", and "apply
+  fixes in part 1 so u dont have to fix things like that again for future parts apply all the fix each time we finish one".
+  - The part-1 fixes are shared helpers at the top of `fight_w/parts/build_v8x.js`: `hit()` (chest-level cut into a guard, with a
+    half-way key so the blade does not flip mid-swing), `knockTo()` (a 1.4-3 block slide that runs into the next move), `far()`, `SWm`,
+    `midWind` / `midSweep` / `midCut` / `loParry`. Build every later part from these, and fold each part's fixes back into them.
+  - **Root cause of every blade snap over 40 degrees: the push-out has no memory.** Proven with `?nopush=1` (no snaps at all). It is now
+    limited to `PUSHCAP` degrees from the keyed direction (`rig2_w.js`, 14 for `vid=v8x`, 0 = unlimited for older videos); deeper overlaps
+    are blocking errors and still show in `phase_qa.js`.
+  - Blade intent `bd` is blended in a straight line between keys: never key two blade directions more than about 100 degrees apart
+    back to back (wind-back -> cut, cut -> wind-back, high block -> skid); put a key in between.
+  - `qa/v8x/part_check.mjs` does QA + clash distance/height + jitter probe + stills + the part render in one page load.
+- **Footwork (user on part 2 v1): "LEGS not moving wide enough again theres a bunch of small steps that make the movement looks cursed
+  god damn it we fixed this before".** The earlier fix (DRIFT footwork, `assemble_w.py`) only works inside a gait window. Any `at()`
+  travel outside a RUN / WALK / DRIFT window is walked by the reactive planner: one tiny step each time a foot falls 0.17 blocks
+  behind. v8x's choreography (v8's body) never declared any, and parts 1-2 were first rebuilt without them.
+  - First attempt (superseded): per-fighter `step()` gait windows. They hid the problem from the probe more than they fixed it: every
+    window re-planted BOTH feet at once when it began (a hop), took a 0.05-0.25 block first step, and re-planted both again at its end;
+    the first `steps_probe.js` skipped gait-window contacts, so it reported 2 small strides where there were about 10 per fighter.
+  - **Fix that stands (user: "fix the not right part"): STEP PLANNER 2 in `assemble_w.py` (v8x; use it for every new fight).** All
+    ground time outside a sprint, a slide or a jump is stepped automatically, nothing to declare in the build: one foot at a time; a
+    foot steps when it is 0.34 blocks from where the pose wants it (0.24 when coming to rest) or when the feet are about to stand in
+    line / cross in the body frame over the next 0.25 s of turning; it lands where the body WILL be 0.16 s after landing, on its own
+    side of the other foot. Sprints: no entry hop (feet hold until 0.2 s before their first running contact); no double re-plant
+    after a slide. `?oldstep=1` = the old footwork for a before / after.
+  - A move faster than about 3.5 blocks/s still has to be a `RUN` window (`'charge'` keeps the pose's arms).
+  - **Measure with `qa/v8x/steps_probe.js`** (inside `part_check.mjs`): strides under 0.35 blocks (sprint contacts included), contacts
+    under 0.14 s apart (a sprint's cadence and two-footed landings not counted), median stride; and `cross_qa` must read 0.
+  - Planner bugs met on the way, worth knowing: a per-tick "don't plant across" nudge accumulates during a spin unless it is applied
+    to a copy of the planned target (feet flew 2.3 blocks); stepping while the other foot is still on sprint contacts crossed the legs.
+- Work one part at a time and render only that part (`&solve=t0,t1` solves only that window's clashes; the page loads in about 2.5 min
+  instead of 9). Do not re-render before the user asks.
+
 ## Grip rules (user, bolt30 review, 2026-11-11; details in notes §23)
 - **Never force a grip.** If the hands are pulled apart and the weapon is out of reach, the support hand lets go and does
   not re-grab every frame. Applies to every two-handed weapon and to the bow's string hand. Measure with `tools/hand_qa.js`.

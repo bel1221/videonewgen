@@ -196,6 +196,17 @@ The cloud container is wiped when a session ends; only what is pushed to GitHub 
     `QADIR=qa/v8x READY_MS=900000 PAGE=anim-test/fight_w/index_x.html QS="?sub=1&vid=v8x" node render.mjs still 1.5,3.6,7.3,17.3,27.4,29.9,31.6,32.4,34.5,38.5`;
     then phase/cross/weight/freehand QA (`window.__qa_w=['aegisblade','veilblade']`), render `frames 0 1200`, sound with
     `EVF=fight_w/comp/events_v8x.json OUTF=fight_w/comp/audio_v8x.m4a KINDS=sword,sword EXTRA='[{"t":30.73,"kind":"stab"},{"t":31.5,"kind":"pull"},{"t":32.95,"kind":"fall"},{"t":34.0,"kind":"outro"}]' python fight_w/duo_sfx.py`.
+  - **STATUS 2026-11-13 (supersedes the two bullets above): built and reviewed PART BY PART** (user rule: 5 parts of 5-8 s, list
+    problems, fix, render that part silent, wait for review; no re-render until asked). Parts (video s): P1 0-7.9, P2 7.9-15.0,
+    P3 15.0-22.6, P4 22.6-30.3, P5 30.3-40.0. **Parts 1-3 are re-blocked and rendered** (`out/newgen_v8x_part1-3_v1_silent.mp4`,
+    waiting on the user's review); **Parts 4-5 (S9 onward in `build_v8x.js`) are still the old choreography.** Sound not built.
+    Shared fixes so far (details in `notes/fight-animation-standard.md`, "v8x part-by-part review"): shared `hit()` / `knockTo()` /
+    `far()` helpers, chest-level clashes, wide cameras from one side, 2.4-block knock-backs, and automatic stepping (STEP PLANNER 2
+    in `assemble_w.py`; no `step()` calls, moves faster than ~3.5 blocks/s must be RUN windows).
+    Check a part: `PAGE=anim-test/fight_w/index_x.html QS="?sub=1&vid=v8x&solve=0,22.9" EXTRA=qa/v8x/jitter_probe3.js
+    FRAMES="0,678,out/x.mp4" node qa/v8x/part_check.mjs qa/v8x/p3 2.9 22.8 "<still times>"` (about 9 min; `solve=0,0` = footwork
+    only, 1.5 min). The scripts in `qa/v8x/` are force-added to git (the folder is ignored). Last numbers: leg crossing 0, small
+    steps A 5 / B 1, 19 clashes within 0.17 blocks; open: blade snaps of 59 deg at 18.55 s and 51 deg at 13.2 s.
   - Local tools on this PC (not on PATH): `Desktop\mcrefs\tools\node`, `tools\python` (numpy + scipy, no PIL), `tools\ffmpeg\bin`.
 - **NewGen studio (our own animation system)**: `anim-test/studio/` + skill `.claude/skills/newgen-animate`. Prompt ->
   beat script JSON -> contact-first generated motion on rig2 -> render. Demos: `studio/scripts/demo.json` (voxel meadow),

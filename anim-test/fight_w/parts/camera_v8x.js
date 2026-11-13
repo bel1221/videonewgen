@@ -1,12 +1,17 @@
-const INS = [7.1, 17.2];   // two impact inserts only (standard: fewer jumps). 7.1 = the big clash that ends the first exchange
+const INS = [7.0, 17.5];   // two impact inserts only (standard: fewer jumps). 7.0 = the big clash that ends the first exchange
 const FLASH = 30.73, BIND_T = -9, BIND_END = -8, FALL_T = 32.95, FALL_C = 'B', INTRO_END = 2.9, T_OUTRO = 34.0;
 // calmer than v8 (its shots averaged 0.5 s; the user: "fewer half-second camera changes", "scenes being skipped"): about 1 s per shot
 const SHOTS = [
   // part 1 (user, 2026-11-13): the twirl shot pulled back so both players are in frame; the insert sits on the real contact; the skid gets a side shot wide enough for both
-  [0.0, 'est'], [INTRO_END, 'three4'], [4.0, 'side', { d: 7.8, h: 1.3 }], [5.05, 'trackA', { d: 3.8 }], [5.75, 'side', { d: 5.0, h: 1.3 }], [7.1, 'ins'], [7.2, 'side', { d: 7.6, h: 1.4 }],
-  [7.95, 'trackB'], [8.65, 'three4'], [9.85, 'wide', { d: 6.5 }], [10.5, 'trackB', { d: 4 }], [11.0, 'low', { d: 4.6, look: 2.2, roll: 0.05 }], [11.5, 'side', { d: 5.0, h: 1.4 }],
-  [12.9, 'three4'], [14.5, 'wide', { d: 6.8 }], [15.1, 'otsA'], [16.0, 'orbit', { a0: 0.1, a1: 0.8 }], [16.85, 'low', { d: 3.8, look: 1.0, roll: -0.04 }], [17.2, 'ins'], [17.3, 'three4'],
-  [18.0, 'wide', { d: 7.5 }], [18.9, 'trackB', { d: 4.2 }], [19.55, 'low', { d: 4.4, look: 2.0, roll: 0.05 }], [20.4, 'side', { d: 4.6, h: 1.3 }], [21.45, 'wide', { d: 6.5 }],
+  [0.0, 'est'], [INTRO_END, 'three4'], [4.0, 'side', { d: 7.8, h: 1.3 }], [5.05, 'trackA', { d: 3.8 }], [5.75, 'side', { d: 5.0, h: 1.3 }], [7.0, 'ins'], [7.1, 'side', { d: 7.6, h: 1.4 }],
+  // part 2 (user, 2026-11-13): no camera behind a fighter's back ('three4' put A's back over both spin cuts and the overhead), no run
+  // of 0.5 s shots (9.85-11.5 had four), wide enough for the long knock-backs. Side-on shots show both swords.
+  [7.95, 'trackB', { d: 4.4 }], [8.7, 'side', { d: 5.8, h: 1.3 }], [9.9, 'side', { d: 7.8, h: 1.4 }], [10.5, 'trackB', { d: 4.4 }], [11.0, 'low', { d: 4.8, look: 2.2, roll: 0.05 }], [11.6, 'side', { d: 6.0, h: 1.4 }],
+  [13.35, 'side', { d: 7.0, h: 1.4 }],
+  // part 3 (2026-11-13): no over-the-shoulder shot (it sat inside A's back), no orbit behind B; six shots in 7.6 s, all from the same
+  // side of the fighters' line, wide enough for the 2.4-block knock-backs
+  [15.1, 'side', { d: 6.2, h: 1.4 }], [16.4, 'low', { d: 5.2, look: 2.0, roll: 0.04 }], [17.5, 'ins'], [17.6, 'side', { d: 7.4, h: 1.4 }],
+  [19.05, 'low', { d: 5.4, look: 2.4, roll: 0.05 }], [20.1, 'side', { d: 6.6, h: 1.4 }],
   [23.0, 'otsB'], [23.9, 'side', { d: 4.4, h: 1.3 }], [24.7, 'wide', { d: 8.5 }], [25.4, 'trackA', { d: 4.2 }], [25.85, 'side', { d: 4.8, h: 1.3 }],
   [26.8, 'low', { d: 3.3, look: 1.5, roll: 0.05 }], [27.5, 'three4'], [28.4, 'wide', { d: 8 }], [29.75, 'trackA', { d: 4.4 }], [30.25, 'low', { d: 5.0, look: 1.6, roll: -0.05 }],
   [FLASH, 'flash'], [FLASH + 3 * DT, 'pierce'], [31.6, 'side', { d: 4.6, h: 1.2 }], [32.5, 'wide', { d: 7 }], [33.6, 'orbit', { a0: 0.3, a1: 0.62, d: 6.5, h: 1.6 }],

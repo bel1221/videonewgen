@@ -119,19 +119,23 @@ s = rep(s, "    const sw = clamp((t1 - 0.12 - t) / 0.2), rb = runBody(phi, cp(p)
 # stayed put and the body glided. Now every DRIFT window is a gait window too ('strafe': stride 1.15, wide 0.21 side stance, lift 0.2).
 s = rep(s, "  for (const [t0, t1, kind] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk'])]) {\n"
            "    const WK = kind === 'walk', STR = WK ? 0.95 : STRIDE, SWH = WK ? 0.12 : 0.5, STF = WK ? 0.55 : 0.22, BOB = WK ? 0.008 : 0.025;",
-           "  for (const [t0, t1, kind] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk']), ...DRIFT.map(w => [w[0], w[1], 'strafe'])]) {\n"
-           "    const WK = kind === 'walk', SF = kind === 'strafe', STR = SF ? 1.15 : WK ? 0.95 : STRIDE, SWH = SF ? 0.2 : WK ? 0.12 : 0.5, STF = SF ? 0.4 : WK ? 0.55 : 0.22,\n"
+           # v8x 2026-11-13 (user: "LEGS not moving wide enough again theres a bunch of small steps ... we fixed this before"): a DRIFT entry may
+           # carry its own stride and fighter, [t0, t1, mode, speed, stride, who], so a build can give ONE fighter a stepping window with no
+           # drift at all (speed 0). Any travel outside a RUN / WALK / DRIFT window falls back to the reactive planner = tiny steps.
+           "  for (const [t0, t1, kind, strd] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk']), ...DRIFT.filter(w => !w[5] || w[5] === c).map(w => [w[0], w[1], 'strafe', w[4]])]) {\n"
+           "    const WK = kind === 'walk', SF = kind === 'strafe', STR = SF ? (strd || 1.15) : WK ? 0.95 : STRIDE, SWH = SF ? 0.2 : WK ? 0.12 : 0.5, STF = SF ? 0.4 : WK ? 0.55 : 0.22,\n"
            "      BOB = SF ? 0.012 : WK ? 0.008 : 0.025, LAT = SF ? 0.21 : 0.15, FWD = SF ? 0.12 : 0.28;")
 s = rep(s, "        con.push({ i, f, p: [root[i][0] + fx * 0.28 + side * 0.15 * lx, root[i][1] + fz * 0.28 + side * 0.15 * lz] });",
            "        con.push({ i, f, p: [root[i][0] + fx * FWD + side * LAT * lx, root[i][1] + fz * FWD + side * LAT * lz] });")
 s = rep(s, "return { i, f, p: [root[i][0] + fx * 0.28 + side * 0.15 * lx, root[i][1] + fz * 0.28 + side * 0.15 * lz] }; };",
            "return { i, f, p: [root[i][0] + fx * FWD + side * LAT * lx, root[i][1] + fz * FWD + side * LAT * lz] }; };")
-s = rep(s, "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) ||", "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) || inWin(DRIFT, i / HZ) ||")
+s = rep(s, "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) ||", "const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) || inWin(DRIFT.filter(w => !w[5] || w[5] === c), i / HZ) ||")
 s = rep(s, "  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]]; }",
            "  { const o = c === 'A' ? 'B' : 'A', ro = samp(SIM[o].root, t); p.opp = [ro[0], W.floorAt(ro[0], ro[1]), ro[1]];\n"
            "    const ob = basePose(o, t), pitch = ((ob.waist[0] || 0) + (ob.chest[0] || 0) * 0.6) * Math.PI / 180, oy = ob.yaw * Math.PI / 180, lean = Math.sin(pitch) * 0.95;\n"
            "    p.oppLean = [Math.sin(oy) * lean, 0, Math.cos(oy) * lean, yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9];   // opponent chest/head offset for the weapon collision\n"
            "    p.oppArms = oppArmPts(ob, ro, p.oppLean);\n"
+           "    if (CLASHES.some(cl => cl.gap && t > cl.t - 0.42 && t < cl.t + 0.26)) p.oppArms = null;   // spaced clashes (v8x part 1, 2026-11-13): the attacker's sword arm sweeps past the guard blade and this un-smoothed push-out threw the blade 100+ deg per frame = jitter\n"
            "    p.oppFeet = ['r', 'l'].map(s => { const f = samp(SIM[o][s], t); return f ? [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.05, f[2]] : null; });   // opponent legs for the weapon collision\n"
            "    { let k = 1; for (const cl of CLASHES) k = Math.min(k, clamp((Math.abs(t - cl.t) - 0.08) / 0.14)); p.oppFeetK = k; }   // eased off around clashes so the clash solve stays exact\n"
            "  }")
@@ -173,5 +177,47 @@ function freeArm(c, t, p) {
   p[arm] = [lerp(p[arm][0], px, w), p[arm][1] * (1 - w), lerp(p[arm][2], sg * pz, w)]; p[elb] = [lerp(p[elb][0], el, w), 0, 0];
 }
 function poseRaw(c, t) {""")
+# ---- STEP PLANNER 2 (v8x, 2026-11-13; user: "LEGS not moving wide enough again theres a bunch of small steps that make the movement looks
+# cursed ... we fixed this before", then "fix the not right part"). Measured causes in the old footwork (qa/v8x/steps_probe.js):
+#   - outside a gait window the planner stepped whenever a foot fell 0.17 blocks behind -> strides of 0.2-0.5 blocks;
+#   - every gait window (run or step) re-planted BOTH feet at the same instant when it began (a hop, contacts 0.00-0.02 s apart), took a
+#     0.05-0.25 block "first contact" step, and both feet were re-planted again when it ended and after every slide (0.07 s apart).
+# Now, for ALL ground time outside a sprint, a slide or a jump (nothing to declare in the build): one foot at a time, a foot steps only
+# when it is 0.34 blocks from where the pose wants it (0.24 when the fighter is coming to rest), and it lands where the body WILL be
+# 0.16 s after the landing (the root path is known ahead), so a step is 0.4-1.0 blocks. Sprints: the feet hold until 0.2 s before their
+# first running contact instead of both hopping. ?oldstep=1 = the old footwork, for before / after measurements.
+if vid == 'v8x':
+    s = rep(s, "function runGait(c, root, rawXZ, N, rawP) {", "const STEP2 = !QS_.has('oldstep'), HOLD = { hold: true };\nfunction runGait(c, root, rawXZ, N, rawP) {")
+    s = rep(s, "    { const mk = (i, f) => {", "    if (!STEP2) { const mk = (i, f) => {")
+    s = rep(s, "      if (cs.length) for (let i = i0; i < cs[0].i; i++) g[f][i] = { swingTo: cs[0].p, from: i0, to: cs[0].i };",
+               "      if (cs.length) { let is0 = i0; if (STEP2) { is0 = Math.max(i0, cs[0].i - Math.round(0.2 * HZ)); for (let i = i0; i < is0; i++) if (Math.hypot(root[i][0] - root[i0][0], root[i][1] - root[i0][1]) > 0.4) { is0 = i; break; } }\n"
+               "        for (let i = i0; i < cs[0].i; i++) g[f][i] = i < is0 ? HOLD : { swingTo: cs[0].p, from: is0, to: cs[0].i }; }")
+    s = rep(s, "        if (gv !== undefined && !air) {\n          if (Array.isArray(gv)) {",
+               "        if (gv !== undefined && !air && !(gv.hold && step[f])) {\n"
+               "          if (gv.hold) { if (!feet[f]) feet[f] = [root[i][0], root[i][1]]; out.push([feet[f][0], 0, feet[f][1]]); continue; }\n"
+               "          if (Array.isArray(gv)) {")
+    s = rep(s, "rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, root, rawXZ, N, raw[c]), entry = {};",
+               "rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, root, rawXZ, N, raw[c]), entry = {};\n"
+               "    const Dat = (j, f) => { j = Math.max(0, Math.min(N - 1, j)); const q = raw[c][j], ya = q.yaw * Math.PI / 180, cy = Math.cos(ya), sy = Math.sin(ya),\n"
+               "        off = legFK(f === 'r' ? q.rLeg : q.lLeg, f === 'r' ? q.rKnee : q.lKnee, f === 'r' ? -2 : 2, q.wide ?? 1), lx = off[0] / 16, lz = off[1] / 16;\n"
+               "      return [root[j][0] + lx * cy + lz * sy, root[j][1] - lx * sy + lz * cy]; };   // where the pose wants this foot at index j\n"
+               "    const yawAt = j => raw[c][Math.max(0, Math.min(N - 1, j))].yaw * Math.PI / 180;\n"
+               "    const step2 = (i, f, o) => { const t = i / HZ, A = Math.round(0.1 * HZ), a = Dat(i + A, f), e = Math.hypot(feet[f][0] - a[0], feet[f][1] - a[1]), sg = f === 'l' ? 1 : -1;\n"
+               "      if (t - lastStep[f] < 0.1 || (G[o][i] !== undefined && !G[o][i].hold)) return null;   // not while the other foot is still on its sprint contacts\n"
+               "      const ref = step[o] ? step[o].to : feet[o]; let gmin = 9;                               // lateral gap to the other foot in the body frame, now and over the next 0.25 s of turning\n"
+               "      if (ref) for (const k of [0, 0.12, 0.25]) { const y = yawAt(i + Math.round(k * HZ)); gmin = Math.min(gmin, sg * ((feet[f][0] - ref[0]) * Math.cos(y) - (feet[f][1] - ref[1]) * Math.sin(y))); }\n"
+               "      const need = gmin < 0.1;                                                                // about to stand in line or crossed: this foot has to move even if it is close to its place\n"
+               "      if (step[o]) { if ((t - step[o].t0) / step[o].dur < 0.6 || (e < 0.55 && !need)) return null; } else if (t - lastStep[o] < 0.06 && e < 0.55 && !need) return null;   // one foot at a time unless it is far behind\n"
+               "      const ao = feet[o] && !step[o] ? Dat(i + A, o) : null, eo = ao ? Math.hypot(feet[o][0] - ao[0], feet[o][1] - ao[1]) : 0;\n"
+               "      const j4 = Math.min(N - 1, i + Math.round(0.4 * HZ)), rest = Math.hypot(root[j4][0] - root[i][0], root[j4][1] - root[i][1]) < 0.12;\n"
+               "      if ((!need && e < (rest ? 0.24 : 0.34)) || eo > e + 0.02) return null;                    // the foot that is further off goes first\n"
+               "      const dur = need ? 0.16 : Math.max(0.18, Math.min(0.3, 0.16 + 0.16 * e)), jd = Math.min(N - 1, i + Math.round(dur * HZ)), jl = i + Math.round((dur + 0.16) * HZ); let to = Dat(jl, f);\n"
+               "      const dx = to[0] - root[jd][0], dz = to[1] - root[jd][1], dd = Math.hypot(dx, dz); if (dd > 0.6) to = [root[jd][0] + dx / dd * 0.6, root[jd][1] + dz / dd * 0.6];\n"
+               "      if (ref) for (const j of [jd, jl]) { const y = yawAt(j), lx = Math.cos(y), lz = -Math.sin(y), s2 = (to[0] - ref[0]) * lx + (to[1] - ref[1]) * lz; if (sg * s2 < XMIN + 0.03) { const k = sg * (XMIN + 0.03) - s2; to = [to[0] + lx * k, to[1] + lz * k]; } }   // land on its own side\n"
+               "      return { from: feet[f].slice(), to, t0: t, dur, h: Math.min(0.3, 0.1 + 0.22 * Math.hypot(to[0] - feet[f][0], to[1] - feet[f][1])), fix: true, to0: to.slice() }; };")
+    s = rep(s, "        if (i > 0 && inWin(SLIDES[c], (i - 1) / HZ) && feet[f] && rec[f] == null) rec[f]", "        if (!STEP2 && i > 0 && inWin(SLIDES[c], (i - 1) / HZ) && feet[f] && rec[f] == null) rec[f]")
+    s = rep(s, "          if (u < 0.85) s_.to = [", "          if (s_.fix) s_.to = s_.to0.slice(); else if (u < 0.85) s_.to = [")
+    s = rep(s, "        if (crossed || (err > 0.17 && rested", "        const st2 = STEP2 ? step2(i, f, o) : null; if (st2) step[f] = st2; else if (STEP2 ? crossed : crossed || (err > 0.17 && rested")
+    s = rep(s, "    const forced = i => inWin(RUN[c], i / HZ) ||", "    const forced = i => STEP2 || inWin(RUN[c], i / HZ) ||")
 open(f'fight_w/choreo_{vid}.js', 'w', encoding='utf-8').write(s)
 print(f'fight_w/choreo_{vid}.js', len(s), 'chars')

@@ -128,6 +128,7 @@ const VARS = ['ax', 'az', 'el', 'wr', 'ba', 'ch', 'fw'];
 // in and reach further but never pushes the two bodies into each other. ?wide=0 restores the v4 limits.
 const WIDE = +(params.get('wide') ?? 1), LIM0 = { ax: 60, az: 60, el: 50, wr: 50, ba: 70, ch: 45, fw: 1.2 }, LIM3 = { ax: 80, az: 80, el: 65, wr: 75, ba: 100, ch: 55, fw: 0 };
 const GAP_MIN = 0.78;   // root-to-root; capsules are 0.32 each, + a little air
+function contactY(t) { const [a0, a1] = blade('A', t, cast.A.cseg), [b0, b1] = blade('B', t, cast.B.cseg); return segClosest(a0, a1, b0, b1).mid.y; }
 function bodyGap(t) { const a = C.pose('A', t).pos, b = C.pose('B', t).pos; return Math.hypot(a[0] - b[0], a[2] - b[2]); }
 const SOL = {};
 // user, v8x part-1 review 2026-11-13 ("too close to eachother ... sword have no space"): a clash may carry its own spacing,
@@ -157,7 +158,8 @@ for (let passN = 0; passN < NPASS; passN++) {
     const [eA, eB] = SOL[cl.t];
     // a spaced clash reaches with the ARMS (the wide limits from the first pass on) instead of stepping the bodies together
     const LIMc = cl.gap ? { ...LIM3, fw: passN === 2 ? 0 : (cl.fwMax ?? 0.3) } : LIM;
-    const f = () => bladeDist(cl.t) + 0.0003 * VARS.reduce((s, v) => s + (v === 'fw' ? 400 : 1) * (eA[v] * eA[v] + eB[v] * eB[v]), 0) + 6 * Math.max(0, (cl.gap ?? GAP_MIN) - bodyGap(cl.t));
+    const f = () => bladeDist(cl.t) + 0.0003 * VARS.reduce((s, v) => s + (v === 'fw' ? 400 : 1) * (eA[v] * eA[v] + eB[v] * eB[v]), 0) + 6 * Math.max(0, (cl.gap ?? GAP_MIN) - bodyGap(cl.t))
+      + (cl.hmax != null ? 1.5 * Math.max(0, contactY(cl.t) - FLOOR - cl.hmax) : 0) + (cl.hmin != null ? 1.5 * Math.max(0, FLOOR + cl.hmin - contactY(cl.t)) : 0);   // user 2026-11-13: clashes at head / chest level, not above the heads
     let best = f();
     if (passN === 2 && bladeDist(cl.t) < 0.12) continue;            // already touching
     for (const step of passN && !cl.gap ? [4, 2, 1, 0.5] : [16, 8, 4, 2, 1, 0.5]) for (let pass = 0; pass < 8; pass++) { let imp = false;

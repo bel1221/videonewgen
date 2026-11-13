@@ -5,6 +5,8 @@
 // foot targets (feet stay planted, nothing sinks into the floor); arms/torso by FK angles.
 // Units inside the rig: pixels (char = 32 px tall); the mesh is scaled 1/16 so 1 block = 1 unit.
 import * as THREE from 'three';
+const NOPUSH = typeof location !== 'undefined' && new URLSearchParams(location.search).has('nopush');
+const PUSHCAP = typeof location === 'undefined' ? 0 : +(new URLSearchParams(location.search).get('pushcap') ?? (new URLSearchParams(location.search).get('vid') === 'v8x' ? 14 : 0));   // degrees; 0 = unlimited (every video before v8x)
 const D2R = Math.PI / 180, PX = 1 / 16;
 // blade twist in the fist (about the blade's own axis): 90 deg turns the flat of the blade to face sideways, edge leading
 export let TWIST = Math.PI / 2; export function setTwist(deg) { TWIST = deg * D2R; }
@@ -271,7 +273,8 @@ export function applyPose(ch, P) {
       const F_ = new THREE.Vector3(...f), H_ = new THREE.Vector3(P.opp[0] + (f[0] - P.opp[0]) * 0.25, P.opp[1] + 0.72, P.opp[2] + (f[2] - P.opp[2]) * 0.25);
       if ((P.oppFeetK ?? 1) > 0.02) opp.push({ a: F_, b: H_, r: 0.17 * (P.oppFeetK ?? 1) }); }
     const closest = (p, a, bb) => { const ab = bb.clone().sub(a), L2 = ab.lengthSq(); const u = L2 > 1e-9 ? Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / L2)) : 0; return cl.copy(a).addScaledVector(ab, u); };
-    for (let it = 0; it < 44; it++) {
+    const d0_ = d.clone();
+    for (let it = 0; it < (NOPUSH ? 0 : 44); it++) {   // ?nopush=1 (diagnosis only): is a blade snap the push-out or the keys?
       ch.root.updateMatrixWorld(true); let hit = false;
       for (const a of ch.wspan) {
         ch.weapon.localToWorld(pt.set(0, a, 0));
@@ -283,6 +286,10 @@ export function applyPose(ch, P) {
       }
       if (!hit) break; d.normalize(); aim(d);
     }
+    // PUSHCAP (v8x, 2026-11-13): the push-out has no memory, so a blade that is deep in an obstacle on one frame and clear on the next is
+    // thrown 60-170 deg in 1/60 s (measured: every snap over 40 deg vanished with ?nopush=1). The correction is limited to PUSHCAP degrees
+    // away from the keyed direction; what is left over is a choreography error to fix in the blocking (phase_qa.js still reports it).
+    if (PUSHCAP > 0) { const ang = d.angleTo(d0_), cap = PUSHCAP * D2R; if (ang > cap) { const q = new THREE.Quaternion().setFromUnitVectors(d0_, d.clone().normalize()); d.copy(d0_).applyQuaternion(new THREE.Quaternion().slerp(q, cap / ang)).normalize(); aim(d); } }
     ch.bladeContact = !!(ch.floorAt) && (() => { ch.weapon.localToWorld(pt.set(0, ch.seg[ch.seg.length - 1], 0)); return pt.y < ch.floorAt(pt.x, pt.z) + 0.08; })();
   }
   // two-handed weapons: the left hand rides the shaft at ch.lh px along the weapon

@@ -301,6 +301,37 @@ function buildAll() {
   const blk = (def, t0, t1, name, d1 = {}, d2 = {}, e0 = 'o') => { const b0 = { ...D[def] }; K(def, t0, L[name], e0, d1); K(def, t1, L[name], 'lin', d2);
     const k2 = T[def][T[def].length - 1], k1 = T[def][T[def].length - 2]; PARRY.push({ t: t1, def, apply: n => { k1[1] = S(L[n], { ...b0, ...d1 }); k2[1] = S(L[n], { ...b0, ...d2 }); } }); };
   const ex = (att, def, t, s, big = false, wind = 0.16) => { const [w, sl, pa] = STRIKE[s]; wind = Math.max(wind, 0.22); /* medium swords: a real wind-up (weight class) */ K(att, t - wind, L[w], 'o'); K(att, t, L[sl], 'i'); blk(def, t - wind + 0.02, t, pa, {}, s === 'T' ? { waist: [10, 0, -18] } : {}); clash(t, big); };
+  // ================= SHARED sword work (user reviews 2026-11-13; every part built from here on uses these) =================
+  // What part 1 taught, measured with qa/v8x/part_check.mjs + jitter_probe.js (rules in notes/fight-animation-standard.md):
+  //   - hits about 2.1 blocks apart so the blades meet mid-blade, clashes at head / chest level (never above the heads);
+  //   - the sword stays beside and in front of the body: the overhead wind-up, a forward-leaning guard and the low sprint carry all
+  //     sat inside the blade-is-solid push-out and were thrown 60-128 deg in one frame (the jitter);
+  //   - a cut is one even-speed 0.3 s sweep that stops ON the guard; the defender's sword travels to the guard over the whole gap;
+  //   - hits 0.5 s or more apart; a knock-back is a real slide (1.4-3 blocks) that runs straight into the next move, never a wait.
+  const far = (o = {}) => Object.assign(CLASHES[CLASHES.length - 1], { gap: 1.4, fwMax: 0.2, hmin: 0.95, hmax: 1.45, ...o });   // spacing + contact height for the clash just keyed
+  const SWm = { rArm: [-10, 0, -20], rElbow: [-62, 0, 0], bd: bdv(28, -18) };                               // run carry: sword at the hip pointing forward-up
+  const midWind = S(L.windR, { rArm: [-72, 0, -72], rElbow: [-58, 0, 0], bd: bdv(16, -128) });            // drawn back to the right side at chest height
+  const midCut = S(L.slashR, { rArm: [-82, 0, 18], rElbow: [-16, 0, 0], bd: bdv(12, 38) });               // the cut stops in front of the chest, on the guard
+  const loParry = S(L.parryL, { rArm: [-42, 0, 46], rElbow: [-76, 0, 0], bd: bdv(68, 34) });              // guard: hand at chest height close to the body, blade upright
+  // hit(att, def, t, big, { wind, da, dd, meta }): a chest-level cut into a guard at time t. Key both roots about 2.1 blocks apart at t.
+  // The blade intent (bd) is blended as a straight line between keys, so two keys pointing nearly opposite ways (wind-back -> cut is
+  // 166 deg) do all their turning in the middle of the segment: 80-150 deg in 1/60 s (measured, part 2). So the cut gets a half-way key
+  // (midSweep), and an attacker coming straight from his own cut passes through the guard first ({ rec: true }).
+  const midSweep = S(L.slashR, { rArm: [-78, 0, -28], rElbow: [-36, 0, 0], chest: [6, 4, 0], waist: [8, 2, 0], bd: bdv(14, -46) });
+  const hit = (att, def, t, big = false, o = {}) => { const wind = o.wind ?? 0.3; if (o.rec) K(att, t - wind - 0.14, loParry, 'io', o.da);
+    K(att, t - wind, midWind, 'io', o.da); K(att, t - wind * 0.5, midSweep, 'lin', o.da); K(att, t, midCut, 'lin', o.da);
+    K(def, t - 0.08, loParry, 'io', o.dd); K(def, t, loParry, 'lin', o.dd); clash(t, big); far(o.meta); };
+  // knockTo(c, t, x, z, dur, rest): c is thrown back from a hit at t and slides to (x, z) over dur seconds with sand spray; rest = false
+  // when the next move (a sprint) starts straight out of the slide.
+  // step(c, t0, t1, stride): c travels on REAL steps between t0 and t1 (a stepping-gait window; stride = blocks per right + left step).
+  // user, 2026-11-13: "LEGS not moving wide enough again theres a bunch of small steps that make the movement looks cursed ... we fixed
+  // this before". The fix existed (assemble_w.py, DRIFT footwork) but only inside gait windows: any travel keyed with at() OUTSIDE a
+  // RUN / WALK / step window is walked by the reactive planner, one tiny step each time a foot falls 0.17 blocks behind.
+  // Since the "fix the not right part" round the stepping is AUTOMATIC (assemble_w.py, STEP PLANNER 2): all ground travel outside a
+  // sprint (RUN), a slide (knockTo / slide) or a jump is walked on real steps, one foot at a time. Nothing to declare here; a move
+  // faster than about 3.5 blocks/s still has to be a RUN window. Check with qa/v8x/steps_probe.js (part_check.mjs prints it).
+  const knockTo = (c, t, x, z, dur = 0.55, rest = true) => { at(c, t + dur, x, z, 'o'); K(c, t + 0.1, L.hitBack, 'io'); K(c, t + 0.26, L.skid, 'io'); K(c, t + dur - 0.05, L.skid, 'lin');
+    if (rest) K(c, t + dur + 0.12, G, 'io'); slide(c, W8(t + 0.12), W8(t + dur)); };
   // ================= S1 0-2.4  sword skill: both twirl their swords, B points the blade at A =================
   at('A', 0, -3.4, 0); at('A', 2.15, -3.4, 0); at('B', 0, 3.4, 0); at('B', 2.2, 3.4, 0);
   K('A', 0, L.relaxed); K('A', 0.28, L.twirlS, 'io'); K('A', 1.0, L.twirlS, 'lin'); K('A', 1.18, G, 'o'); K('A', 1.9, G, 'io');
@@ -311,90 +342,102 @@ function buildAll() {
   // ================= S2 2.15-5.0  sprint in, exchange while strafing sideways, big clash, both skid apart ==========
   // user, part-1 review 2026-11-13: "fighters on first exchanges are too close ... sword have no space", "skid apart also too short",
   // swords too quick to read -> a 1.6-block gap held at every hit (was 1.2 keyed, about 0.9 after the solver stepped them in; 2.0 was measured too far for the blades to meet), 3 cuts 0.42 s apart with 0.3 s wind-ups (was 4 at 0.35 s), a longer skid with sand spray
-  sprint('A', 2.15, 2.72, [-3.4, 0], [-0.95, 0.2]); sprint('B', 2.2, 2.72, [3.4, 0], [0.94, -0.1]);
-  K('A', 2.15, L.crouch, 'io', SW); K('A', 2.55, L.guard, 'lin', SW); K('B', 2.22, L.crouch, 'io', SW); K('B', 2.5, L.guard, 'lin', SW);
+  sprint('A', 2.15, 2.72, [-3.4, 0], [-1.05, 0.2]); sprint('B', 2.2, 2.72, [3.4, 0], [1.05, -0.1]);
+  K('A', 2.15, L.crouch, 'io', SWm); K('A', 2.55, L.guard, 'lin', SWm); K('B', 2.22, L.crouch, 'io', SWm); K('B', 2.5, L.guard, 'lin', SWm);
   // per-hit distances are the ones measured to let the blades meet (clash distance 0-0.13 blocks): 1.9 for a cut from range, 1.5 for the close reply
-  const S2 = [[2.95, -0.95, 0.6, 0.94, 0.5], [3.38, -0.75, 1.3, 0.72, 1.2], [3.8, -0.94, 2.0, 0.95, 1.9], [4.2, -0.94, 2.7, 0.94, 2.62]];
+  // user, part-1 v2 review 2026-11-13: "the swords are like jittering when theyre raising their sword up for clashing" and "i want to see
+  // more motions where swords are clashing below their head ... at head level or chest level".
+  // Measured (qa/v8x/jitter_probe.js): the blade direction snapped 45-125 deg in 1/60 s - the cut ('i' ease) landed in 2 frames, and the
+  // defender's sword whipped up to its parry in 2 frames ('o' ease, 0.14 s) right after its own cut; every clash was 1.9-2.3 blocks up
+  // (head top = 1.6). So here: 3 hits 0.55 s apart, a smooth wind-back, an even-speed 0.3 s cut that stops ON the parry, the defender's
+  // sword travelling to a LOW parry over the whole gap, and a ceiling on the contact height (hmax, the solver keeps the blades under it).
+  // 2.1 blocks apart: the blades meet mid-blade. Closer (1.5-1.9) the attacker's forearm reached the defender's blade and the
+  // blade-is-solid push-out threw that blade 127 deg in one frame (measured).
+  const S2 = [[3.0, -1.05, 0.6, 1.05, 0.5], [3.55, -1.05, 1.5, 1.05, 1.4], [4.1, -1.05, 2.5, 1.05, 2.4]];
   for (const [t, ax, az, bx, bz] of S2) { at('A', t, ax, az, 'io'); at('B', t, bx, bz, 'io'); }
-  const far = () => Object.assign(CLASHES[CLASHES.length - 1], { gap: 1.4, fwMax: 0.08 });   // keep the bodies apart at the hit: the blades meet between them
-  ex('B', 'A', 2.95, 'R', false, 0.32); far(); ex('A', 'B', 3.38, 'R', false, 0.3); far(); ex('B', 'A', 3.8, 'R', false, 0.3); far();
-  ex('A', 'B', 4.2, 'R', true, 0.3); far();   // the big one (impact insert): a full cut into a parry, both thrown back
+  hit('B', 'A', 3.0); hit('A', 'B', 3.55); hit('B', 'A', 4.1, true);   // the last one is the big one (impact insert): both thrown back
   at('A', 4.95, -3.2, 3.1, 'o'); at('B', 4.95, 3.1, 2.8, 'o');
-  K('A', 4.34, L.skid, 'o'); K('A', 4.86, L.skid, 'lin'); K('A', 5.0, G, 'io'); K('B', 4.34, L.skid, 'o'); K('B', 4.86, L.skid, 'lin'); K('B', 5.0, G, 'io');
-  slide('A', W8(4.36), W8(4.9)); slide('B', W8(4.36), W8(4.9));
-  // ================= S3 5.0-7.4  B rushes with a flat cut, A ducks and slips past, spins twice, rising cut =========
+  K('A', 4.42, L.skid, 'io'); K('A', 4.86, L.skid, 'lin'); K('A', 5.0, G, 'io'); K('B', 4.42, L.skid, 'io'); K('B', 4.86, L.skid, 'lin'); K('B', 5.0, G, 'io');   // eased into the skid pose: on a hard 'o' at 4.26 the blade whipped 74 deg in 1/60 s off the clash
+  slide('A', W8(4.28), W8(4.9)); slide('B', W8(4.28), W8(4.9));
+  // ================= S3 5.0-7.5  B rushes with a flat cut, A ducks and slips past, ONE spin cut, a big cut; B is thrown 3 blocks back =========
+  // part 2 (user, 2026-11-13): "the fighter gets knocked back only a little and they takes too long to get back into the fight" ->
+  // longer knock-backs that run straight into the next attack, no standing waits. Was: two spin cuts 0.33 s apart from 0.9 blocks
+  // (both missed by 0.6), a rising cut, a 2-block knock-back and 0.6 s of both standing.
   RUN.B.push([5.05, 5.45]); at('B', 5.05, 3.1, 2.8); at('B', 5.5, 0.55, 2.6, 'lin'); at('B', 5.8, 0.15, 2.65, 'o');
-  K('B', 5.05, L.crouch, 'io', SW); K('B', 5.35, L.guard, 'lin', SW); K('B', 5.45, L.windL, 'o'); K('B', 5.62, L.slashL, 'i'); K('B', 5.85, L.skid, 'o'); K('B', 6.0, G, 'io');
-  at('A', 5.05, -3.2, 3.1); at('A', 5.62, -0.25, 3.62, 'lin'); at('A', 5.95, 1.6, 2.45, 'o');
-  K('A', 5.25, G); K('A', 5.45, L.duck, 'o'); K('A', 5.75, L.duck, 'lin'); K('A', 5.92, L.skid, 'o');
-  K('A', 6.03, L.spin, 'lin', { yawOff: -200 }); K('A', 6.15, L.slashR, 'i', { yawOff: -360 }); D.A = { yawOff: -360 };
-  blk('B', 6.0, 6.15, 'parryL'); clash(6.15);
-  K('A', 6.33, L.spin, 'lin', { yawOff: -560 }); K('A', 6.48, L.slashR, 'i', { yawOff: -720 }); D.A = { yawOff: -720 };
-  blk('B', 6.32, 6.48, 'parryL', { y: -0.2 }); clash(6.48);
-  K('A', 6.64, L.upperW, 'o'); K('A', 6.85, L.upper, 'i'); blk('B', 6.68, 6.85, 'parryR', {}, { y: -0.3 }); clash(6.85, true);
-  at('A', 6.15, 1.02, 2.5, 'io'); at('A', 6.48, 1.0, 2.5, 'io'); at('A', 6.85, 0.6, 2.5, 'o'); at('A', 7.15, 1.0, 2.5, 'o');
-  at('B', 6.15, 0.08, 2.7, 'io'); at('B', 6.48, -0.25, 2.7, 'io'); at('B', 6.85, -0.62, 2.65, 'o'); at('B', 7.35, -2.6, 2.8, 'o');
-  K('A', 7.05, G, 'io'); K('B', 6.98, L.hitBack, 'o'); K('B', 7.08, L.skid, 'o'); K('B', 7.35, L.skid, 'lin'); K('B', 7.5, G, 'io');
-  // ================= S4 7.5-9.6  B sprints and leaps into an aerial spinning overhead; A blocks and is driven back ==
-  RUN.B.push([7.65, 8.0]); at('B', 7.65, -2.6, 2.8); at('B', 8.06, -0.95, 2.6, 'lin'); at('B', 8.5, 0.05, 2.55, 'lin'); at('B', 8.62, 0.15, 2.55, 'o');
-  at('A', 8.3, 1.3, 2.5); at('A', 8.5, 1.35, 2.5); at('A', 9.0, 2.6, 2.4, 'o');
-  K('B', 7.65, L.crouch, 'io', SW); K('B', 7.95, L.crouch, 'o', { y: -0.4 }); K('B', 8.08, L.takeoff, 'o', { y: 0.9 });
-  K('B', 8.3, L.spin, 'lin', { y: 1.6, yawOff: -180 }); K('B', 8.5, L.slashO, 'i', { y: 0.6, yawOff: -360 }); D.B = { yawOff: -360 };
+  K('B', 5.05, L.crouch, 'io', SWm); K('B', 5.2, L.guard, 'lin', SWm); K('B', 5.26, midWind, 'io'); K('B', 5.38, midSweep, 'lin'); K('B', 5.5, midCut, 'lin'); K('B', 5.85, L.skid, 'io'); K('B', 6.0, G, 'io');   // the cut lands at 5.5, while A is still out of reach (at 5.62 it ran 2 px through the ducking A)
+  // A slips past 1.6 blocks wide of B (0.9 before: B's cut and A's sword were pushed out of each other's bodies, 150 deg in a frame)
+  at('A', 5.05, -3.2, 3.1); at('A', 5.62, -0.25, 4.2, 'lin'); at('A', 6.0, 2.0, 2.45, 'o');
+  RUN.A.push([5.08, 5.9, 'charge']);   // 5.6 blocks in under a second is a run, not a shuffle (it had no gait window at all)
+  K('A', 5.25, G); K('A', 5.45, L.duck, 'o'); K('A', 5.75, L.duck, 'lin'); K('A', 5.95, L.skid, 'o');
+  K('A', 6.12, L.spin, 'lin', { yawOff: -190 }); K('A', 6.34, midCut, 'lin', { yawOff: -360 }); D.A = { yawOff: -360 };
+  K('B', 6.26, loParry, 'io'); K('B', 6.34, loParry, 'lin'); clash(6.34); far();
+  at('A', 6.34, 2.0, 2.5, 'io'); at('B', 6.34, -0.1, 2.7, 'io');
+  at('A', 6.88, 1.75, 2.5, 'io'); at('B', 6.88, -0.35, 2.68, 'io'); hit('A', 'B', 6.88, true, { rec: true });
+  knockTo('B', 6.88, -3.7, 2.8, 0.62, false);
+  K('A', 7.12, G, 'io'); at('A', 7.2, 1.75, 2.5);
+  // ================= S4 7.6-9.4  B sprints straight out of the slide and leaps into an aerial spinning overhead; A blocks and is driven back; B follows with a cut ==
+  RUN.B.push([7.6, 8.02]); at('B', 7.6, -3.7, 2.8); at('B', 8.06, -0.65, 2.6, 'lin'); at('B', 8.5, 0.35, 2.55, 'lin'); at('B', 8.62, 0.45, 2.55, 'o');
+  at('A', 8.3, 1.75, 2.5); at('A', 8.5, 1.8, 2.5); at('A', 9.0, 3.0, 2.4, 'o');
+  K('B', 7.6, L.crouch, 'io', SWm); K('B', 7.95, L.crouch, 'o', { y: -0.4 }); K('B', 8.08, L.takeoff, 'o', { y: 0.9 });
+  K('B', 8.3, L.spin, 'lin', { y: 1.6, yawOff: -180 }); K('B', 8.5, L.slashO, 'lin', { y: 0.6, yawOff: -360 }); D.B = { yawOff: -360 };
   K('B', 8.62, L.land, 'o'); K('B', 8.85, G, 'io');
-  K('A', 8.2, G); blk('A', 8.35, 8.5, 'parryH', {}, { y: -0.3 }); clash(8.5, true);
-  K('A', 8.6, L.skid, 'o'); K('A', 8.95, L.skid, 'lin'); K('A', 9.08, G, 'io');
-  at('B', 9.2, 1.4, 2.45, 'io'); at('B', 9.45, 1.6, 2.4, 'io'); at('A', 9.2, 2.75, 2.35, 'io'); at('A', 9.45, 3.0, 2.3, 'io');
-  ex('B', 'A', 9.2, 'R', false, 0.15); ex('B', 'A', 9.45, 'L', false, 0.13);
-  // ================= S5 9.6-12.1  B thrusts, A deflects and sidesteps, B overruns; A strikes, flourishes, overhead =
-  const yB5 = face('B', 9.8, 90);
-  K('B', 9.62, L.windT, 'o', { yawAbs: yB5 }); K('B', 9.8, L.thrust, 'i', { yawAbs: yB5 }); K('B', 10.0, L.thrust, 'lin', { yawAbs: yB5, chest: [16, 6, 0] });
-  at('B', 9.8, 2.05, 2.35, 'o'); at('B', 10.02, 2.72, 2.25, 'o');
-  K('A', 9.62, G); blk('A', 9.7, 9.8, 'parryR', { waist: [10, 0, -20] }, { waist: [10, 0, -20] }); clash(9.8); K('A', 9.95, L.dodge, 'o');
-  at('A', 9.8, 3.0, 2.3); at('A', 10.05, 3.2, 3.5, 'o'); at('A', 10.1, 3.15, 3.45, 'io');
-  const yB5b = face('B', 10.25, yB5);
-  blk('B', 10.13, 10.25, 'parryH', { yawAbs: yB5b }, { yawAbs: yB5b, y: -0.25 }); K('B', 10.45, G, 'io', { yawAbs: face('B', 10.45, yB5b) }); K('B', 10.55, G);
-  K('A', 10.1, L.windO, 'o'); K('A', 10.25, L.slashO, 'i'); clash(10.25);
-  at('A', 10.25, 3.15, 3.45); at('A', 10.7, 3.6, 4.55, 'o'); at('B', 10.55, 2.85, 2.3); at('B', 11.05, 3.0, 2.9, 'io'); at('B', 11.5, 2.9, 2.8, 'io');
-  K('A', 10.42, L.twirlF, 'o'); K('A', 11.02, L.twirlF, 'lin'); tw('A', 10.45, 11.02, 1);
-  K('A', 11.3, L.windO, 'o'); K('A', 11.5, L.slashO, 'i'); at('A', 11.2, 3.5, 4.35, 'io'); at('A', 11.5, 3.2, 3.92, 'o');
-  blk('B', 11.32, 11.5, 'parryH', {}, { y: -0.32 }); clash(11.5, true);
-  at('B', 11.95, 2.6, 1.3, 'o'); K('B', 11.62, L.skid, 'o'); K('B', 11.92, L.skid, 'lin'); K('B', 12.1, G, 'io');
-  // ================= S6 12.1-15.1  A drives B back in a straight line: six strikes, B ducks the 7th and counters ==
-  at('A', 12.15, 2.7, 2.65, 'io'); at('B', 12.1, 2.62, 1.3);
-  const FL = ['R', 'L', 'O', 'R', 'L', 'T'];
-  for (let i = 0; i < FL.length; i++) { const t = 12.4 + 0.28 * i, az = 2.5 - 0.33 * i, sx = 0.08 * (i % 2 ? 1 : -1);
-    at('A', t, 2.68 + sx, az, 'io'); at('B', t, 2.62 - sx, az - 1.28, 'io'); if (i === 3) ex('B', 'A', t, FL[i], false, 0.15); else ex('A', 'B', t, FL[i], false, 0.15); }
-  K('A', 13.92, L.windR, 'o'); K('A', 14.08, L.slashR, 'i');                                      // whiff: B ducks under it
-  K('B', 13.96, L.duck, 'o'); K('B', 14.12, L.duck, 'lin'); K('B', 14.18, L.upperW, 'o'); K('B', 14.3, L.upper, 'i');
-  blk('A', 14.2, 14.3, 'parryR', {}, { y: -0.2 }); clash(14.3, true);
-  at('A', 14.08, 2.66, 0.55, 'io'); at('B', 14.08, 2.62, -0.7, 'io'); at('A', 14.3, 2.66, 0.5); at('B', 14.3, 2.62, -0.58, 'o');
-  at('A', 15.0, 2.6, 2.3, 'o'); K('A', 14.45, L.hitBack, 'o', { y: 0.2 }); K('A', 14.6, L.skid, 'o'); K('A', 14.95, L.skid, 'lin'); K('A', 15.1, G, 'io');
-  K('B', 14.55, G, 'io');
-  // ================= S7 15.1-17.5  stalking, B's twirl, running thrust, A deflects aside, jump slash at the skid ===
-  at('A', 15.1, 2.6, 2.3); at('A', 15.95, 1.6, 2.6, 'io'); at('B', 14.6, 2.62, -0.58); at('B', 15.95, 3.4, -0.9, 'io');
-  BR.A.push([15.1, 16.2]); BR.B.push([14.6, 16.0]);
-  K('B', 15.05, L.twirlS, 'io'); K('B', 15.78, L.twirlS, 'lin'); K('B', 15.95, G, 'io'); tw('B', 15.12, 15.78, 2);
-  K('A', 15.4, G); K('A', 16.1, G);
-  RUN.B.push([16.0, 16.38]); at('B', 16.0, 3.4, -0.9); at('B', 16.5, 2.05, 1.6, 'lin'); at('B', 16.95, 0.7, 3.9, 'o');
-  K('B', 16.0, L.crouch, 'io', SW); K('B', 16.3, L.windT, 'o'); K('B', 16.5, L.thrust, 'i'); K('B', 16.7, L.skid, 'o'); K('B', 16.95, L.skid, 'lin');
-  at('A', 16.2, 1.6, 2.6); at('A', 16.55, 0.9, 1.7, 'o');
-  K('A', 16.32, G); blk('A', 16.42, 16.5, 'parryR', { waist: [10, 0, -20] }, { waist: [10, 0, -20] }); clash(16.5); K('A', 16.62, L.dodge, 'o');
-  K('A', 16.75, L.crouch, 'o', { y: -0.35 }); K('A', 16.86, L.takeoff, 'o', { y: 0.7 }); K('A', 17.0, L.windO, 'o', { y: 1.2 }); K('A', 17.18, L.slashO, 'i', { y: 0.4 });
-  at('A', 16.75, 0.9, 1.7); at('A', 17.18, 0.85, 2.72, 'o');
-  blk('B', 17.02, 17.18, 'parryH', {}, { y: -0.3 }); clash(17.18, true);
-  K('A', 17.32, L.land, 'o'); K('A', 17.48, G, 'io'); K('B', 17.36, G, 'io');
-  // ================= S8 17.5-20.5  low sweep -> A hops it and cuts in the air; thrust dodged; trade; shoulder check =
-  K('B', 18.3, L.windT, 'o'); K('B', 18.45, L.thrust, 'i'); K('A', 18.3, G); K('A', 18.42, L.dodge, 'o'); at('A', 18.3, 0.85, 2.72); at('A', 18.5, 1.4, 2.8, 'o');
-  ex('A', 'B', 18.7, 'R', false, 0.15); ex('B', 'A', 18.95, 'O', false, 0.15);
-  K('A', 19.1, L.windO, 'o'); K('B', 19.12, L.crouch, 'o', { y: -0.2 }); K('B', 19.25, L.charge, 'i');
-  at('B', 18.95, 0.98, 3.65, 'io'); at('B', 19.05, 0.98, 3.65); at('B', 19.25, 1.25, 3.25, 'o');
-  clash(19.25, false, 'kick', { at: () => { const q = pose('A', 19.27).pos; return [q[0], q[1] + 1.25, q[2]]; } });
-  at('A', 19.25, 1.4, 2.8); at('A', 19.7, 1.9, 1.2, 'o');
-  K('A', 19.27, L.hitBack, 'o'); K('A', 19.4, L.skid, 'o'); K('A', 19.7, L.skid, 'lin');
-  K('A', 19.85, L.twirlF, 'o'); K('A', 20.3, L.twirlF, 'lin'); K('A', 20.45, G, 'io'); tw('A', 19.86, 20.3, 1);
-  K('B', 19.5, G, 'io'); at('B', 20.4, 1.6, 2.5, 'io');
+  K('A', 8.2, G); blk('A', 8.35, 8.5, 'parryH', {}, { y: -0.3 }); clash(8.5, true);   // the jump attack plunges from above: the one high block of this part
+  K('A', 8.6, G, 'io'); K('A', 8.74, L.skid, 'io'); K('A', 8.95, L.skid, 'lin'); K('A', 9.08, G, 'io'); slide('A', W8(8.6), W8(9.0));   // through the guard: high block -> skid pose directly is a near-opposite blade flip
+  at('B', 9.4, 0.9, 2.45, 'io'); at('A', 9.4, 3.0, 2.38, 'io'); hit('B', 'A', 9.4);
+  // ================= S5 9.6-12.0  B thrusts, A deflects and sidesteps, B overruns; A cuts, B is driven back, A follows and cuts again (big) =
+  const yB5 = 90;   // B thrusts straight along +x at where A WAS: A is already stepping off the line (the thrust ran 2 px through A's torso and was pushed out, 174 deg in a frame)
+  K('B', 9.6, L.windT, 'io', { yawAbs: yB5 }); K('B', 9.85, L.thrust, 'lin', { yawAbs: yB5 }); K('B', 10.05, L.thrust, 'lin', { yawAbs: yB5, chest: [16, 6, 0] });
+  at('B', 9.6, 0.9, 2.45); at('B', 9.85, 2.0, 2.36, 'o'); at('B', 10.07, 2.7, 2.25, 'o');
+  K('A', 9.66, G, 'io'); blk('A', 9.75, 9.85, 'parryR', { waist: [10, 0, -20] }, { waist: [10, 0, -20] }); clash(9.85); K('A', 10.0, L.dodge, 'o');
+  at('A', 9.58, 3.0, 2.38); at('A', 9.82, 3.12, 3.2, 'io'); at('A', 10.2, 3.3, 4.1, 'o');
+  const yB5b = face('B', 10.4, yB5);
+  K('A', 10.12, midWind, 'io'); K('A', 10.4, midCut, 'lin'); K('B', 10.32, loParry, 'io', { yawAbs: yB5b }); K('B', 10.4, loParry, 'lin', { yawAbs: yB5b }); clash(10.4); far();
+  at('A', 10.4, 3.3, 4.1); at('B', 10.4, 2.7, 2.25);
+  knockTo('B', 10.4, 2.3, 0.92, 0.5);                                           // driven back 1.4 blocks...
+  K('A', 10.6, G, 'io'); at('A', 10.55, 3.3, 4.1); at('A', 11.2, 3.0, 2.95, 'io');   // ...and A walks him down (was: A stood with the sword raised for 0.6 s)
+  at('A', 11.5, 3.0, 2.95); at('B', 11.5, 2.3, 0.92); hit('A', 'B', 11.5, true);
+  knockTo('B', 11.5, 1.95, -0.35, 0.5);
+  K('A', 11.72, G, 'io');
+  // ================= S6 12.1-15.2  A drives B back down a straight line: two cuts, B's riposte, A's next cut is ducked, B's big counter throws A back ====
+  // part 3 (user, 2026-11-13: "apply fixes for part 3 as well"). Was: six strikes 0.28 s apart from 1.28 blocks, all above the heads,
+  // filmed over A's shoulder. Now the part-1/2 rules: hits 0.55 s apart, 2.1 blocks, chest level, the line travels 1.3 blocks, the
+  // knock-back is a 2.4-block slide that the next attack runs straight into.
+  at('A', 12.2, 3.0, 2.95); at('B', 12.3, 1.95, -0.35);
+  const S6 = [[12.65, 2.70, 2.0, 2.07, 0.0], [13.2, 2.47, 1.29, 1.85, -0.71], [13.75, 2.32, 0.82, 1.70, -1.18]];
+  for (const [t, ax, az, bx, bz] of S6) { at('A', t, ax, az, 'io'); at('B', t, bx, bz, 'io'); }
+  hit('A', 'B', 12.65); hit('A', 'B', 13.2, false, { rec: true }); hit('B', 'A', 13.75);
+  K('A', 13.98, midWind, 'io'); K('A', 14.08, midSweep, 'lin'); K('A', 14.18, midCut, 'lin');   // A's cut finds air: he steps in, B drops under it
+  at('A', 14.18, 2.23, 0.54, 'io'); at('B', 14.18, 1.70, -1.18);
+  K('B', 13.97, L.duck, 'io'); K('B', 14.16, L.duck, 'lin');
+  at('A', 14.6, 2.32, 0.82, 'io'); at('B', 14.6, 1.70, -1.18); hit('B', 'A', 14.6, true);       // B comes up out of the duck with the big one (impact insert)
+  knockTo('A', 14.6, 3.05, 3.15, 0.6);
+  K('B', 14.86, G, 'io');
+  // ================= S7 15.2-17.1  B sprints in with a thrust, A deflects it and dashes off the line; A leaps onto the overrun B (the high block of this part) ===
+  // Was: 0.9 s of stalking and a twirl first (twirls: opening only), and the leap filmed from behind B.
+  const y7 = 17;                                                                // B's thrust line: at where A stood
+  RUN.B.push([15.22, 15.6]); at('B', 15.2, 1.70, -1.18); at('B', 15.6, 2.4, 1.05, 'lin'); at('B', 15.8, 2.75, 2.2, 'o'); at('B', 16.05, 2.9, 3.2, 'o'); at('B', 16.22, 2.9, 3.6, 'o');
+  K('B', 15.18, L.crouch, 'io', SWm); K('B', 15.4, L.guard, 'lin', SWm); K('B', 15.56, L.windT, 'io', { yawAbs: y7 }); K('B', 15.8, L.thrust, 'lin', { yawAbs: y7 }); K('B', 16.0, L.thrust, 'lin', { yawAbs: y7, chest: [16, 6, 0] });
+  K('B', 16.14, L.skid, 'io', { yawAbs: y7 }); slide('B', W8(15.95), W8(16.22));
+  at('A', 15.52, 3.05, 3.15); at('A', 15.8, 3.9, 2.9, 'io'); at('A', 16.12, 4.7, 1.9, 'o');
+  K('A', 15.6, G, 'io'); blk('A', 15.7, 15.8, 'parryR', { waist: [10, 0, -20] }, { waist: [10, 0, -20] }); clash(15.8); K('A', 15.95, L.dodge, 'o');
+  K('A', 16.2, L.crouch, 'o', { y: -0.35 }); K('A', 16.3, L.takeoff, 'o', { y: 0.7 }); K('A', 16.44, L.windO, 'o', { y: 1.2 }); K('A', 16.6, L.slashO, 'lin', { y: 0.4 });
+  at('A', 16.2, 4.7, 1.9); at('A', 16.6, 3.95, 2.6, 'o');
+  const y7b = face('B', 16.6, y7);
+  blk('B', 16.44, 16.6, 'parryH', { yawAbs: y7b }, { yawAbs: y7b, y: -0.3 }); clash(16.6, true);
+  K('A', 16.72, L.land, 'o'); K('A', 16.9, G, 'io'); at('A', 16.9, 3.95, 2.6);
+  knockTo('B', 16.6, 1.81, 4.63, 0.5, false);                                   // driven 1.5 blocks back, and straight into S8
+  // ================= S8 (v8 time 17.9-20.5 = 20.0-22.6 s)  B comes straight back with a cut, A answers, B shoulder-charges him 2.4 blocks back ===
+  // Was: a third thrust-and-dodge, two cuts 0.25 s apart from 0.9 blocks (the "hugging" lean), a twirl and 0.7 s of standing.
+  at('A', 18.45, 3.59, 2.94, 'io'); at('B', 18.45, 2.06, 4.39, 'io'); hit('B', 'A', 18.45);
+  at('A', 19.0, 3.11, 2.43, 'io'); at('B', 19.0, 1.58, 3.88, 'io'); hit('A', 'B', 19.0);
+  RUN.B.push([19.14, 19.38, 'charge']); at('B', 19.12, 1.58, 3.88); at('B', 19.4, 2.54, 2.97, 'lin');   /* stops 0.78 blocks short: at 0.5 the two bodies overlapped (the 'hugging' look) */
+  K('B', 19.16, L.crouch, 'io', { y: -0.2 }); K('B', 19.4, L.charge, 'lin');
+  K('A', 19.34, midWind, 'io');                                                  // A is winding the next cut when the shoulder arrives
+  clash(19.4, false, 'kick', { at: () => { const q = pose('A', 19.42).pos; return [q[0], q[1] + 1.25, q[2]]; } });
+  at('A', 19.4, 3.11, 2.43); knockTo('A', 19.4, 4.85, 0.78, 0.6);
+  K('B', 19.62, G, 'io'); at('B', 19.5, 2.54, 2.97); at('B', 20.4, 3.3, 2.2, 'io');
   // ================= S9 20.5-24.6  both spin-cut into a blade lock that drifts, shove, B's three, A's riposte =======
-  at('A', 20.45, 1.9, 1.2); K('A', 20.5, G); K('B', 20.5, G); K('A', 22.25, G); K('B', 22.25, G);   // (blade lock removed) they step round to the next exchange
+  at('A', 20.5, 4.85, 0.78); K('A', 20.5, G); K('B', 20.5, G); K('A', 22.25, G); K('B', 22.25, G);   // (blade lock removed) they step round to the next exchange
   const S9 = [[22.45, 'B', 'R', 3.05, 0.0, 2.95, 1.2], [22.7, 'B', 'L', 3.05, -0.3, 2.95, 0.9], [22.95, 'B', 'O', 3.0, -0.6, 2.9, 0.6],
               [23.25, 'A', 'T', 3.0, -0.55, 2.95, 0.68], [23.55, 'B', 'O', 3.0, -0.7, 2.95, 0.52], [23.85, 'A', 'L', 3.05, -0.55, 3.0, 0.68]];   // 23.85 is made big below: both blown apart
   for (const [t, att, s, ax, az, bx, bz] of S9) { at('A', t, ax, az, 'io'); at('B', t, bx, bz, 'io'); ex(att, att === 'A' ? 'B' : 'A', t, s, t === 23.85, 0.15); }
@@ -880,11 +923,12 @@ function legFK(leg, knee, hipX, wide = 1) {   // desired sole offset in the body
 function yEff(p) { if (isAir(p) || p.y >= 0) return isAir(p) ? p.y : p.y * 0.8; const a = -p.y; return -(0.25 * a + 0.75 * Math.max(0, a - 0.3)); }   // guard -0.14 -> -0.035 (light athletic bend), slam -0.62 -> -0.4
 function isAir(p) { return p.y > 0.22 || Math.abs(p.tilt[0]) > 30; }
 const XMIN = 0.22;   // min lateral gap between the feet (blocks, about 3.5 px): legs never cross over (cross_qa.js)
+const STEP2 = !QS_.has('oldstep'), HOLD = { hold: true };
 function runGait(c, root, rawXZ, N, rawP) {
   // returns per-index overrides { r:[x,y,z]|undefined, l:..., yoff } inside run windows, plus contact events
   const g = { r: new Array(N), l: new Array(N), yoff: new Float32Array(N), ev: [] };
-  for (const [t0, t1, kind] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk']), ...DRIFT.map(w => [w[0], w[1], 'strafe'])]) {
-    const WK = kind === 'walk', SF = kind === 'strafe', STR = SF ? 1.15 : WK ? 0.95 : STRIDE, SWH = SF ? 0.2 : WK ? 0.12 : 0.5, STF = SF ? 0.4 : WK ? 0.55 : 0.22,
+  for (const [t0, t1, kind, strd] of [...RUN[c].map(w => [w[0], w[1], 'run']), ...WALK[c].map(w => [w[0], w[1], 'walk']), ...DRIFT.filter(w => !w[5] || w[5] === c).map(w => [w[0], w[1], 'strafe', w[4]])]) {
+    const WK = kind === 'walk', SF = kind === 'strafe', STR = SF ? (strd || 1.15) : WK ? 0.95 : STRIDE, SWH = SF ? 0.2 : WK ? 0.12 : 0.5, STF = SF ? 0.4 : WK ? 0.55 : 0.22,
       BOB = SF ? 0.012 : WK ? 0.008 : 0.025, LAT = SF ? 0.21 : 0.15, FWD = SF ? 0.12 : 0.28;
     const i0 = Math.round(t0 * HZ), i1 = Math.min(N - 1, Math.round(t1 * HZ)), a = rawXZ[i0];
     const phiAt = i => Math.hypot(rawXZ[i][0] - a[0], rawXZ[i][1] - a[1]) / STR;
@@ -898,7 +942,7 @@ function runGait(c, root, rawXZ, N, rawP) {
         con.push({ i, f, p: [root[i][0] + fx * FWD + side * LAT * lx, root[i][1] + fz * FWD + side * LAT * lz] });
       }
     }
-    { const mk = (i, f) => { const vx = root[i][0] - root[Math.max(i0, i - 6)][0], vz = root[i][1] - root[Math.max(i0, i - 6)][1], vn = Math.hypot(vx, vz) || 1;
+    if (!STEP2) { const mk = (i, f) => { const vx = root[i][0] - root[Math.max(i0, i - 6)][0], vz = root[i][1] - root[Math.max(i0, i - 6)][1], vn = Math.hypot(vx, vz) || 1;
         const fx = vx / vn, fz = vz / vn, side = f === 'r' ? -1 : 1, yl = rawP[i].yaw * Math.PI / 180, lx = Math.cos(yl), lz = -Math.sin(yl); return { i, f, p: [root[i][0] + fx * FWD + side * LAT * lx, root[i][1] + fz * FWD + side * LAT * lz] }; };
       for (const f of ['r', 'l']) { const fc = con.find(q => q.f === f), lim = fc ? fc.i : i1; if (fc && (fc.i - i0) / HZ <= 0.2) continue;
         let ie = i0 + 1; while (ie < lim && phiAt(ie) < 0.06) ie++; ie = Math.min(ie + Math.round(0.06 * HZ), lim - Math.round(0.12 * HZ)); if (ie > i0) con.push(mk(ie, f)); }
@@ -919,7 +963,8 @@ function runGait(c, root, rawXZ, N, rawP) {
         g.ev.push({ t: cur.i / HZ, f, p: cur.p });
       }
       // before this foot's first contact: it swings from wherever it was (filled in by the planner at window entry)
-      if (cs.length) for (let i = i0; i < cs[0].i; i++) g[f][i] = { swingTo: cs[0].p, from: i0, to: cs[0].i };
+      if (cs.length) { let is0 = i0; if (STEP2) { is0 = Math.max(i0, cs[0].i - Math.round(0.2 * HZ)); for (let i = i0; i < is0; i++) if (Math.hypot(root[i][0] - root[i0][0], root[i][1] - root[i0][1]) > 0.4) { is0 = i; break; } }
+        for (let i = i0; i < cs[0].i; i++) g[f][i] = i < is0 ? HOLD : { swingTo: cs[0].p, from: is0, to: cs[0].i }; }
     }
     // body bob: lowest at mid-stance, highest in flight, phase from the step sequence
     for (let k = 0; k < con.length; k++) { const a_ = con[k].i, b_ = k + 1 < con.length ? con[k + 1].i : Math.min(i1, a_ + 60);
@@ -947,6 +992,23 @@ function simulate() {
     const root = raw[c].map((p, i) => [p.pos[0] + sm[i][0], p.pos[2] + sm[i][1]]);
     const feet = { r: null, l: null }, step = { r: null, l: null }, outs = { r: [], l: [] }, Dsm = { r: null, l: null }, lastStep = { r: -9, l: -9 }, rec = { r: null, l: null };
     const rawXZ = raw[c].map(p => [p.pos[0], p.pos[2]]), G = runGait(c, root, rawXZ, N, raw[c]), entry = {};
+    const Dat = (j, f) => { j = Math.max(0, Math.min(N - 1, j)); const q = raw[c][j], ya = q.yaw * Math.PI / 180, cy = Math.cos(ya), sy = Math.sin(ya),
+        off = legFK(f === 'r' ? q.rLeg : q.lLeg, f === 'r' ? q.rKnee : q.lKnee, f === 'r' ? -2 : 2, q.wide ?? 1), lx = off[0] / 16, lz = off[1] / 16;
+      return [root[j][0] + lx * cy + lz * sy, root[j][1] - lx * sy + lz * cy]; };   // where the pose wants this foot at index j
+    const yawAt = j => raw[c][Math.max(0, Math.min(N - 1, j))].yaw * Math.PI / 180;
+    const step2 = (i, f, o) => { const t = i / HZ, A = Math.round(0.1 * HZ), a = Dat(i + A, f), e = Math.hypot(feet[f][0] - a[0], feet[f][1] - a[1]), sg = f === 'l' ? 1 : -1;
+      if (t - lastStep[f] < 0.1 || (G[o][i] !== undefined && !G[o][i].hold)) return null;   // not while the other foot is still on its sprint contacts
+      const ref = step[o] ? step[o].to : feet[o]; let gmin = 9;                               // lateral gap to the other foot in the body frame, now and over the next 0.25 s of turning
+      if (ref) for (const k of [0, 0.12, 0.25]) { const y = yawAt(i + Math.round(k * HZ)); gmin = Math.min(gmin, sg * ((feet[f][0] - ref[0]) * Math.cos(y) - (feet[f][1] - ref[1]) * Math.sin(y))); }
+      const need = gmin < 0.1;                                                                // about to stand in line or crossed: this foot has to move even if it is close to its place
+      if (step[o]) { if ((t - step[o].t0) / step[o].dur < 0.6 || (e < 0.55 && !need)) return null; } else if (t - lastStep[o] < 0.06 && e < 0.55 && !need) return null;   // one foot at a time unless it is far behind
+      const ao = feet[o] && !step[o] ? Dat(i + A, o) : null, eo = ao ? Math.hypot(feet[o][0] - ao[0], feet[o][1] - ao[1]) : 0;
+      const j4 = Math.min(N - 1, i + Math.round(0.4 * HZ)), rest = Math.hypot(root[j4][0] - root[i][0], root[j4][1] - root[i][1]) < 0.12;
+      if ((!need && e < (rest ? 0.24 : 0.34)) || eo > e + 0.02) return null;                    // the foot that is further off goes first
+      const dur = need ? 0.16 : Math.max(0.18, Math.min(0.3, 0.16 + 0.16 * e)), jd = Math.min(N - 1, i + Math.round(dur * HZ)), jl = i + Math.round((dur + 0.16) * HZ); let to = Dat(jl, f);
+      const dx = to[0] - root[jd][0], dz = to[1] - root[jd][1], dd = Math.hypot(dx, dz); if (dd > 0.6) to = [root[jd][0] + dx / dd * 0.6, root[jd][1] + dz / dd * 0.6];
+      if (ref) for (const j of [jd, jl]) { const y = yawAt(j), lx = Math.cos(y), lz = -Math.sin(y), s2 = (to[0] - ref[0]) * lx + (to[1] - ref[1]) * lz; if (sg * s2 < XMIN + 0.03) { const k = sg * (XMIN + 0.03) - s2; to = [to[0] + lx * k, to[1] + lz * k]; } }   // land on its own side
+      return { from: feet[f].slice(), to, t0: t, dur, h: Math.min(0.3, 0.1 + 0.22 * Math.hypot(to[0] - feet[f][0], to[1] - feet[f][1])), fix: true, to0: to.slice() }; };
     for (const e of G.ev) STEPS.push({ c, t: e.t, foot: e.f, p: [e.p[0], 0, e.p[1]], kind: 'step', sp: 5, run: true });
     for (let i = 0; i < N; i++) {
       const t = i / HZ, p = raw[c][i], air = isAir(p), yaw = p.yaw * Math.PI / 180, cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -956,7 +1018,8 @@ function simulate() {
       const skid = inWin(SLIDES[c], t);
       for (const [f, leg, knee, hx] of [['r', p.rLeg, p.rKnee, -2], ['l', p.lLeg, p.lKnee, 2]]) {
         const out = outs[f], gv = G[f][i];
-        if (gv !== undefined && !air) {
+        if (gv !== undefined && !air && !(gv.hold && step[f])) {
+          if (gv.hold) { if (!feet[f]) feet[f] = [root[i][0], root[i][1]]; out.push([feet[f][0], 0, feet[f][1]]); continue; }
           if (Array.isArray(gv)) { out.push(gv); if (gv[1] === 0) feet[f] = [gv[0], gv[2]]; step[f] = null; continue; }
           if (!entry[f + gv.from]) entry[f + gv.from] = feet[f] ? feet[f].slice() : [root[i][0], root[i][1]];
           const fr = entry[f + gv.from], u = (i - gv.from) / Math.max(1, gv.to - gv.from), w = u * u * (3 - 2 * u);
@@ -975,12 +1038,12 @@ function simulate() {
         if (skid) { feet[f] = [lerp(feet[f][0], D[0], 0.25), lerp(feet[f][1], D[1], 0.25)]; step[f] = null;
           if (f === 'l' && feet.r) for (const [ax, az] of [[cy, -sy], [cyF, -syF]]) { const s3 = (feet.l[0] - feet.r[0]) * ax + (feet.l[1] - feet.r[1]) * az;   // no crossover while sliding
             if (s3 < XMIN) { const kk = (XMIN - s3) / 2; feet.l = [feet.l[0] + ax * kk, feet.l[1] + az * kk]; feet.r = [feet.r[0] - ax * kk, feet.r[1] - az * kk]; } } if (i % 12 === 0) STEPS.push({ c, t, foot: f, p: [feet[f][0], 0, feet[f][1]], kind: 'skid' }); out.push([feet[f][0], 0, feet[f][1]]); continue; }
-        if (i > 0 && inWin(SLIDES[c], (i - 1) / HZ) && feet[f] && rec[f] == null) rec[f] = t + (f === 'r' ? 0 : 0.07);   // slide just ended
+        if (!STEP2 && i > 0 && inWin(SLIDES[c], (i - 1) / HZ) && feet[f] && rec[f] == null) rec[f] = t + (f === 'r' ? 0 : 0.07);   // slide just ended
         if (rec[f] != null && t >= rec[f] && !step[f]) { const sd = f === 'r' ? -1 : 1; step[f] = { from: feet[f].slice(), to: [root[i][0] + sd * 0.14 * cy + 0.05 * sy + vx * 0.12, root[i][1] - sd * 0.14 * sy + 0.05 * cy + vz * 0.12], t0: t, dur: 0.15, h: 0.16 }; rec[f] = null; }   // neutral stance under the hips
         const o = f === 'r' ? 'l' : 'r';
         if (step[f]) {
           const s_ = step[f], u = Math.min(1, (t - s_.t0) / s_.dur), uh = Math.min(1, u / 0.85), w = uh * uh * (3 - 2 * uh);
-          if (u < 0.85) s_.to = [lerp(s_.to[0], D[0] + vx * (s_.dur * (1 - u)) * 0.6, 0.15), lerp(s_.to[1], D[1] + vz * (s_.dur * (1 - u)) * 0.6, 0.15)];
+          if (s_.fix) s_.to = s_.to0.slice(); else if (u < 0.85) s_.to = [lerp(s_.to[0], D[0] + vx * (s_.dur * (1 - u)) * 0.6, 0.15), lerp(s_.to[1], D[1] + vz * (s_.dur * (1 - u)) * 0.6, 0.15)];
           { const o2 = f === 'r' ? 'l' : 'r', rf = feet[o2]; if (rf && !step[o2]) { const sg = f === 'l' ? 1 : -1, g = (s_.to[0] - rf[0]) * cy - (s_.to[1] - rf[1]) * sy;   // but never plant across
             if (sg * g < XMIN) { const k = sg * XMIN - g; s_.to = [s_.to[0] + cy * k, s_.to[1] - sy * k]; } } }
           const x = lerp(s_.from[0], s_.to[0], w), z = lerp(s_.from[1], s_.to[1], w), y = s_.h * Math.sin(Math.PI * u);
@@ -995,14 +1058,14 @@ function simulate() {
         const rested = t - lastStep[f] > 0.18 && t - lastStep[o] > 0.08;
         const gapAt = (ax, az) => (f === 'l' ? 1 : -1) * ((feet[f][0] - feet[o][0]) * ax + (feet[f][1] - feet[o][1]) * az);
         const crossed = feet[o] && !step[o] && Math.min(gapAt(cy, -sy), gapAt(cyF, -syF)) < XMIN * 0.6 && t - lastStep[f] > 0.04;
-        if (crossed || (err > 0.17 && rested && !otherBusy && !(step[o] == null && feet[o] && errO > err * 1.4 && reach < 0.5)) || (reach > Math.max(0.5, Math.hypot(D[0] - root[i][0], D[1] - root[i][1]) + 0.15) && Math.hypot(feet[f][0] - D[0], feet[f][1] - D[1]) > 0.08 && !step[f] && t - lastStep[f] > 0.06)) {
+        const st2 = STEP2 ? step2(i, f, o) : null; if (st2) step[f] = st2; else if (STEP2 ? crossed : crossed || (err > 0.17 && rested && !otherBusy && !(step[o] == null && feet[o] && errO > err * 1.4 && reach < 0.5)) || (reach > Math.max(0.5, Math.hypot(D[0] - root[i][0], D[1] - root[i][1]) + 0.15) && Math.hypot(feet[f][0] - D[0], feet[f][1] - D[1]) > 0.08 && !step[f] && t - lastStep[f] > 0.06)) {
           const run = sp > 2.5, dur = run ? Math.max(0.12, Math.min(0.18, 0.75 / sp)) : crossed ? 0.12 : Math.min(0.26, Math.max(0.15, 0.1 + 0.12 * err));   // crossed: quick side step
           step[f] = { from: feet[f].slice(), to: [D[0] + vx * dur * 0.75, D[1] + vz * dur * 0.75], t0: t, dur, h: run ? 0.28 : crossed ? 0.14 : Math.min(0.26, 0.07 + 0.24 * err) };
         }
         out.push([feet[f][0], 0, feet[f][1]]);
       }
     }
-    const forced = i => inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) || inWin(DRIFT, i / HZ) || inWin(SLIDES[c], i / HZ) || isAir(raw[c][i]);
+    const forced = i => STEP2 || inWin(RUN[c], i / HZ) || inWin(WALK[c], i / HZ) || inWin(DRIFT.filter(w => !w[5] || w[5] === c), i / HZ) || inWin(SLIDES[c], i / HZ) || isAir(raw[c][i]);
     const swing = i => (outs.r[i] && outs.r[i][1] > 0.004) || (outs.l[i] && outs.l[i][1] > 0.004);
     const wt = new Float32Array(N); for (let i = 0; i < N; i++) wt[i] = forced(i) || swing(i) ? 1 : 0.08;
     const bounds = [0];
@@ -1087,6 +1150,7 @@ function poseRaw(c, t) {
     const ob = basePose(o, t), pitch = ((ob.waist[0] || 0) + (ob.chest[0] || 0) * 0.6) * Math.PI / 180, oy = ob.yaw * Math.PI / 180, lean = Math.sin(pitch) * 0.95;
     p.oppLean = [Math.sin(oy) * lean, 0, Math.cos(oy) * lean, yEff(ob) + 0.035 - (1 - Math.cos(pitch)) * 0.9];   // opponent chest/head offset for the weapon collision
     p.oppArms = oppArmPts(ob, ro, p.oppLean);
+    if (CLASHES.some(cl => cl.gap && t > cl.t - 0.42 && t < cl.t + 0.26)) p.oppArms = null;   // spaced clashes (v8x part 1, 2026-11-13): the attacker's sword arm sweeps past the guard blade and this un-smoothed push-out threw the blade 100+ deg per frame = jitter
     p.oppFeet = ['r', 'l'].map(s => { const f = samp(SIM[o][s], t); return f ? [f[0], W.floorAt(f[0], f[2]) + f[1] + 0.05, f[2]] : null; });   // opponent legs for the weapon collision
     { let k = 1; for (const cl of CLASHES) k = Math.min(k, clamp((Math.abs(t - cl.t) - 0.08) / 0.14)); p.oppFeetK = k; }   // eased off around clashes so the clash solve stays exact
   }
@@ -1119,15 +1183,20 @@ const BIG = () => CONT.filter(c => c.big && c.kind === 'blade');
 
 // ------------------------------------------------------------------ shots
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
-const INS = [7.1, 17.2];   // two impact inserts only (standard: fewer jumps). 7.1 = the big clash that ends the first exchange
+const INS = [7.0, 17.5];   // two impact inserts only (standard: fewer jumps). 7.0 = the big clash that ends the first exchange
 const FLASH = 30.73, BIND_T = -9, BIND_END = -8, FALL_T = 32.95, FALL_C = 'B', INTRO_END = 2.9, T_OUTRO = 34.0;
 // calmer than v8 (its shots averaged 0.5 s; the user: "fewer half-second camera changes", "scenes being skipped"): about 1 s per shot
 const SHOTS = [
   // part 1 (user, 2026-11-13): the twirl shot pulled back so both players are in frame; the insert sits on the real contact; the skid gets a side shot wide enough for both
-  [0.0, 'est'], [INTRO_END, 'three4'], [4.0, 'side', { d: 7.8, h: 1.3 }], [5.05, 'trackA', { d: 3.8 }], [5.75, 'side', { d: 5.0, h: 1.3 }], [7.1, 'ins'], [7.2, 'side', { d: 7.6, h: 1.4 }],
-  [7.95, 'trackB'], [8.65, 'three4'], [9.85, 'wide', { d: 6.5 }], [10.5, 'trackB', { d: 4 }], [11.0, 'low', { d: 4.6, look: 2.2, roll: 0.05 }], [11.5, 'side', { d: 5.0, h: 1.4 }],
-  [12.9, 'three4'], [14.5, 'wide', { d: 6.8 }], [15.1, 'otsA'], [16.0, 'orbit', { a0: 0.1, a1: 0.8 }], [16.85, 'low', { d: 3.8, look: 1.0, roll: -0.04 }], [17.2, 'ins'], [17.3, 'three4'],
-  [18.0, 'wide', { d: 7.5 }], [18.9, 'trackB', { d: 4.2 }], [19.55, 'low', { d: 4.4, look: 2.0, roll: 0.05 }], [20.4, 'side', { d: 4.6, h: 1.3 }], [21.45, 'wide', { d: 6.5 }],
+  [0.0, 'est'], [INTRO_END, 'three4'], [4.0, 'side', { d: 7.8, h: 1.3 }], [5.05, 'trackA', { d: 3.8 }], [5.75, 'side', { d: 5.0, h: 1.3 }], [7.0, 'ins'], [7.1, 'side', { d: 7.6, h: 1.4 }],
+  // part 2 (user, 2026-11-13): no camera behind a fighter's back ('three4' put A's back over both spin cuts and the overhead), no run
+  // of 0.5 s shots (9.85-11.5 had four), wide enough for the long knock-backs. Side-on shots show both swords.
+  [7.95, 'trackB', { d: 4.4 }], [8.7, 'side', { d: 5.8, h: 1.3 }], [9.9, 'side', { d: 7.8, h: 1.4 }], [10.5, 'trackB', { d: 4.4 }], [11.0, 'low', { d: 4.8, look: 2.2, roll: 0.05 }], [11.6, 'side', { d: 6.0, h: 1.4 }],
+  [13.35, 'side', { d: 7.0, h: 1.4 }],
+  // part 3 (2026-11-13): no over-the-shoulder shot (it sat inside A's back), no orbit behind B; six shots in 7.6 s, all from the same
+  // side of the fighters' line, wide enough for the 2.4-block knock-backs
+  [15.1, 'side', { d: 6.2, h: 1.4 }], [16.4, 'low', { d: 5.2, look: 2.0, roll: 0.04 }], [17.5, 'ins'], [17.6, 'side', { d: 7.4, h: 1.4 }],
+  [19.05, 'low', { d: 5.4, look: 2.4, roll: 0.05 }], [20.1, 'side', { d: 6.6, h: 1.4 }],
   [23.0, 'otsB'], [23.9, 'side', { d: 4.4, h: 1.3 }], [24.7, 'wide', { d: 8.5 }], [25.4, 'trackA', { d: 4.2 }], [25.85, 'side', { d: 4.8, h: 1.3 }],
   [26.8, 'low', { d: 3.3, look: 1.5, roll: 0.05 }], [27.5, 'three4'], [28.4, 'wide', { d: 8 }], [29.75, 'trackA', { d: 4.4 }], [30.25, 'low', { d: 5.0, look: 1.6, roll: -0.05 }],
   [FLASH, 'flash'], [FLASH + 3 * DT, 'pierce'], [31.6, 'side', { d: 4.6, h: 1.2 }], [32.5, 'wide', { d: 7 }], [33.6, 'orbit', { a0: 0.3, a1: 0.62, d: 6.5, h: 1.6 }],
